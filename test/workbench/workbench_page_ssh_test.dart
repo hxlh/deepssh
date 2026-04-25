@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,6 +15,9 @@ class FakeSshBridgeClient implements SshBridgeClient {
   var outputStreamListenCount = 0;
   var writeToSessionCount = 0;
   var closeSessionCount = 0;
+  Object? closeError;
+  Object? cancelOutputSubscriptionError;
+  final closedSessionIds = <String>[];
   List<int> lastWriteData = const [];
 
   @override
@@ -81,6 +85,14 @@ class FakeSshBridgeClient implements SshBridgeClient {
   @override
   Stream<List<int>> outputStream(String sessionId) {
     outputStreamListenCount += 1;
+    final cancelError = cancelOutputSubscriptionError;
+    if (cancelError != null) {
+      final controller = StreamController<List<int>>(
+        onCancel: () => throw cancelError,
+      );
+      controller.add('real ssh output\r\n'.codeUnits);
+      return controller.stream;
+    }
     return Stream.value('real ssh output\r\n'.codeUnits);
   }
 
@@ -100,6 +112,11 @@ class FakeSshBridgeClient implements SshBridgeClient {
   @override
   Future<void> closeSession(String sessionId) async {
     closeSessionCount += 1;
+    closedSessionIds.add(sessionId);
+    final error = closeError;
+    if (error != null) {
+      throw error;
+    }
   }
 }
 
@@ -256,6 +273,179 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('example.com · terminal1'), findsOneWidget);
+  });
+
+  testWidgets(
+    'right-click close permanently closes SSH session from explorer',
+    (tester) async {
+      final bridge = FakeSshBridgeClient();
+      bridge.profiles.add(
+        const SshProfileItem(
+          id: 'profile-1',
+          name: 'Prod',
+          host: 'example.com',
+          port: 22,
+          username: 'root',
+          password: 'secret',
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('新增连接'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('SSH'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('连接'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('terminal1'), findsOneWidget);
+      expect(find.text('example.com · terminal1'), findsOneWidget);
+
+      await tester.tap(find.text('terminal1'), buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('关闭 SSH 会话'));
+      await tester.pumpAndSettle();
+
+      expect(bridge.closeSessionCount, 1);
+      expect(bridge.closedSessionIds, ['session-1']);
+      expect(find.text('terminal1'), findsNothing);
+      expect(find.text('example.com · terminal1'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'closing pending SSH session cleans up connection if connect later succeeds',
+    (tester) async {
+      final bridge = FakeSshBridgeClient();
+      bridge.profiles.add(
+        const SshProfileItem(
+          id: 'profile-1',
+          name: 'Prod',
+          host: 'example.com',
+          port: 22,
+          username: 'root',
+          password: 'secret',
+        ),
+      );
+      final connect = Completer<SshConnectionResult>();
+      bridge.connectCompleters.add(connect);
+
+      await tester.pumpWidget(
+        MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('新增连接'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('SSH'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('连接'));
+      await tester.pump();
+
+      expect(find.text('terminal1'), findsOneWidget);
+      expect(find.text('example.com · terminal1'), findsOneWidget);
+
+      await tester.tap(find.text('terminal1'), buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('关闭 SSH 会话'));
+      await tester.pumpAndSettle();
+
+      expect(bridge.closeSessionCount, 0);
+      expect(find.text('terminal1'), findsNothing);
+      expect(find.text('example.com · terminal1'), findsNothing);
+
+      connect.complete(
+        const SshConnectionResult(sessionId: 'session-1', title: 'Prod'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(bridge.closeSessionCount, 1);
+      expect(bridge.closedSessionIds, ['session-1']);
+      expect(bridge.outputStreamListenCount, 0);
+      expect(find.text('terminal1'), findsNothing);
+      expect(find.text('example.com · terminal1'), findsNothing);
+    },
+  );
+
+  testWidgets('failed closeSession keeps SSH session in explorer and tab', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.closeError = StateError('close failed');
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('terminal1'), buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('关闭 SSH 会话'));
+    await tester.pumpAndSettle();
+
+    expect(bridge.closeSessionCount, 1);
+    expect(find.text('terminal1'), findsOneWidget);
+    expect(find.text('example.com · terminal1'), findsOneWidget);
+  });
+
+  testWidgets('cancel output subscription failure still removes SSH UI', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.cancelOutputSubscriptionError = StateError('cancel failed');
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('terminal1'), buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('关闭 SSH 会话'));
+    await tester.pumpAndSettle();
+
+    expect(bridge.closeSessionCount, 1);
+    expect(find.text('terminal1'), findsNothing);
+    expect(find.text('example.com · terminal1'), findsNothing);
   });
 
   testWidgets(

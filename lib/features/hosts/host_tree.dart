@@ -24,6 +24,8 @@ class HostTree extends StatelessWidget {
     required this.sshSessionsByProfileId,
     required this.onSshProfileTap,
     required this.onSshSessionTap,
+    required this.onCloseSshSession,
+    required this.onCloseLocalTerminal,
   });
 
   final HostTreeState state;
@@ -38,6 +40,28 @@ class HostTree extends StatelessWidget {
   final Map<String, List<SshSessionItem>> sshSessionsByProfileId;
   final ValueChanged<SshProfileItem> onSshProfileTap;
   final ValueChanged<SshSessionItem> onSshSessionTap;
+  final Future<void> Function(SshSessionItem) onCloseSshSession;
+  final Future<void> Function(LocalTerminalItem) onCloseLocalTerminal;
+
+  Future<void> _showCloseMenu({
+    required BuildContext context,
+    required Offset position,
+    required String label,
+    required Future<void> Function() onClose,
+  }) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(position.dx, position.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      items: [PopupMenuItem<String>(value: 'close', child: Text(label))],
+    );
+    if (selected == 'close') {
+      await onClose();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +110,14 @@ class HostTree extends StatelessWidget {
               ...sessions.map(
                 (session) => InkWell(
                   onTap: () => onSshSessionTap(session),
+                  onSecondaryTapDown: (details) {
+                    _showCloseMenu(
+                      context: context,
+                      position: details.globalPosition,
+                      label: '关闭 SSH 会话',
+                      onClose: () => onCloseSshSession(session),
+                    );
+                  },
                   child: Container(
                     height: AppSpacing.itemHeight,
                     margin: const EdgeInsets.fromLTRB(24, 2, 8, 2),
@@ -147,6 +179,14 @@ class HostTree extends StatelessWidget {
             ...localTerminals.map(
               (terminal) => InkWell(
                 onTap: () => onLocalTerminalTap(terminal),
+                onSecondaryTapDown: (details) {
+                  _showCloseMenu(
+                    context: context,
+                    position: details.globalPosition,
+                    label: '关闭终端',
+                    onClose: () => onCloseLocalTerminal(terminal),
+                  );
+                },
                 child: Container(
                   height: AppSpacing.itemHeight,
                   margin: const EdgeInsets.fromLTRB(24, 2, 8, 2),

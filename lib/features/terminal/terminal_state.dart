@@ -134,7 +134,12 @@ class TerminalState {
   }
 
   TerminalState close(String tabId) {
-    final nextTabs = tabs.where((tab) => tab.id != tabId).toList();
+    final existingIndex = tabs.indexWhere((tab) => tab.id == tabId);
+    if (existingIndex == -1) return this;
+    final nextTabs = [
+      ...tabs.take(existingIndex),
+      ...tabs.skip(existingIndex + 1),
+    ];
     final nextActiveId = nextTabs.isEmpty ? null : nextTabs.last.id;
     return TerminalState(tabs: nextTabs, activeTabId: nextActiveId);
   }

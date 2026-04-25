@@ -108,6 +108,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   Map<String, List<SshSessionItem>> sshSessionsByProfileId = const {};
   int sshSessionCounter = 0;
   final sshOutputSubscriptions = <String, StreamSubscription<String>>{};
+  final closingSshSessionIds = <String>{};
+  final removedPendingSshSessionIds = <String>{};
   SshProfileItem? editingSshProfile;
   String? sshErrorMessage;
 
@@ -162,6 +164,16 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     setState(() {
       terminalState = terminalState.open(tab);
       contentMode = WorkbenchContentMode.terminal;
+    });
+  }
+
+  Future<void> _handleCloseLocalTerminal(LocalTerminalItem terminal) async {
+    setState(() {
+      localTerminals = [
+        for (final item in localTerminals)
+          if (item.id != terminal.id) item,
+      ];
+      terminalState = terminalState.close(terminal.id);
     });
   }
 
@@ -292,36 +304,41 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     sshOutputSubscriptions[session.id] = widget.sshBridge
         .outputStream(sessionId)
         .transform(utf8.decoder)
-        .listen((text) {
-          if (!mounted || text.isEmpty) return;
-          final sessions =
-              sshSessionsByProfileId[session.profileId] ??
-              const <SshSessionItem>[];
-          SshSessionItem? updatedSession;
-          final nextSessions = [
-            for (final item in sessions)
-              if (item.id == session.id)
-                updatedSession = item.copyWith(
-                  history: _appendSshHistory(item.history, text),
-                )
-              else
-                item,
-          ];
-          if (updatedSession == null) return;
-          final terminal = updatedSession.terminal;
-          if (terminal != null) {
-            terminal.write(text);
-          }
-          setState(() {
-            sshSessionsByProfileId = {
-              ...sshSessionsByProfileId,
-              session.profileId: nextSessions,
-            };
-            terminalState = terminalState.update(
-              _sshTabFromSession(updatedSession!),
-            );
-          });
-        });
+        .listen(
+          (text) {
+            if (!mounted || text.isEmpty) return;
+            final sessions =
+                sshSessionsByProfileId[session.profileId] ??
+                const <SshSessionItem>[];
+            SshSessionItem? updatedSession;
+            final nextSessions = [
+              for (final item in sessions)
+                if (item.id == session.id)
+                  updatedSession = item.copyWith(
+                    history: _appendSshHistory(item.history, text),
+                  )
+                else
+                  item,
+            ];
+            if (updatedSession == null) return;
+            final terminal = updatedSession.terminal;
+            if (terminal != null) {
+              terminal.write(text);
+            }
+            setState(() {
+              sshSessionsByProfileId = {
+                ...sshSessionsByProfileId,
+                session.profileId: nextSessions,
+              };
+              terminalState = terminalState.update(
+                _sshTabFromSession(updatedSession!),
+              );
+            });
+          },
+          onDone: () {
+            sshOutputSubscriptions.remove(session.id);
+          },
+        );
   }
 
   void _updateSshSession(SshSessionItem session) {
@@ -354,6 +371,39 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     });
   }
 
+  Future<void> _handleCloseSshSession(SshSessionItem session) async {
+    if (!closingSshSessionIds.add(session.id)) {
+      return;
+    }
+
+    final sessionId = session.sessionId;
+    if (sessionId == null) {
+      removedPendingSshSessionIds.add(session.id);
+      _removeSshSession(session);
+      closingSshSessionIds.remove(session.id);
+      return;
+    }
+
+    try {
+      await widget.sshBridge.closeSession(sessionId);
+    } catch (error) {
+      closingSshSessionIds.remove(session.id);
+      if (!mounted) return;
+      setState(() {
+        sshErrorMessage = 'Close session failed: $error';
+      });
+      return;
+    }
+
+    try {
+      await sshOutputSubscriptions.remove(session.id)?.cancel();
+    } catch (_) {}
+
+    closingSshSessionIds.remove(session.id);
+    if (!mounted) return;
+    _removeSshSession(session);
+  }
+
   Future<void> _handleConnectSshProfile(SshProfileItem profile) async {
     final nextIndex = sshSessionCounter + 1;
     final session = SshSessionItem(
@@ -380,6 +430,17 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     try {
       final result = await widget.sshBridge.connectProfile(profile.id);
       if (!mounted) return;
+      if (removedPendingSshSessionIds.remove(session.id)) {
+        try {
+          await widget.sshBridge.closeSession(result.sessionId);
+        } catch (error) {
+          if (!mounted) return;
+          setState(() {
+            sshErrorMessage = 'Close pending session failed: $error';
+          });
+        }
+        return;
+      }
       _updateSshSession(session.copyWith(sessionId: result.sessionId));
     } catch (error) {
       if (!mounted) return;
@@ -418,6 +479,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               sshSessionsByProfileId: sshSessionsByProfileId,
               onSshProfileTap: (_) {},
               onSshSessionTap: _handleSshSessionTap,
+              onCloseSshSession: _handleCloseSshSession,
+              onCloseLocalTerminal: _handleCloseLocalTerminal,
             ),
           ),
           const VerticalDivider(
