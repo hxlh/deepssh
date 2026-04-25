@@ -48,3 +48,12 @@ app.*.map.json
 
 # rust
 rust/target
+
+# tmp dir
+.tmp/
+
+# ai coding assistant related
+.agents/
+.claude/
+CLAUDE.md
+docs/superpowers
