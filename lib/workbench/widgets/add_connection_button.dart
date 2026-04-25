@@ -21,10 +21,7 @@ class AddConnectionButton extends StatelessWidget {
           value: AddConnectionAction.localTerminal,
           child: Text('本地终端'),
         ),
-        PopupMenuItem(
-          value: AddConnectionAction.ssh,
-          child: Text('SSH'),
-        ),
+        PopupMenuItem(value: AddConnectionAction.ssh, child: Text('SSH')),
       ],
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -40,10 +37,7 @@ class AddConnectionButton extends StatelessWidget {
             SizedBox(width: 6),
             Text(
               '新增连接',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textPrimary,
-              ),
+              style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
             ),
           ],
         ),

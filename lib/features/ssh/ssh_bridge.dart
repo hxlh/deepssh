@@ -122,7 +122,10 @@ class RustSshBridgeClient implements SshBridgeClient {
       username: profile.username,
       password: profile.password,
     );
-    return SshConnectionResult(sessionId: session.sessionId, title: session.title);
+    return SshConnectionResult(
+      sessionId: session.sessionId,
+      title: session.title,
+    );
   }
 
   @override
@@ -144,7 +147,11 @@ class RustSshBridgeClient implements SshBridgeClient {
     required int cols,
   }) async {
     await _ensureInitialized();
-    await rust_session.resizeSession(sessionId: sessionId, rows: rows, cols: cols);
+    await rust_session.resizeSession(
+      sessionId: sessionId,
+      rows: rows,
+      cols: cols,
+    );
   }
 
   @override
@@ -171,7 +178,8 @@ class InMemorySshBridgeClient implements SshBridgeClient {
   var _nextSessionId = 1;
 
   @override
-  Future<List<SshProfileItem>> listProfiles() async => List.unmodifiable(_profiles);
+  Future<List<SshProfileItem>> listProfiles() async =>
+      List.unmodifiable(_profiles);
 
   @override
   Future<SshProfileItem> createProfile({

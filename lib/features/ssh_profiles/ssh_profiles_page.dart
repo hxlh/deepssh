@@ -21,7 +21,10 @@ class SshProfilesPage extends StatelessWidget {
   final ValueChanged<SshProfileItem> onEdit;
   final ValueChanged<SshProfileItem> onDelete;
 
-  Future<void> confirmDelete(BuildContext context, SshProfileItem profile) async {
+  Future<void> confirmDelete(
+    BuildContext context,
+    SshProfileItem profile,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -57,37 +60,40 @@ class SshProfilesPage extends StatelessWidget {
               const Expanded(
                 child: Text(
                   'SSH Configurations',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                 ),
               ),
-              TextButton(
-                onPressed: onAdd,
-                child: const Text('新增'),
-              ),
+              TextButton(onPressed: onAdd, child: const Text('新增')),
             ],
           ),
           if (errorMessage != null) ...[
             const SizedBox(height: 12),
-            Text(errorMessage!, style: const TextStyle(color: Colors.redAccent)),
+            Text(
+              errorMessage!,
+              style: const TextStyle(color: Colors.redAccent),
+            ),
           ],
           const SizedBox(height: 16),
           Expanded(
             child: ListView.separated(
               itemCount: profiles.length,
-              separatorBuilder: (_, _) => const Divider(color: AppColors.border),
+              separatorBuilder: (_, _) =>
+                  const Divider(color: AppColors.border),
               itemBuilder: (context, index) {
                 final profile = profiles[index];
                 return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   tileColor: AppColors.tabInactive,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6),
                   ),
                   title: Text(profile.name),
-                  subtitle: Text('${profile.username}@${profile.host}:${profile.port}'),
+                  subtitle: Text(
+                    '${profile.username}@${profile.host}:${profile.port}',
+                  ),
                   trailing: Wrap(
                     spacing: 8,
                     children: [

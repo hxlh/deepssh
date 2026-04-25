@@ -196,16 +196,18 @@ fn wire__crate__profile__create_profile_impl(
             let api_password = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(crate::profile::create_profile(
-                        api_name,
-                        api_host,
-                        api_port,
-                        api_username,
-                        api_password,
-                    ))?;
-                    Ok(output_ok)
-                })())
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::profile::create_profile(
+                            api_name,
+                            api_host,
+                            api_port,
+                            api_username,
+                            api_password,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
             }
         },
     )
@@ -269,10 +271,12 @@ fn wire__crate__profile__list_profiles_impl(
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(crate::profile::list_profiles())?;
-                    Ok(output_ok)
-                })())
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::profile::list_profiles()?;
+                        Ok(output_ok)
+                    })(),
+                )
             }
         },
     )

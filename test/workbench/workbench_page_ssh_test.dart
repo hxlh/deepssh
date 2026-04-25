@@ -147,6 +147,43 @@ void main() {
     },
   );
 
+  testWidgets('reloads SSH profiles from bridge when opening SSH page again', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('SSH Configurations'), findsOneWidget);
+    expect(find.text('Prod'), findsNothing);
+
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Prod'), findsWidgets);
+    expect(find.text('root@example.com:22'), findsOneWidget);
+  });
+
   testWidgets('clicking SSH profile in explorer does not start a connection', (
     tester,
   ) async {

@@ -20,9 +20,7 @@ class Sidebar extends StatelessWidget {
       width: AppSpacing.sidebarWidth,
       decoration: const BoxDecoration(
         color: AppColors.sidebar,
-        border: Border(
-          right: BorderSide(color: AppColors.border),
-        ),
+        border: Border(right: BorderSide(color: AppColors.border)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -42,9 +40,7 @@ class Sidebar extends StatelessWidget {
                     ),
                   ),
                 ),
-                AddConnectionButton(
-                  onSelected: onAddConnectionSelected,
-                ),
+                AddConnectionButton(onSelected: onAddConnectionSelected),
               ],
             ),
           ),

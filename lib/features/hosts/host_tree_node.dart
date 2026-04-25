@@ -39,7 +39,11 @@ class HostTreeNode extends StatelessWidget {
                     size: 18,
                     color: AppColors.textMuted,
                   ),
-                  const Icon(Icons.computer, size: 16, color: AppColors.textMuted),
+                  const Icon(
+                    Icons.computer,
+                    size: 16,
+                    color: AppColors.textMuted,
+                  ),
                   const SizedBox(width: 8),
                   Text(host.name),
                 ],
@@ -88,10 +92,7 @@ class _TerminalRow extends StatelessWidget {
             const Icon(Icons.terminal, size: 16, color: AppColors.textMuted),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                terminal.title,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text(terminal.title, overflow: TextOverflow.ellipsis),
             ),
           ],
         ),

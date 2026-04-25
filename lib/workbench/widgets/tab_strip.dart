@@ -54,7 +54,9 @@ class TabStrip extends StatelessWidget {
                       tab.label,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: active ? AppColors.textPrimary : AppColors.textMuted,
+                        color: active
+                            ? AppColors.textPrimary
+                            : AppColors.textMuted,
                       ),
                     ),
                   ),
@@ -63,7 +65,11 @@ class TabStrip extends StatelessWidget {
                     message: 'Close ${tab.label}',
                     child: GestureDetector(
                       onTap: () => onClose(tab.id),
-                      child: const Icon(Icons.close, size: 16, color: AppColors.textMuted),
+                      child: const Icon(
+                        Icons.close,
+                        size: 16,
+                        color: AppColors.textMuted,
+                      ),
                     ),
                   ),
                 ],

@@ -70,10 +70,12 @@ class _DefaultAppSshBridgeClientHolder implements SshBridgeClient {
   Future<void> deleteProfile(String id) => _delegate.deleteProfile(id);
 
   @override
-  Future<SshConnectionResult> connectProfile(String id) => _delegate.connectProfile(id);
+  Future<SshConnectionResult> connectProfile(String id) =>
+      _delegate.connectProfile(id);
 
   @override
-  Stream<List<int>> outputStream(String sessionId) => _delegate.outputStream(sessionId);
+  Stream<List<int>> outputStream(String sessionId) =>
+      _delegate.outputStream(sessionId);
 
   @override
   Future<void> writeToSession(String sessionId, List<int> data) =>
@@ -87,5 +89,6 @@ class _DefaultAppSshBridgeClientHolder implements SshBridgeClient {
   }) => _delegate.resizeSession(sessionId: sessionId, rows: rows, cols: cols);
 
   @override
-  Future<void> closeSession(String sessionId) => _delegate.closeSession(sessionId);
+  Future<void> closeSession(String sessionId) =>
+      _delegate.closeSession(sessionId);
 }
