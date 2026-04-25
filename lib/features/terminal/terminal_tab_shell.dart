@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../workbench/widgets/empty_state.dart';
 import '../../workbench/widgets/tab_strip.dart';
+import '../ssh/ssh_bridge.dart';
 import 'terminal_state.dart';
 import 'terminal_view.dart';
 
@@ -12,11 +13,13 @@ class TerminalTabShell extends StatelessWidget {
     required this.state,
     required this.onSelectTab,
     required this.onCloseTab,
+    required this.sshBridge,
   });
 
   final TerminalState state;
   final ValueChanged<String> onSelectTab;
   final ValueChanged<String> onCloseTab;
+  final SshBridgeClient sshBridge;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +42,11 @@ class TerminalTabShell extends StatelessWidget {
         Expanded(
           child: DecoratedBox(
             decoration: const BoxDecoration(color: AppColors.panel),
-            child: TerminalView(tab: activeTab),
+            child: TerminalView(
+              key: ValueKey(activeTab.id),
+              tab: activeTab,
+              sshBridge: sshBridge,
+            ),
           ),
         ),
       ],

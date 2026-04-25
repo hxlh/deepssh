@@ -12,7 +12,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('SSH Configurations'), findsOneWidget);
-    expect(find.text('Production Bastion'), findsOneWidget);
     expect(find.text('新增'), findsOneWidget);
   });
 

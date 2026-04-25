@@ -26,6 +26,9 @@ constexpr const wchar_t kGetPreferredBrightnessRegKey[] =
   L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize";
 constexpr const wchar_t kGetPreferredBrightnessRegValue[] = L"AppsUseLightTheme";
 
+constexpr int kMinWindowWidth = 854;
+constexpr int kMinWindowHeight = 480;
+
 // The number of Win32Window objects that currently exist.
 static int g_active_window_count = 0;
 
@@ -186,6 +189,13 @@ Win32Window::MessageHandler(HWND hwnd,
         PostQuitMessage(0);
       }
       return 0;
+
+    case WM_GETMINMAXINFO: {
+      auto minmax = reinterpret_cast<MINMAXINFO*>(lparam);
+      minmax->ptMinTrackSize.x = kMinWindowWidth;
+      minmax->ptMinTrackSize.y = kMinWindowHeight;
+      return 0;
+    }
 
     case WM_DPICHANGED: {
       auto newRectSize = reinterpret_cast<RECT*>(lparam);

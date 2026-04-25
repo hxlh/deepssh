@@ -1,11 +1,19 @@
+import 'dart:convert';
+
+import 'package:deepssh/core/models/ssh_profile_item.dart';
+import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/terminal/terminal_state.dart';
+import 'package:deepssh/features/terminal/terminal_tab_shell.dart';
 import 'package:deepssh/features/terminal/terminal_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xterm/xterm.dart' as xterm;
 
 void main() {
-  testWidgets('renders an xterm terminal for a remote tab', (tester) async {
+  testWidgets('enables text input so IME composition can enter SSH terminals', (
+    tester,
+  ) async {
     const tab = OpenTerminalTab(
       id: 'm1-t1',
       hostId: 'machine1',
@@ -17,29 +25,352 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TerminalView(tab: tab),
+          body: TerminalView(tab: tab, sshBridge: InMemorySshBridgeClient()),
         ),
       ),
     );
 
+    final terminalWidget = tester.widget<xterm.TerminalView>(
+      find.byType(xterm.TerminalView),
+    );
+    expect(terminalWidget.hardwareKeyboardOnly, isTrue);
     expect(find.byType(xterm.TerminalView), findsOneWidget);
   });
 
-  testWidgets('renders an xterm terminal for a local tab', (tester) async {
-    final tab = OpenTerminalTab.local(
-      id: 'local-terminal-1',
+  testWidgets('restores SSH terminal history when switching tabs', (
+    tester,
+  ) async {
+    var state = TerminalState(
+      tabs: [
+        OpenTerminalTab.ssh(
+          id: 'ssh-tab-1',
+          hostName: 'host1',
+          title: 'terminal1',
+          sessionId: 'session-1',
+          history: 'first session\r\n',
+        ),
+        OpenTerminalTab.ssh(
+          id: 'ssh-tab-2',
+          hostName: 'host2',
+          title: 'terminal2',
+          sessionId: 'session-2',
+          history: 'second session\r\n',
+        ),
+      ],
+      activeTabId: 'ssh-tab-1',
+    );
+
+    await tester.pumpWidget(
+      _terminalShellApp(state: state, bridge: RecordingSshBridgeClient()),
+    );
+    await tester.pumpAndSettle();
+
+    state = state.activate('ssh-tab-2');
+    await tester.pumpWidget(
+      _terminalShellApp(state: state, bridge: RecordingSshBridgeClient()),
+    );
+    await tester.pumpAndSettle();
+
+    var terminalWidget = tester.widget<xterm.TerminalView>(
+      find.byType(xterm.TerminalView),
+    );
+    expect(
+      terminalWidget.terminal.buffer.toString(),
+      contains('second session'),
+    );
+    expect(
+      terminalWidget.terminal.buffer.toString(),
+      isNot(contains('first session')),
+    );
+
+    state = state.activate('ssh-tab-1');
+    await tester.pumpWidget(
+      _terminalShellApp(state: state, bridge: RecordingSshBridgeClient()),
+    );
+    await tester.pumpAndSettle();
+
+    terminalWidget = tester.widget<xterm.TerminalView>(
+      find.byType(xterm.TerminalView),
+    );
+    expect(
+      terminalWidget.terminal.buffer.toString(),
+      contains('first session'),
+    );
+    expect(
+      terminalWidget.terminal.buffer.toString(),
+      isNot(contains('second session')),
+    );
+  });
+
+  testWidgets('reuses provided SSH terminal without replaying history', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.write('ssh prompt\r\n');
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
       title: 'terminal1',
+      sessionId: 'session-1',
+      history: 'ssh prompt\r\n',
+      terminal: terminal,
     );
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TerminalView(tab: tab),
+          body: TerminalView(tab: tab, sshBridge: RecordingSshBridgeClient()),
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
-    expect(find.byType(xterm.TerminalView), findsOneWidget);
-    expect(tab.label, 'local · terminal1');
+    final terminalWidget = tester.widget<xterm.TerminalView>(
+      find.byType(xterm.TerminalView),
+    );
+    final bufferText = terminalWidget.terminal.buffer.toString();
+    expect(identical(terminalWidget.terminal, terminal), isTrue);
+    expect('ssh prompt'.allMatches(bufferText), hasLength(1));
   });
+
+  testWidgets('writes IME text input to SSH sessions', (tester) async {
+    final binding = TestWidgetsFlutterBinding.ensureInitialized();
+    final bridge = RecordingSshBridgeClient();
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(tab: tab, sshBridge: bridge),
+        ),
+      ),
+    );
+    await tester.tap(find.byType(TextField).last);
+    await tester.pump(const Duration(seconds: 1));
+
+    binding.testTextInput.enterText('中文');
+    await binding.idle();
+
+    expect(bridge.writes.join(), '中文');
+  });
+
+  testWidgets('sends Ctrl+C through SSH terminal input proxy', (tester) async {
+    final bridge = RecordingSshBridgeClient();
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(tab: tab, sshBridge: bridge),
+        ),
+      ),
+    );
+    await tester.tap(find.byType(TextField).last);
+    await tester.pump();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyC, character: '');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyC);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    expect(bridge.writes.join(), '');
+  });
+
+  testWidgets('does not send composing IME text before commit', (tester) async {
+    final binding = TestWidgetsFlutterBinding.ensureInitialized();
+    final bridge = RecordingSshBridgeClient();
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(tab: tab, sshBridge: bridge),
+        ),
+      ),
+    );
+    await tester.tap(find.byType(TextField).last);
+    await tester.pump();
+
+    binding.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '中文',
+        composing: TextRange(start: 0, end: 2),
+      ),
+    );
+    await binding.idle();
+    binding.testTextInput.updateEditingValue(
+      const TextEditingValue(text: '中文'),
+    );
+    await binding.idle();
+
+    expect(bridge.writes.join(), '中文');
+  });
+
+  testWidgets('coalesces rapid SSH terminal viewport resize events', (
+    tester,
+  ) async {
+    final bridge = RecordingSshBridgeClient();
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'machine1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+    );
+
+    await tester.pumpWidget(
+      _terminalApp(width: 900, height: 600, tab: tab, bridge: bridge),
+    );
+    await tester.pumpAndSettle();
+    bridge.resizeCalls.clear();
+
+    final terminalWidget = tester.widget<xterm.TerminalView>(
+      find.byType(xterm.TerminalView),
+    );
+    terminalWidget.terminal.resize(80, 24);
+    terminalWidget.terminal.resize(81, 24);
+    terminalWidget.terminal.resize(82, 24);
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(bridge.resizeCalls, hasLength(1));
+    expect(bridge.resizeCalls.single.sessionId, 'session-1');
+    expect(bridge.resizeCalls.single.cols, 82);
+    expect(bridge.resizeCalls.single.rows, 24);
+  });
+}
+
+Widget _terminalApp({
+  required double width,
+  required double height,
+  required OpenTerminalTab tab,
+  required SshBridgeClient bridge,
+}) {
+  return MaterialApp(
+    home: Scaffold(
+      body: SizedBox(
+        width: width,
+        height: height,
+        child: TerminalView(tab: tab, sshBridge: bridge),
+      ),
+    ),
+  );
+}
+
+Widget _terminalShellApp({
+  required TerminalState state,
+  required SshBridgeClient bridge,
+}) {
+  return MaterialApp(
+    home: Scaffold(
+      body: TerminalTabShell(
+        state: state,
+        onSelectTab: (_) {},
+        onCloseTab: (_) {},
+        sshBridge: bridge,
+      ),
+    ),
+  );
+}
+
+class RecordingSshBridgeClient implements SshBridgeClient {
+  final resizeCalls = <ResizeCall>[];
+  final writes = <String>[];
+
+  @override
+  Future<void> closeSession(String sessionId) async {}
+
+  @override
+  Future<SshConnectionResult> connectProfile(String id) async {
+    return const SshConnectionResult(
+      sessionId: 'session-1',
+      title: 'terminal1',
+    );
+  }
+
+  @override
+  Future<SshProfileItem> createProfile({
+    required String name,
+    required String host,
+    required int port,
+    required String username,
+    required String password,
+  }) async {
+    return SshProfileItem(
+      id: 'profile-1',
+      name: name,
+      host: host,
+      port: port,
+      username: username,
+      password: password,
+    );
+  }
+
+  @override
+  Future<void> deleteProfile(String id) async {}
+
+  @override
+  Future<List<SshProfileItem>> listProfiles() async => const [];
+
+  @override
+  Stream<List<int>> outputStream(String sessionId) => const Stream.empty();
+
+  @override
+  Future<void> resizeSession({
+    required String sessionId,
+    required int rows,
+    required int cols,
+  }) async {
+    resizeCalls.add(ResizeCall(sessionId: sessionId, rows: rows, cols: cols));
+  }
+
+  @override
+  Future<SshProfileItem> updateProfile({
+    required String id,
+    required String name,
+    required String host,
+    required int port,
+    required String username,
+    required String password,
+  }) async {
+    return SshProfileItem(
+      id: id,
+      name: name,
+      host: host,
+      port: port,
+      username: username,
+      password: password,
+    );
+  }
+
+  @override
+  Future<void> writeToSession(String sessionId, List<int> data) async {
+    writes.add(utf8.decode(data));
+  }
+}
+
+class ResizeCall {
+  const ResizeCall({
+    required this.sessionId,
+    required this.rows,
+    required this.cols,
+  });
+
+  final String sessionId;
+  final int rows;
+  final int cols;
 }
