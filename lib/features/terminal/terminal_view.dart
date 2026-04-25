@@ -58,21 +58,30 @@ class _TerminalViewState extends State<TerminalView> {
   void _bindSshSession(String sessionId) {
     logDebug('[terminal:bind] session=$sessionId tab=${widget.tab.id}');
     terminal.onResize = (width, height, _, _) {
-      _resizeDebounce?.cancel();
-      _resizeDebounce = Timer(const Duration(milliseconds: 80), () {
-        widget.sshBridge.resizeSession(
-          sessionId: sessionId,
-          rows: height,
-          cols: width,
-        );
-      });
+      _syncSshSize(sessionId, width, height);
     };
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.tab.sessionId == sessionId) {
+        _syncSshSize(sessionId, terminal.viewWidth, terminal.viewHeight);
+      }
+    });
     terminal.onOutput = (data) {
       logDebug(
         '[terminal:onOutput] session=$sessionId data=${jsonEncode(data)}',
       );
       widget.sshBridge.writeToSession(sessionId, utf8.encode(data));
     };
+  }
+
+  void _syncSshSize(String sessionId, int width, int height) {
+    _resizeDebounce?.cancel();
+    _resizeDebounce = Timer(const Duration(milliseconds: 80), () {
+      widget.sshBridge.resizeSession(
+        sessionId: sessionId,
+        rows: height,
+        cols: width,
+      );
+    });
   }
 
   void _handleTextEditingChanged() {
@@ -164,18 +173,10 @@ class _TerminalViewState extends State<TerminalView> {
     return handled ? KeyEventResult.handled : KeyEventResult.ignored;
   }
 
-  void _focusTextInput() {
-    logDebug(
-      '[terminal:focus-request] before primary=${FocusManager.instance.primaryFocus?.debugLabel} '
-      'inputFocus=${inputFocusNode.hasFocus}',
-    );
+  void _focusInputProxy() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (mounted && !inputFocusNode.hasFocus) {
         inputFocusNode.requestFocus();
-        logDebug(
-          '[terminal:focus-request] after primary=${FocusManager.instance.primaryFocus?.debugLabel} '
-          'inputFocus=${inputFocusNode.hasFocus}',
-        );
       }
     });
   }
@@ -212,12 +213,12 @@ class _TerminalViewState extends State<TerminalView> {
     return Container(
       color: AppColors.panel,
       padding: const EdgeInsets.all(12),
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTapDown: (_) => _focusTextInput(),
-        child: Stack(
-          children: [
-            Positioned.fill(
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (_) => _focusInputProxy(),
               child: xterm.TerminalView(
                 terminal,
                 autofocus: true,
@@ -249,33 +250,34 @@ class _TerminalViewState extends State<TerminalView> {
                 ),
               ),
             ),
-            Positioned.fill(
-              child: Opacity(
-                opacity: 0.01,
-                child: Focus(
-                  onKeyEvent: _handleProxyKeyEvent,
-                  child: TextField(
-                    focusNode: inputFocusNode,
-                    controller: textController,
-                    autofocus: true,
-                    keyboardType: TextInputType.text,
-                    textInputAction: TextInputAction.none,
-                    enableSuggestions: false,
-                    autocorrect: false,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    style: const TextStyle(color: Colors.transparent),
-                    cursorColor: Colors.transparent,
-                    maxLines: null,
-                    expands: true,
+          ),
+          Positioned(
+            width: 1,
+            height: 1,
+            child: Opacity(
+              opacity: 0.01,
+              child: Focus(
+                onKeyEvent: _handleProxyKeyEvent,
+                child: TextField(
+                  key: const Key('terminal-input-proxy'),
+                  focusNode: inputFocusNode,
+                  controller: textController,
+                  autofocus: true,
+                  keyboardType: TextInputType.text,
+                  textInputAction: TextInputAction.none,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
                   ),
+                  style: const TextStyle(color: Colors.transparent),
+                  cursorColor: Colors.transparent,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

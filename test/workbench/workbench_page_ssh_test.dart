@@ -218,46 +218,45 @@ void main() {
     },
   );
 
-  testWidgets(
-    'closing an SSH tab keeps the session available in explorer',
-    (tester) async {
-      final bridge = FakeSshBridgeClient();
-      bridge.profiles.add(
-        const SshProfileItem(
-          id: 'profile-1',
-          name: 'Prod',
-          host: 'example.com',
-          port: 22,
-          username: 'root',
-          password: 'secret',
-        ),
-      );
+  testWidgets('closing an SSH tab keeps the session available in explorer', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
 
-      await tester.pumpWidget(
-        MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('新增连接'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('SSH'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('连接'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('example.com · terminal1'), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.close).first);
-      await tester.pumpAndSettle();
+    expect(find.text('example.com · terminal1'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close).first);
+    await tester.pumpAndSettle();
 
-      expect(bridge.closeSessionCount, 0);
-      expect(find.text('terminal1'), findsOneWidget);
+    expect(bridge.closeSessionCount, 0);
+    expect(find.text('terminal1'), findsOneWidget);
 
-      await tester.tap(find.text('terminal1'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('terminal1'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('example.com · terminal1'), findsOneWidget);
-    },
-  );
+    expect(find.text('example.com · terminal1'), findsOneWidget);
+  });
 
   testWidgets(
     'creates SSH profile from workbench form and opens SSH tab on connect',
@@ -299,7 +298,7 @@ void main() {
       expect(bridge.outputStreamListenCount, 1);
 
       final binding = TestWidgetsFlutterBinding.ensureInitialized();
-      await tester.tap(find.byType(TextField).last);
+      await tester.tap(find.byKey(const Key('terminal-input-proxy')));
       await tester.pump(const Duration(seconds: 1));
       binding.testTextInput.enterText('中文');
       await binding.idle();

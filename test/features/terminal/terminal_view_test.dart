@@ -34,6 +34,7 @@ void main() {
       find.byType(xterm.TerminalView),
     );
     expect(terminalWidget.hardwareKeyboardOnly, isTrue);
+    expect(find.byKey(const Key('terminal-input-proxy')), findsOneWidget);
     expect(find.byType(xterm.TerminalView), findsOneWidget);
   });
 
@@ -150,8 +151,36 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byType(TextField).last);
+    await tester.tap(find.byKey(const Key('terminal-input-proxy')));
     await tester.pump(const Duration(seconds: 1));
+
+    binding.testTextInput.enterText('中文');
+    await binding.idle();
+
+    expect(bridge.writes.join(), '中文');
+  });
+
+  testWidgets('writes IME text after clicking terminal surface', (
+    tester,
+  ) async {
+    final binding = TestWidgetsFlutterBinding.ensureInitialized();
+    final bridge = RecordingSshBridgeClient();
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(tab: tab, sshBridge: bridge),
+        ),
+      ),
+    );
+    await tester.tap(find.byType(xterm.TerminalView));
+    await tester.pump(const Duration(milliseconds: 300));
 
     binding.testTextInput.enterText('中文');
     await binding.idle();
@@ -175,8 +204,8 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byType(TextField).last);
-    await tester.pump();
+    await tester.tap(find.byKey(const Key('terminal-input-proxy')));
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.keyC, character: '');
@@ -204,8 +233,8 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byType(TextField).last);
-    await tester.pump();
+    await tester.tap(find.byKey(const Key('terminal-input-proxy')));
+    await tester.pump(const Duration(milliseconds: 300));
 
     binding.testTextInput.updateEditingValue(
       const TextEditingValue(
@@ -221,6 +250,47 @@ void main() {
 
     expect(bridge.writes.join(), '中文');
   });
+
+  testWidgets(
+    'syncs current terminal size when SSH session binds after layout',
+    (tester) async {
+      final bridge = RecordingSshBridgeClient();
+      final terminal = xterm.Terminal(maxLines: 3000);
+      final pendingTab = OpenTerminalTab.ssh(
+        id: 'ssh-tab-1',
+        hostName: 'machine1',
+        title: 'terminal1',
+        terminal: terminal,
+      );
+      final connectedTab = pendingTab.copyWith(sessionId: 'session-1');
+
+      await tester.pumpWidget(
+        _terminalApp(width: 900, height: 600, tab: pendingTab, bridge: bridge),
+      );
+      await tester.pumpAndSettle();
+
+      final terminalWidget = tester.widget<xterm.TerminalView>(
+        find.byType(xterm.TerminalView),
+      );
+      final laidOutCols = terminalWidget.terminal.viewWidth;
+      final laidOutRows = terminalWidget.terminal.viewHeight;
+
+      await tester.pumpWidget(
+        _terminalApp(
+          width: 900,
+          height: 600,
+          tab: connectedTab,
+          bridge: bridge,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 120));
+
+      expect(bridge.resizeCalls, hasLength(1));
+      expect(bridge.resizeCalls.single.sessionId, 'session-1');
+      expect(bridge.resizeCalls.single.cols, laidOutCols);
+      expect(bridge.resizeCalls.single.rows, laidOutRows);
+    },
+  );
 
   testWidgets('coalesces rapid SSH terminal viewport resize events', (
     tester,
