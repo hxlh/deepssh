@@ -58,5 +58,6 @@ rust/target
 .claude/
 CLAUDE.md
 docs/superpowers
+skills-lock.json
 .mcp.json
 figma-plugin
