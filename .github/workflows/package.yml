@@ -42,7 +42,7 @@ jobs:
 
       - name: Package (macOS)
         if: matrix.platform == 'macos'
-        run: ./build.sh package --release
+        run: bash ./build.sh package --release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
