@@ -45,6 +45,8 @@ abstract class SshBridgeClient {
   });
 
   Future<void> closeSession(String sessionId);
+
+  Future<SshConnectionResult> duplicateSession(String sessionId);
 }
 
 class RustSshBridgeClient implements SshBridgeClient {
@@ -160,6 +162,16 @@ class RustSshBridgeClient implements SshBridgeClient {
     await rust_session.closeSession(sessionId: sessionId);
   }
 
+  @override
+  Future<SshConnectionResult> duplicateSession(String sessionId) async {
+    await _ensureInitialized();
+    final session = await rust_session.duplicateSession(sessionId: sessionId);
+    return SshConnectionResult(
+      sessionId: session.sessionId,
+      title: session.title,
+    );
+  }
+
   SshProfileItem _toItem(rust_profile.SshProfile profile) {
     return SshProfileItem(
       id: profile.id,
@@ -255,4 +267,12 @@ class InMemorySshBridgeClient implements SshBridgeClient {
 
   @override
   Future<void> closeSession(String sessionId) async {}
+
+  @override
+  Future<SshConnectionResult> duplicateSession(String sessionId) async {
+    return SshConnectionResult(
+      sessionId: 'ssh-session-${_nextSessionId++}',
+      title: 'duplicated',
+    );
+  }
 }

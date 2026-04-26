@@ -6,8 +6,8 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `push_output`, `run_session_loop`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `SshClientHandler`, `SshCommand`, `SshConnection`
+// These functions are ignored because they are not marked as `pub`: `cleanup_session_after_loop`, `push_output`, `run_session_loop`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `SshChannel`, `SshClientHandler`, `SshCommand`, `SshConnectionInfo`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `check_server_key`, `clone`, `clone`, `eq`, `fmt`
 
 Stream<Uint8List> createOutputStream({required String sessionId}) => RustLib
@@ -30,6 +30,9 @@ Future<SshSession> connectProfile({
   username: username,
   password: password,
 );
+
+Future<SshSession> duplicateSession({required String sessionId}) =>
+    RustLib.instance.api.crateSshSessionDuplicateSession(sessionId: sessionId);
 
 Future<void> writeToSession({
   required String sessionId,
@@ -55,6 +58,7 @@ Future<bool> closeSession({required String sessionId}) =>
 class SshSession {
   final String sessionId;
   final String profileId;
+  final String connectionId;
   final String title;
   final int rows;
   final int cols;
@@ -62,6 +66,7 @@ class SshSession {
   const SshSession({
     required this.sessionId,
     required this.profileId,
+    required this.connectionId,
     required this.title,
     required this.rows,
     required this.cols,
@@ -71,6 +76,7 @@ class SshSession {
   int get hashCode =>
       sessionId.hashCode ^
       profileId.hashCode ^
+      connectionId.hashCode ^
       title.hashCode ^
       rows.hashCode ^
       cols.hashCode;
@@ -82,6 +88,7 @@ class SshSession {
           runtimeType == other.runtimeType &&
           sessionId == other.sessionId &&
           profileId == other.profileId &&
+          connectionId == other.connectionId &&
           title == other.title &&
           rows == other.rows &&
           cols == other.cols;

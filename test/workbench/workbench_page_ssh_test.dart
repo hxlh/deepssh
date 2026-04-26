@@ -125,6 +125,14 @@ class FakeSshBridgeClient implements SshBridgeClient {
       throw error;
     }
   }
+
+  @override
+  Future<SshConnectionResult> duplicateSession(String sessionId) async {
+    return SshConnectionResult(
+      sessionId: 'ssh-session-dup',
+      title: 'duplicated',
+    );
+  }
 }
 
 void main() {

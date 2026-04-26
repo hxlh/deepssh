@@ -39,6 +39,7 @@ void main() {
             onCloseSshSession: (_) async {},
             onCloseLocalTerminal: (_) async {},
             onOpenThemeConfig: () {},
+            onDuplicateSshSession: (_) async {},
             themeConfigActive: false,
           ),
         ),

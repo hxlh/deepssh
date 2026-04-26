@@ -26,6 +26,7 @@ class HostTree extends StatelessWidget {
     required this.onSshSessionTap,
     required this.onEditSshSessionNote,
     required this.onCloseSshSession,
+    required this.onDuplicateSshSession,
     required this.onCloseLocalTerminal,
     required this.onOpenThemeConfig,
     required this.themeConfigActive,
@@ -45,6 +46,7 @@ class HostTree extends StatelessWidget {
   final ValueChanged<SshSessionItem> onSshSessionTap;
   final Future<void> Function(SshSessionItem) onEditSshSessionNote;
   final Future<void> Function(SshSessionItem) onCloseSshSession;
+  final Future<void> Function(SshSessionItem) onDuplicateSshSession;
   final Future<void> Function(LocalTerminalItem) onCloseLocalTerminal;
   final VoidCallback onOpenThemeConfig;
   final bool themeConfigActive;
@@ -73,6 +75,7 @@ class HostTree extends StatelessWidget {
     required BuildContext context,
     required Offset position,
     required Future<void> Function() onEditNote,
+    required Future<void> Function() onDuplicate,
     required Future<void> Function() onClose,
   }) async {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
@@ -84,12 +87,16 @@ class HostTree extends StatelessWidget {
       ),
       items: const [
         PopupMenuItem<String>(value: 'edit-note', child: Text('编辑备注')),
+        PopupMenuItem<String>(value: 'duplicate', child: Text('复制')),
         PopupMenuItem<String>(value: 'close', child: Text('关闭 SSH 会话')),
       ],
     );
     switch (selected) {
       case 'edit-note':
         await onEditNote();
+        break;
+      case 'duplicate':
+        await onDuplicate();
         break;
       case 'close':
         await onClose();
@@ -153,6 +160,7 @@ class HostTree extends StatelessWidget {
                             context: context,
                             position: details.globalPosition,
                             onEditNote: () => onEditSshSessionNote(session),
+                            onDuplicate: () => onDuplicateSshSession(session),
                             onClose: () => onCloseSshSession(session),
                           );
                         },
