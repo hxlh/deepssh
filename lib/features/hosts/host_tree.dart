@@ -51,20 +51,58 @@ class HostTree extends StatelessWidget {
   final VoidCallback onOpenThemeConfig;
   final bool themeConfigActive;
 
+  static const Color _menuAccent = Color(0xFFFFB280);
+  static const double _menuItemHeight = 32;
+  static const double _menuWidth = 150;
+
+  RelativeRect _menuPosition(BuildContext context, Offset position) {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    return RelativeRect.fromRect(
+      Rect.fromLTWH(position.dx, position.dy, 0, 0),
+      Offset.zero & overlay.size,
+    );
+  }
+
+  Future<String?> _showStyledMenu({
+    required BuildContext context,
+    required Offset position,
+    required List<PopupMenuEntry<String>> items,
+  }) {
+    return showMenu<String>(
+      context: context,
+      position: _menuPosition(context, position),
+      color: AppColors.panel,
+      elevation: 8,
+      shadowColor: const Color(0x66000000),
+      surfaceTintColor: Colors.transparent,
+      menuPadding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: _menuWidth),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6),
+        side: BorderSide(color: AppColors.border),
+      ),
+      items: items,
+    );
+  }
+
   Future<void> _showCloseMenu({
     required BuildContext context,
     required Offset position,
     required String label,
     required Future<void> Function() onClose,
   }) async {
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    final selected = await showMenu<String>(
+    final selected = await _showStyledMenu(
       context: context,
-      position: RelativeRect.fromRect(
-        Rect.fromLTWH(position.dx, position.dy, 0, 0),
-        Offset.zero & overlay.size,
-      ),
-      items: [PopupMenuItem<String>(value: 'close', child: Text(label))],
+      position: position,
+      items: [
+        PopupMenuItem<String>(
+          value: 'close',
+          height: _menuItemHeight,
+          padding: EdgeInsets.zero,
+          child: _HostContextMenuItem(label: label),
+        ),
+      ],
     );
     if (selected == 'close') {
       await onClose();
@@ -78,17 +116,28 @@ class HostTree extends StatelessWidget {
     required Future<void> Function() onDuplicate,
     required Future<void> Function() onClose,
   }) async {
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    final selected = await showMenu<String>(
+    final selected = await _showStyledMenu(
       context: context,
-      position: RelativeRect.fromRect(
-        Rect.fromLTWH(position.dx, position.dy, 0, 0),
-        Offset.zero & overlay.size,
-      ),
+      position: position,
       items: const [
-        PopupMenuItem<String>(value: 'edit-note', child: Text('编辑备注')),
-        PopupMenuItem<String>(value: 'duplicate', child: Text('复制')),
-        PopupMenuItem<String>(value: 'close', child: Text('关闭 SSH 会话')),
+        PopupMenuItem<String>(
+          value: 'edit-note',
+          height: _menuItemHeight,
+          padding: EdgeInsets.zero,
+          child: _HostContextMenuItem(label: '编辑备注'),
+        ),
+        PopupMenuItem<String>(
+          value: 'duplicate',
+          height: _menuItemHeight,
+          padding: EdgeInsets.zero,
+          child: _HostContextMenuItem(label: '复制'),
+        ),
+        PopupMenuItem<String>(
+          value: 'close',
+          height: _menuItemHeight,
+          padding: EdgeInsets.zero,
+          child: _HostContextMenuItem(label: '关闭 SSH 会话'),
+        ),
       ],
     );
     switch (selected) {
@@ -274,6 +323,54 @@ class HostTree extends StatelessWidget {
         ),
         _ThemeConfigButton(active: themeConfigActive, onTap: onOpenThemeConfig),
       ],
+    );
+  }
+}
+
+class _HostContextMenuItem extends StatefulWidget {
+  const _HostContextMenuItem({required this.label});
+
+  final String label;
+
+  @override
+  State<_HostContextMenuItem> createState() => _HostContextMenuItemState();
+}
+
+class _HostContextMenuItemState extends State<_HostContextMenuItem> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Container(
+        width: HostTree._menuWidth,
+        height: HostTree._menuItemHeight,
+        color: _hovered ? AppColors.tabHover : Colors.transparent,
+        child: Row(
+          children: [
+            Container(
+              width: 3,
+              height: double.infinity,
+              color: _hovered ? HostTree._menuAccent : Colors.transparent,
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                widget.label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: _hovered ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

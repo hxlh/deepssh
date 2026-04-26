@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart' as xterm;
@@ -281,6 +282,81 @@ class _TerminalViewState extends State<TerminalView> {
     return handled ? KeyEventResult.handled : KeyEventResult.ignored;
   }
 
+  static const Color _menuAccent = Color(0xFFFFB280);
+  static const double _menuItemHeight = 32;
+  static const double _menuWidth = 120;
+
+  void _showContextMenu(BuildContext context, Offset position) {
+    final selection = terminalController.selection;
+    final hasSelection =
+        selection != null && terminal.buffer.getText(selection).isNotEmpty;
+
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final relativePosition = RelativeRect.fromRect(
+      Rect.fromLTWH(position.dx, position.dy, 0, 0),
+      Offset.zero & overlay.size,
+    );
+
+    showMenu<String>(
+      context: context,
+      position: relativePosition,
+      color: AppColors.panel,
+      elevation: 8,
+      shadowColor: const Color(0x66000000),
+      surfaceTintColor: Colors.transparent,
+      menuPadding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: _menuWidth),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6),
+        side: BorderSide(color: AppColors.border),
+      ),
+      items: [
+        PopupMenuItem<String>(
+          value: 'copy',
+          enabled: hasSelection,
+          height: _menuItemHeight,
+          padding: EdgeInsets.zero,
+          child: _TerminalContextMenuItem(label: '复制', enabled: hasSelection),
+        ),
+        const PopupMenuItem<String>(
+          value: 'paste',
+          height: _menuItemHeight,
+          padding: EdgeInsets.zero,
+          child: _TerminalContextMenuItem(label: '粘贴'),
+        ),
+      ],
+    ).then((value) {
+      if (!mounted) return;
+      if (value == 'copy') {
+        _copySelection();
+        _focusInputProxy();
+      } else if (value == 'paste') {
+        _pasteFromClipboard();
+      } else {
+        _focusInputProxy();
+      }
+    });
+  }
+
+  void _copySelection() {
+    final selection = terminalController.selection;
+    if (selection == null) return;
+    final text = terminal.buffer.getText(selection);
+    if (text.isEmpty) return;
+    Clipboard.setData(ClipboardData(text: text));
+  }
+
+  void _pasteFromClipboard() {
+    Clipboard.getData(Clipboard.kTextPlain).then((data) {
+      if (!mounted) return;
+      if (data != null && data.text != null && data.text!.isNotEmpty) {
+        terminal.textInput(data.text!);
+      }
+      _focusInputProxy();
+    });
+  }
+
   void _focusInputProxy() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !inputFocusNode.hasFocus) {
@@ -356,7 +432,13 @@ class _TerminalViewState extends State<TerminalView> {
           Positioned.fill(
             child: Listener(
               behavior: HitTestBehavior.translucent,
-              onPointerDown: (_) => _focusInputProxy(),
+              onPointerDown: (event) {
+                if (event.buttons == kSecondaryButton) {
+                  _showContextMenu(context, event.position);
+                } else {
+                  _focusInputProxy();
+                }
+              },
               child: xterm.TerminalView(
                 terminal,
                 controller: terminalController,
@@ -424,6 +506,64 @@ class _TerminalViewState extends State<TerminalView> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TerminalContextMenuItem extends StatefulWidget {
+  const _TerminalContextMenuItem({required this.label, this.enabled = true});
+
+  final String label;
+  final bool enabled;
+
+  @override
+  State<_TerminalContextMenuItem> createState() =>
+      _TerminalContextMenuItemState();
+}
+
+class _TerminalContextMenuItemState extends State<_TerminalContextMenuItem> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final highlighted = widget.enabled && _hovered;
+    final foreground = widget.enabled
+        ? AppColors.textPrimary
+        : AppColors.textMuted.withValues(alpha: 0.45);
+
+    return MouseRegion(
+      cursor: widget.enabled
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      onEnter: widget.enabled ? (_) => setState(() => _hovered = true) : null,
+      onExit: widget.enabled ? (_) => setState(() => _hovered = false) : null,
+      child: Container(
+        width: _TerminalViewState._menuWidth,
+        height: _TerminalViewState._menuItemHeight,
+        color: highlighted ? AppColors.tabHover : Colors.transparent,
+        child: Row(
+          children: [
+            Container(
+              width: 3,
+              height: double.infinity,
+              color: highlighted
+                  ? _TerminalViewState._menuAccent
+                  : Colors.transparent,
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                widget.label,
+                style: TextStyle(
+                  color: foreground,
+                  fontSize: 13,
+                  fontWeight: highlighted ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
