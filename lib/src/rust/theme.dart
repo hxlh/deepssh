@@ -19,11 +19,16 @@ Future<void> saveTheme({required ThemeSettings settings}) =>
 class RegexHighlight {
   final String pattern;
   final String color;
+  final String note;
 
-  const RegexHighlight({required this.pattern, required this.color});
+  const RegexHighlight({
+    required this.pattern,
+    required this.color,
+    required this.note,
+  });
 
   @override
-  int get hashCode => pattern.hashCode ^ color.hashCode;
+  int get hashCode => pattern.hashCode ^ color.hashCode ^ note.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -31,7 +36,8 @@ class RegexHighlight {
       other is RegexHighlight &&
           runtimeType == other.runtimeType &&
           pattern == other.pattern &&
-          color == other.color;
+          color == other.color &&
+          note == other.note;
 }
 
 class TerminalTheme {

@@ -3,15 +3,22 @@ import 'package:flutter/material.dart';
 enum CursorStyle { block, underline, bar }
 
 class RegexHighlight {
-  const RegexHighlight({required this.pattern, required this.color});
+  const RegexHighlight({
+    required this.pattern,
+    required this.color,
+    this.note = '',
+  });
 
   final String pattern;
   final Color color;
+  final String note;
 
-  RegexHighlight copyWith({String? pattern, Color? color}) => RegexHighlight(
-    pattern: pattern ?? this.pattern,
-    color: color ?? this.color,
-  );
+  RegexHighlight copyWith({String? pattern, Color? color, String? note}) =>
+      RegexHighlight(
+        pattern: pattern ?? this.pattern,
+        color: color ?? this.color,
+        note: note ?? this.note,
+      );
 }
 
 class UiThemeSettings {
@@ -152,21 +159,37 @@ class TerminalThemeSettings {
       RegexHighlight(
         pattern: 'ERROR|FATAL|Exception|Traceback',
         color: Color(0xFFF14C4C),
+        note: '错误日志',
       ),
-      RegexHighlight(pattern: 'WARN|WARNING', color: Color(0xFFF5F543)),
-      RegexHighlight(pattern: 'SUCCESS|OK|DONE', color: Color(0xFF23D18B)),
-      RegexHighlight(pattern: r'\b[45]\d\d\b', color: Color(0xFFF14C4C)),
+      RegexHighlight(
+        pattern: 'WARN|WARNING',
+        color: Color(0xFFF5F543),
+        note: '警告日志',
+      ),
+      RegexHighlight(
+        pattern: 'SUCCESS|OK|DONE',
+        color: Color(0xFF23D18B),
+        note: '成功状态',
+      ),
+      RegexHighlight(
+        pattern: r'\b[45]\d\d\b',
+        color: Color(0xFFF14C4C),
+        note: 'HTTP 错误',
+      ),
       RegexHighlight(
         pattern: r'\b\d+ms\b|\b\d+\.\d+s\b',
         color: Color(0xFF29B8DB),
+        note: '耗时',
       ),
       RegexHighlight(
         pattern: r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
         color: Color(0xFFD670D6),
+        note: 'IP 地址',
       ),
       RegexHighlight(
         pattern: r'\b[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\b',
         color: Color(0xFF3B8EEA),
+        note: 'UUID',
       ),
     ],
   );

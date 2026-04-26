@@ -88,15 +88,9 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _SectionCard(
-                    title: '界面主题',
-                    child: _buildUiSection(),
-                  ),
+                  _SectionCard(title: '界面主题', child: _buildUiSection()),
                   const SizedBox(height: 20),
-                  _SectionCard(
-                    title: '终端主题',
-                    child: _buildTerminalSection(),
-                  ),
+                  _SectionCard(title: '终端主题', child: _buildTerminalSection()),
                 ],
               ),
             ),
@@ -124,12 +118,8 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
         _FontRow(
           family: uiSettings.fontFamily,
           size: uiSettings.fontSize,
-          onFamilyChanged: (v) => _updateUi(
-            uiSettings.copyWith(fontFamily: v),
-          ),
-          onSizeChanged: (v) => _updateUi(
-            uiSettings.copyWith(fontSize: v),
-          ),
+          onFamilyChanged: (v) => _updateUi(uiSettings.copyWith(fontFamily: v)),
+          onSizeChanged: (v) => _updateUi(uiSettings.copyWith(fontSize: v)),
         ),
         const SizedBox(height: 16),
         const _SectionLabel('配色'),
@@ -161,14 +151,12 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
             _ColorField(
               label: '文字',
               value: uiSettings.textPrimary,
-              onChanged: (c) =>
-                  _updateUi(uiSettings.copyWith(textPrimary: c)),
+              onChanged: (c) => _updateUi(uiSettings.copyWith(textPrimary: c)),
             ),
             _ColorField(
               label: '次要文字',
               value: uiSettings.textMuted,
-              onChanged: (c) =>
-                  _updateUi(uiSettings.copyWith(textMuted: c)),
+              onChanged: (c) => _updateUi(uiSettings.copyWith(textMuted: c)),
             ),
           ],
         ),
@@ -200,12 +188,10 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
               child: _FontRow(
                 family: termSettings.fontFamily,
                 size: termSettings.fontSize,
-                onFamilyChanged: (v) => _updateTerm(
-                  termSettings.copyWith(fontFamily: v),
-                ),
-                onSizeChanged: (v) => _updateTerm(
-                  termSettings.copyWith(fontSize: v),
-                ),
+                onFamilyChanged: (v) =>
+                    _updateTerm(termSettings.copyWith(fontFamily: v)),
+                onSizeChanged: (v) =>
+                    _updateTerm(termSettings.copyWith(fontSize: v)),
               ),
             ),
             const SizedBox(width: 16),
@@ -213,12 +199,10 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
               child: _CursorRow(
                 style: termSettings.cursorStyle,
                 blink: termSettings.cursorBlink,
-                onStyleChanged: (v) => _updateTerm(
-                  termSettings.copyWith(cursorStyle: v),
-                ),
-                onBlinkChanged: (v) => _updateTerm(
-                  termSettings.copyWith(cursorBlink: v),
-                ),
+                onStyleChanged: (v) =>
+                    _updateTerm(termSettings.copyWith(cursorStyle: v)),
+                onBlinkChanged: (v) =>
+                    _updateTerm(termSettings.copyWith(cursorBlink: v)),
               ),
             ),
           ],
@@ -262,38 +246,34 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
         ...termSettings.regexHighlights.asMap().entries.map(
           (entry) => _RegexRuleRow(
             pattern: entry.value.pattern,
+            note: entry.value.note,
             color: entry.value.color,
             onPatternChanged: (v) {
               final highlights = List<RegexHighlight>.from(
                 termSettings.regexHighlights,
               );
-              highlights[entry.key] = RegexHighlight(
-                pattern: v,
-                color: entry.value.color,
+              highlights[entry.key] = entry.value.copyWith(pattern: v);
+              _updateTerm(termSettings.copyWith(regexHighlights: highlights));
+            },
+            onNoteChanged: (v) {
+              final highlights = List<RegexHighlight>.from(
+                termSettings.regexHighlights,
               );
-              _updateTerm(
-                termSettings.copyWith(regexHighlights: highlights),
-              );
+              highlights[entry.key] = entry.value.copyWith(note: v);
+              _updateTerm(termSettings.copyWith(regexHighlights: highlights));
             },
             onColorChanged: (c) {
               final highlights = List<RegexHighlight>.from(
                 termSettings.regexHighlights,
               );
-              highlights[entry.key] = RegexHighlight(
-                pattern: entry.value.pattern,
-                color: c,
-              );
-              _updateTerm(
-                termSettings.copyWith(regexHighlights: highlights),
-              );
+              highlights[entry.key] = entry.value.copyWith(color: c);
+              _updateTerm(termSettings.copyWith(regexHighlights: highlights));
             },
             onRemove: () {
               final highlights = List<RegexHighlight>.from(
                 termSettings.regexHighlights,
               )..removeAt(entry.key);
-              _updateTerm(
-                termSettings.copyWith(regexHighlights: highlights),
-              );
+              _updateTerm(termSettings.copyWith(regexHighlights: highlights));
             },
           ),
         ),
@@ -303,15 +283,17 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
             termSettings.copyWith(
               regexHighlights: [
                 ...termSettings.regexHighlights,
-                const RegexHighlight(pattern: '', color: Color(0xFFFFFFFF)),
+                const RegexHighlight(
+                  pattern: '',
+                  color: Color(0xFFFFFFFF),
+                  note: '',
+                ),
               ],
             ),
           ),
           icon: const Icon(Icons.add, size: 16),
           label: const Text('添加规则'),
-          style: TextButton.styleFrom(
-            foregroundColor: AppColors.textMuted,
-          ),
+          style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
         ),
         const SizedBox(height: 16),
         const _SectionLabel('其他'),
@@ -323,9 +305,8 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
               child: _NumberInput(
                 label: 'Scrollback lines',
                 value: termSettings.scrollbackLines,
-                onChanged: (v) => _updateTerm(
-                  termSettings.copyWith(scrollbackLines: v),
-                ),
+                onChanged: (v) =>
+                    _updateTerm(termSettings.copyWith(scrollbackLines: v)),
               ),
             ),
           ],
@@ -503,10 +484,7 @@ class _FontRow extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: _TextInput(
-                value: family,
-                onChanged: onFamilyChanged,
-              ),
+              child: _TextInput(value: family, onChanged: onFamilyChanged),
             ),
             const SizedBox(width: 8),
             SizedBox(
@@ -570,10 +548,7 @@ String _cursorStyleLabel(CursorStyle s) {
 }
 
 class _CursorStyleSelector extends StatefulWidget {
-  const _CursorStyleSelector({
-    required this.value,
-    required this.onChanged,
-  });
+  const _CursorStyleSelector({required this.value, required this.onChanged});
 
   final CursorStyle value;
   final ValueChanged<CursorStyle> onChanged;
@@ -781,9 +756,7 @@ class _CursorStyleItemState extends State<_CursorStyleItem> {
                         ? AppColors.textPrimary
                         : AppColors.textMuted,
                     fontSize: 13,
-                    fontWeight: highlight
-                        ? FontWeight.w600
-                        : FontWeight.w400,
+                    fontWeight: highlight ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),
               ),
@@ -831,9 +804,7 @@ class _BlinkCheckboxState extends State<_BlinkCheckbox> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                widget.value
-                    ? Icons.check_box
-                    : Icons.check_box_outline_blank,
+                widget.value ? Icons.check_box : Icons.check_box_outline_blank,
                 size: 16,
                 color: widget.value ? AppColors.accent : AppColors.textMuted,
               ),
@@ -873,10 +844,7 @@ class _ColorField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: Color(0xFFB8ADA6),
-            fontSize: 11,
-          ),
+          style: const TextStyle(color: Color(0xFFB8ADA6), fontSize: 11),
         ),
         const SizedBox(height: 4),
         SizedBox(
@@ -891,15 +859,19 @@ class _ColorField extends StatelessWidget {
 class _RegexRuleRow extends StatelessWidget {
   const _RegexRuleRow({
     required this.pattern,
+    required this.note,
     required this.color,
     required this.onPatternChanged,
+    required this.onNoteChanged,
     required this.onColorChanged,
     required this.onRemove,
   });
 
   final String pattern;
+  final String note;
   final Color color;
   final ValueChanged<String> onPatternChanged;
+  final ValueChanged<String> onNoteChanged;
   final ValueChanged<Color> onColorChanged;
   final VoidCallback onRemove;
 
@@ -911,8 +883,15 @@ class _RegexRuleRow extends StatelessWidget {
         children: [
           Flexible(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 390),
+              constraints: const BoxConstraints(maxWidth: 280),
               child: _TextInput(value: pattern, onChanged: onPatternChanged),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 150),
+              child: _TextInput(value: note, onChanged: onNoteChanged),
             ),
           ),
           const SizedBox(width: 8),
@@ -940,10 +919,7 @@ class _RegexRuleRow extends StatelessWidget {
 }
 
 class _TextInput extends StatefulWidget {
-  const _TextInput({
-    required this.value,
-    required this.onChanged,
-  });
+  const _TextInput({required this.value, required this.onChanged});
 
   final String value;
   final ValueChanged<String> onChanged;
@@ -981,10 +957,7 @@ class _TextInputState extends State<_TextInput> {
       height: 32,
       child: TextFormField(
         controller: controller,
-        style: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 13,
-        ),
+        style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
         decoration: InputDecoration(
           filled: true,
           fillColor: AppColors.background,
@@ -1064,10 +1037,7 @@ class _NumberInputState extends State<_NumberInput> {
         if (widget.label.isNotEmpty) ...[
           Text(
             widget.label,
-            style: const TextStyle(
-              color: Color(0xFFA6998C),
-              fontSize: 11,
-            ),
+            style: const TextStyle(color: Color(0xFFA6998C), fontSize: 11),
           ),
           const SizedBox(height: 4),
         ],
@@ -1077,10 +1047,7 @@ class _NumberInputState extends State<_NumberInput> {
             controller: controller,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
             decoration: InputDecoration(
               filled: true,
               fillColor: AppColors.background,

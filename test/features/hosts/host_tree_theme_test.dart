@@ -35,6 +35,7 @@ void main() {
             sshSessionsByProfileId: const {},
             onSshProfileTap: (_) {},
             onSshSessionTap: (_) {},
+            onEditSshSessionNote: (_) async {},
             onCloseSshSession: (_) async {},
             onCloseLocalTerminal: (_) async {},
             onOpenThemeConfig: () {},
@@ -44,13 +45,13 @@ void main() {
       ),
     );
 
-    final selectedContainer = tester.widgetList<Container>(find.byType(Container)).firstWhere(
-      (container) {
-        final decoration = container.decoration;
-        return decoration is BoxDecoration &&
-            decoration.color == const Color(0xFF123456);
-      },
-    );
+    final selectedContainer = tester
+        .widgetList<Container>(find.byType(Container))
+        .firstWhere((container) {
+          final decoration = container.decoration;
+          return decoration is BoxDecoration &&
+              decoration.color == const Color(0xFF123456);
+        });
     final decoration = selectedContainer.decoration as BoxDecoration;
 
     expect(decoration.color, const Color(0xFF123456));

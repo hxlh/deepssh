@@ -578,11 +578,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RegexHighlight dco_decode_regex_highlight(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 2)
-      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return RegexHighlight(
       pattern: dco_decode_String(arr[0]),
       color: dco_decode_String(arr[1]),
+      note: dco_decode_String(arr[2]),
     );
   }
 
@@ -774,7 +775,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_pattern = sse_decode_String(deserializer);
     var var_color = sse_decode_String(deserializer);
-    return RegexHighlight(pattern: var_pattern, color: var_color);
+    var var_note = sse_decode_String(deserializer);
+    return RegexHighlight(
+      pattern: var_pattern,
+      color: var_color,
+      note: var_note,
+    );
   }
 
   @protected
@@ -1005,6 +1011,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.pattern, serializer);
     sse_encode_String(self.color, serializer);
+    sse_encode_String(self.note, serializer);
   }
 
   @protected

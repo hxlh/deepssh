@@ -37,6 +37,52 @@ class WorkbenchPage extends StatefulWidget {
   State<WorkbenchPage> createState() => _WorkbenchPageState();
 }
 
+class _SshSessionNoteDialog extends StatefulWidget {
+  const _SshSessionNoteDialog({required this.initialNote});
+
+  final String initialNote;
+
+  @override
+  State<_SshSessionNoteDialog> createState() => _SshSessionNoteDialogState();
+}
+
+class _SshSessionNoteDialogState extends State<_SshSessionNoteDialog> {
+  late final TextEditingController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = TextEditingController(text: widget.initialNote);
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('编辑备注'),
+      content: TextField(
+        controller: controller,
+        decoration: const InputDecoration(labelText: '会话备注'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(controller.text),
+          child: const Text('保存'),
+        ),
+      ],
+    );
+  }
+}
+
 class _DefaultSshBridgeClientHolder implements SshBridgeClient {
   const _DefaultSshBridgeClientHolder();
 
@@ -138,6 +184,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   final sshOutputFlushTimers = <String, Timer>{};
   final closingSshSessionIds = <String>{};
   final removedPendingSshSessionIds = <String>{};
+  final _sshCommandBuffers = <String, String>{};
   SshProfileItem? editingSshProfile;
   String? sshErrorMessage;
   UiThemeSettings uiThemeSettings = UiThemeSettings.commandDeck();
@@ -420,7 +467,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         );
   }
 
-  void _updateSshSession(SshSessionItem session) {
+  void _replaceSshSession(SshSessionItem session) {
     final sessions =
         sshSessionsByProfileId[session.profileId] ?? const <SshSessionItem>[];
     setState(() {
@@ -432,7 +479,57 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       };
       terminalState = terminalState.update(_sshTabFromSession(session));
     });
+  }
+
+  void _updateSshSession(SshSessionItem session) {
+    _replaceSshSession(session);
     _startSshOutputSubscription(session);
+  }
+
+  void _handleSshInput(String data) {
+    final sessionId = terminalState.activeTab?.sessionId;
+    if (sessionId == null) return;
+
+    var buffer = _sshCommandBuffers[sessionId] ?? '';
+
+    for (final rune in data.runes) {
+      if (rune == 0x0D || rune == 0x0A) {
+        _commitSshCommand(sessionId, buffer);
+        buffer = '';
+        break;
+      } else if (rune == 0x7F) {
+        if (buffer.isNotEmpty) {
+          final runes = buffer.runes.toList();
+          runes.removeLast();
+          buffer = String.fromCharCodes(runes);
+        }
+      } else if (rune == 0x03) {
+        buffer = '';
+        break;
+      } else if (rune == 0x1B) {
+        break;
+      } else if (rune == 0x09) {
+        // Ignore tab for command inference.
+      } else if (rune >= 0x20) {
+        buffer += String.fromCharCode(rune);
+      }
+    }
+
+    _sshCommandBuffers[sessionId] = buffer;
+  }
+
+  void _commitSshCommand(String sessionId, String command) {
+    final trimmed = command.trim();
+    if (trimmed.isEmpty) return;
+
+    for (final sessions in sshSessionsByProfileId.values) {
+      for (final session in sessions) {
+        if (session.sessionId == sessionId) {
+          _replaceSshSession(session.copyWith(currentCommand: trimmed));
+          return;
+        }
+      }
+    }
   }
 
   void _removeSshSession(SshSessionItem session) {
@@ -443,6 +540,9 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         .toList();
     sshOutputFlushTimers.remove(session.id)?.cancel();
     sshOutputBuffers.remove(session.id);
+    if (session.sessionId != null) {
+      _sshCommandBuffers.remove(session.sessionId);
+    }
     setState(() {
       sshSessionsByProfileId = {
         ...sshSessionsByProfileId,
@@ -450,6 +550,15 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       };
       terminalState = terminalState.close(session.id);
     });
+  }
+
+  Future<void> _handleEditSshSessionNote(SshSessionItem session) async {
+    final note = await showDialog<String>(
+      context: context,
+      builder: (context) => _SshSessionNoteDialog(initialNote: session.note),
+    );
+    if (note == null || !mounted) return;
+    _replaceSshSession(session.copyWith(note: note));
   }
 
   Future<void> _handleCloseSshSession(SshSessionItem session) async {
@@ -522,7 +631,17 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         }
         return;
       }
-      _updateSshSession(session.copyWith(sessionId: result.sessionId));
+      final currentSessions =
+          sshSessionsByProfileId[profile.id] ?? const <SshSessionItem>[];
+      SshSessionItem? currentSession;
+      for (final item in currentSessions) {
+        if (item.id == session.id) {
+          currentSession = item;
+          break;
+        }
+      }
+      if (currentSession == null) return;
+      _updateSshSession(currentSession.copyWith(sessionId: result.sessionId));
     } catch (error) {
       if (!mounted) return;
       _removeSshSession(session);
@@ -610,6 +729,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               sshSessionsByProfileId: sshSessionsByProfileId,
               onSshProfileTap: (_) {},
               onSshSessionTap: _handleSshSessionTap,
+              onEditSshSessionNote: _handleEditSshSessionNote,
               onCloseSshSession: _handleCloseSshSession,
               onCloseLocalTerminal: _handleCloseLocalTerminal,
               onOpenThemeConfig: _handleOpenThemeConfig,
@@ -639,6 +759,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               onTerminalThemeChanged: _handleTerminalThemeChanged,
               onBackFromConfig: _handleBackFromConfig,
               sshBridge: widget.sshBridge,
+              onSshInput: _handleSshInput,
             ),
           ),
         ],

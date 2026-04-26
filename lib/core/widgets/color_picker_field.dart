@@ -65,10 +65,8 @@ class ColorPickerField extends StatelessWidget {
   void _showDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => _ColorPickerDialog(
-        initialColor: value,
-        onChanged: onChanged,
-      ),
+      builder: (_) =>
+          _ColorPickerDialog(initialColor: value, onChanged: onChanged),
     );
   }
 }
@@ -95,9 +93,12 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
   void initState() {
     super.initState();
     hsvColor = HSVColor.fromColor(widget.initialColor);
-    hexController = TextEditingController(text: colorToHex(widget.initialColor));
-    htmlController =
-        TextEditingController(text: cssColorName(widget.initialColor) ?? '');
+    hexController = TextEditingController(
+      text: colorToHex(widget.initialColor),
+    );
+    htmlController = TextEditingController(
+      text: cssColorName(widget.initialColor) ?? '',
+    );
   }
 
   @override
@@ -205,10 +206,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
           width: 40,
           child: Text(
             label,
-            style: TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
         ),
         Expanded(
@@ -249,10 +247,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
 }
 
 class _HsvColorDisc extends StatelessWidget {
-  const _HsvColorDisc({
-    required this.hsvColor,
-    required this.onChanged,
-  });
+  const _HsvColorDisc({required this.hsvColor, required this.onChanged});
 
   final HSVColor hsvColor;
   final ValueChanged<HSVColor> onChanged;
@@ -354,10 +349,7 @@ class _HsvDiscPainter extends CustomPainter {
 }
 
 class _ValueSlider extends StatelessWidget {
-  const _ValueSlider({
-    required this.hsvColor,
-    required this.onChanged,
-  });
+  const _ValueSlider({required this.hsvColor, required this.onChanged});
 
   final HSVColor hsvColor;
   final ValueChanged<double> onChanged;
@@ -395,8 +387,12 @@ class _ValueSliderPainter extends CustomPainter {
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
     final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(4));
 
-    final fullColor =
-        HSVColor.fromAHSV(1, hsvColor.hue, hsvColor.saturation, 1).toColor();
+    final fullColor = HSVColor.fromAHSV(
+      1,
+      hsvColor.hue,
+      hsvColor.saturation,
+      1,
+    ).toColor();
     final gradientPaint = Paint()
       ..shader = LinearGradient(
         colors: [Colors.black, fullColor],

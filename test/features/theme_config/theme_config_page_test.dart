@@ -5,8 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('command deck terminal theme includes common log regex rules', () {
-    final patterns = TerminalThemeSettings.commandDeck()
-        .regexHighlights
+    final patterns = TerminalThemeSettings.commandDeck().regexHighlights
         .map((highlight) => highlight.pattern)
         .toList();
 
@@ -16,7 +15,31 @@ void main() {
     expect(patterns, contains(r'\b\d+ms\b|\b\d+\.\d+s\b'));
   });
 
-  testWidgets('text input changes are emitted as the user types', (tester) async {
+  test('command deck regex rules include readable notes', () {
+    final highlights = TerminalThemeSettings.commandDeck().regexHighlights;
+
+    expect(highlights.first.pattern, 'ERROR|FATAL|Exception|Traceback');
+    expect(highlights.first.note, '错误日志');
+    expect(
+      highlights.map((highlight) => highlight.note),
+      containsAll(['警告日志', '成功状态', 'HTTP 错误', '耗时', 'IP 地址', 'UUID']),
+    );
+  });
+
+  test('regex highlight copyWith preserves and updates note', () {
+    const highlight = RegexHighlight(
+      pattern: 'ERROR',
+      color: Color(0xFFF14C4C),
+      note: '错误日志',
+    );
+
+    expect(highlight.copyWith(pattern: 'WARN').note, '错误日志');
+    expect(highlight.copyWith(note: '警告日志').note, '警告日志');
+  });
+
+  testWidgets('text input changes are emitted as the user types', (
+    tester,
+  ) async {
     UiThemeSettings? savedUi;
 
     await tester.pumpWidget(
@@ -79,8 +102,12 @@ void main() {
     TerminalThemeSettings? savedTerminal;
     final terminalSettings = TerminalThemeSettings.commandDeck().copyWith(
       regexHighlights: const [
-        RegexHighlight(pattern: 'ERROR', color: Color(0xFFF14C4C)),
-        RegexHighlight(pattern: 'WARN', color: Color(0xFFF5F543)),
+        RegexHighlight(
+          pattern: 'ERROR',
+          color: Color(0xFFF14C4C),
+          note: '错误日志',
+        ),
+        RegexHighlight(pattern: 'WARN', color: Color(0xFFF5F543), note: '警告日志'),
       ],
     );
 
@@ -104,5 +131,78 @@ void main() {
 
     expect(savedTerminal?.regexHighlights, hasLength(1));
     expect(savedTerminal?.regexHighlights.single.pattern, 'WARN');
+  });
+
+  testWidgets('updates regex highlight notes from terminal settings', (
+    tester,
+  ) async {
+    TerminalThemeSettings? savedTerminal;
+    final terminalSettings = TerminalThemeSettings.commandDeck().copyWith(
+      regexHighlights: const [
+        RegexHighlight(
+          pattern: 'ERROR',
+          color: Color(0xFFF14C4C),
+          note: '错误日志',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ThemeConfigPage(
+            uiSettings: UiThemeSettings.commandDeck(),
+            terminalSettings: terminalSettings,
+            onUiSettingsChanged: (_) {},
+            onTerminalSettingsChanged: (settings) => savedTerminal = settings,
+            onBack: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.widgetWithText(TextFormField, '错误日志'), '异常');
+    await tester.pump();
+
+    expect(savedTerminal?.regexHighlights, hasLength(1));
+    expect(savedTerminal?.regexHighlights.single.pattern, 'ERROR');
+    expect(
+      savedTerminal?.regexHighlights.single.color,
+      const Color(0xFFF14C4C),
+    );
+    expect(savedTerminal?.regexHighlights.single.note, '异常');
+  });
+
+  testWidgets('adds regex highlight rule with empty note', (tester) async {
+    TerminalThemeSettings? savedTerminal;
+    final terminalSettings = TerminalThemeSettings.commandDeck().copyWith(
+      regexHighlights: const [],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ThemeConfigPage(
+            uiSettings: UiThemeSettings.commandDeck(),
+            terminalSettings: terminalSettings,
+            onUiSettingsChanged: (_) {},
+            onTerminalSettingsChanged: (settings) => savedTerminal = settings,
+            onBack: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('添加规则'));
+    await tester.tap(find.text('添加规则'));
+    await tester.pump();
+
+    expect(savedTerminal?.regexHighlights, hasLength(1));
+    expect(savedTerminal?.regexHighlights.single.pattern, '');
+    expect(savedTerminal?.regexHighlights.single.note, '');
+    expect(
+      savedTerminal?.regexHighlights.single.color,
+      const Color(0xFFFFFFFF),
+    );
   });
 }

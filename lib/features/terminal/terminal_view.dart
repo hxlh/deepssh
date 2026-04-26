@@ -17,11 +17,13 @@ class TerminalView extends StatefulWidget {
     required this.tab,
     required this.sshBridge,
     required this.terminalThemeSettings,
+    this.onSshInput,
   });
 
   final OpenTerminalTab tab;
   final SshBridgeClient sshBridge;
   final TerminalThemeSettings terminalThemeSettings;
+  final ValueChanged<String>? onSshInput;
 
   @override
   State<TerminalView> createState() => _TerminalViewState();
@@ -41,7 +43,8 @@ class _TerminalViewState extends State<TerminalView> {
   @override
   void initState() {
     super.initState();
-    terminal = widget.tab.terminal ??
+    terminal =
+        widget.tab.terminal ??
         xterm.Terminal(maxLines: widget.terminalThemeSettings.scrollbackLines);
     _applyCursorBlinkMode();
     terminal.addListener(_handleTerminalChanged);
@@ -85,6 +88,7 @@ class _TerminalViewState extends State<TerminalView> {
       logDebug(
         '[terminal:onOutput] session=$sessionId data=${jsonEncode(data)}',
       );
+      widget.onSshInput?.call(data);
       widget.sshBridge.writeToSession(sessionId, utf8.encode(data));
     };
   }
@@ -170,7 +174,9 @@ class _TerminalViewState extends State<TerminalView> {
 
     _cursorIdleTimer = Timer(const Duration(milliseconds: 500), () {
       _setCursorBlinkVisible(false);
-      _cursorBlinkTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      _cursorBlinkTimer = Timer.periodic(const Duration(milliseconds: 500), (
+        _,
+      ) {
         _setCursorBlinkVisible(!_cursorVisible);
       });
     });

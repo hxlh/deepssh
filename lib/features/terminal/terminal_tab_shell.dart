@@ -16,6 +16,7 @@ class TerminalTabShell extends StatelessWidget {
     required this.onCloseTab,
     required this.sshBridge,
     required this.terminalThemeSettings,
+    this.onSshInput,
   });
 
   final TerminalState state;
@@ -23,6 +24,7 @@ class TerminalTabShell extends StatelessWidget {
   final ValueChanged<String> onCloseTab;
   final SshBridgeClient sshBridge;
   final TerminalThemeSettings terminalThemeSettings;
+  final ValueChanged<String>? onSshInput;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +52,7 @@ class TerminalTabShell extends StatelessWidget {
               tab: activeTab,
               sshBridge: sshBridge,
               terminalThemeSettings: terminalThemeSettings,
+              onSshInput: onSshInput,
             ),
           ),
         ),

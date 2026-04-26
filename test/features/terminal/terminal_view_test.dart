@@ -621,9 +621,7 @@ void main() {
     expect(controller.highlights.single.backgroundColor, isNull);
   });
 
-  testWidgets('skips invalid regex highlight rules', (
-    tester,
-  ) async {
+  testWidgets('skips invalid regex highlight rules', (tester) async {
     final terminal = xterm.Terminal(maxLines: 3000);
     final tab = OpenTerminalTab.ssh(
       id: 'ssh-tab-1',

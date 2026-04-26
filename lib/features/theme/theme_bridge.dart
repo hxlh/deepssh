@@ -78,8 +78,7 @@ UiThemeSettings _uiFromRust(rust_theme.UiTheme value) {
     panel: css.hexToColor(value.panel) ?? const Color(0xFF252526),
     sidebar: css.hexToColor(value.sidebar) ?? const Color(0xFF181818),
     accent: css.hexToColor(value.accent) ?? const Color(0xFF3794FF),
-    textPrimary:
-        css.hexToColor(value.textPrimary) ?? const Color(0xFFE6E6E6),
+    textPrimary: css.hexToColor(value.textPrimary) ?? const Color(0xFFE6E6E6),
     textMuted: css.hexToColor(value.textMuted) ?? const Color(0xFF9D9D9D),
   );
 }
@@ -110,14 +109,14 @@ TerminalThemeSettings _terminalFromRust(rust_theme.TerminalTheme value) {
         css.hexToColor(value.terminalBackground) ?? const Color(0xFF252526),
     selectionColor:
         css.hexToColor(value.selectionColor) ?? const Color(0xFF094771),
-    cursorColor:
-        css.hexToColor(value.cursorColor) ?? const Color(0xFF3794FF),
+    cursorColor: css.hexToColor(value.cursorColor) ?? const Color(0xFF3794FF),
     scrollbackLines: value.scrollbackLines,
     regexHighlights: value.regexHighlights
         .map(
           (highlight) => RegexHighlight(
             pattern: highlight.pattern,
             color: css.hexToColor(highlight.color) ?? const Color(0xFFE6E6E6),
+            note: highlight.note,
           ),
         )
         .toList(growable: false),
@@ -141,6 +140,7 @@ rust_theme.TerminalTheme _terminalToRust(TerminalThemeSettings value) {
           (highlight) => rust_theme.RegexHighlight(
             pattern: highlight.pattern,
             color: css.colorToHex(highlight.color),
+            note: highlight.note,
           ),
         )
         .toList(growable: false),

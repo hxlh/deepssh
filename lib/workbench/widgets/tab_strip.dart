@@ -100,9 +100,7 @@ class _TabItemState extends State<_TabItem> {
                   widget.tab.label,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: active
-                        ? AppColors.textPrimary
-                        : AppColors.textMuted,
+                    color: active ? AppColors.textPrimary : AppColors.textMuted,
                   ),
                 ),
               ),

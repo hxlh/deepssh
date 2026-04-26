@@ -147,8 +147,7 @@ const cssNamedColors = <String, Color>{
 int _colorKey(Color c) => c.toARGB32();
 
 final _reverseColorNames = <int, String>{
-  for (final entry in cssNamedColors.entries)
-    _colorKey(entry.value): entry.key,
+  for (final entry in cssNamedColors.entries) _colorKey(entry.value): entry.key,
 };
 
 String? cssColorName(Color color) => _reverseColorNames[_colorKey(color)];

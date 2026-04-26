@@ -24,6 +24,7 @@ class HostTree extends StatelessWidget {
     required this.sshSessionsByProfileId,
     required this.onSshProfileTap,
     required this.onSshSessionTap,
+    required this.onEditSshSessionNote,
     required this.onCloseSshSession,
     required this.onCloseLocalTerminal,
     required this.onOpenThemeConfig,
@@ -42,6 +43,7 @@ class HostTree extends StatelessWidget {
   final Map<String, List<SshSessionItem>> sshSessionsByProfileId;
   final ValueChanged<SshProfileItem> onSshProfileTap;
   final ValueChanged<SshSessionItem> onSshSessionTap;
+  final Future<void> Function(SshSessionItem) onEditSshSessionNote;
   final Future<void> Function(SshSessionItem) onCloseSshSession;
   final Future<void> Function(LocalTerminalItem) onCloseLocalTerminal;
   final VoidCallback onOpenThemeConfig;
@@ -67,6 +69,34 @@ class HostTree extends StatelessWidget {
     }
   }
 
+  Future<void> _showSshSessionMenu({
+    required BuildContext context,
+    required Offset position,
+    required Future<void> Function() onEditNote,
+    required Future<void> Function() onClose,
+  }) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(position.dx, position.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      items: const [
+        PopupMenuItem<String>(value: 'edit-note', child: Text('编辑备注')),
+        PopupMenuItem<String>(value: 'close', child: Text('关闭 SSH 会话')),
+      ],
+    );
+    switch (selected) {
+      case 'edit-note':
+        await onEditNote();
+        break;
+      case 'close':
+        await onClose();
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -88,7 +118,8 @@ class HostTree extends StatelessWidget {
               else
                 ...sshProfiles.expand((profile) {
                   final sessions =
-                      sshSessionsByProfileId[profile.id] ?? const <SshSessionItem>[];
+                      sshSessionsByProfileId[profile.id] ??
+                      const <SshSessionItem>[];
                   return [
                     InkWell(
                       onTap: () => onSshProfileTap(profile),
@@ -118,10 +149,10 @@ class HostTree extends StatelessWidget {
                       (session) => InkWell(
                         onTap: () => onSshSessionTap(session),
                         onSecondaryTapDown: (details) {
-                          _showCloseMenu(
+                          _showSshSessionMenu(
                             context: context,
                             position: details.globalPosition,
-                            label: '关闭 SSH 会话',
+                            onEditNote: () => onEditSshSessionNote(session),
                             onClose: () => onCloseSshSession(session),
                           );
                         },
@@ -133,7 +164,9 @@ class HostTree extends StatelessWidget {
                             color: selectedTerminalId == session.id
                                 ? AppColors.selection
                                 : Colors.transparent,
-                            borderRadius: BorderRadius.circular(AppSpacing.radius),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radius,
+                            ),
                           ),
                           child: Row(
                             children: [
@@ -145,7 +178,7 @@ class HostTree extends StatelessWidget {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  session.title,
+                                  session.displayTitle,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -166,7 +199,9 @@ class HostTree extends StatelessWidget {
                       child: Row(
                         children: [
                           Icon(
-                            localExpanded ? Icons.expand_more : Icons.chevron_right,
+                            localExpanded
+                                ? Icons.expand_more
+                                : Icons.chevron_right,
                             size: 18,
                             color: AppColors.textMuted,
                           ),
@@ -202,7 +237,9 @@ class HostTree extends StatelessWidget {
                           color: selectedTerminalId == terminal.id
                               ? AppColors.selection
                               : Colors.transparent,
-                          borderRadius: BorderRadius.circular(AppSpacing.radius),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radius,
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -227,20 +264,14 @@ class HostTree extends StatelessWidget {
             ],
           ),
         ),
-        _ThemeConfigButton(
-          active: themeConfigActive,
-          onTap: onOpenThemeConfig,
-        ),
+        _ThemeConfigButton(active: themeConfigActive, onTap: onOpenThemeConfig),
       ],
     );
   }
 }
 
 class _ThemeConfigButton extends StatefulWidget {
-  const _ThemeConfigButton({
-    required this.active,
-    required this.onTap,
-  });
+  const _ThemeConfigButton({required this.active, required this.onTap});
 
   final bool active;
   final VoidCallback onTap;

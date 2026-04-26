@@ -39,11 +39,7 @@ class HostTreeNode extends StatelessWidget {
                     size: 18,
                     color: AppColors.textMuted,
                   ),
-                  Icon(
-                    Icons.computer,
-                    size: 16,
-                    color: AppColors.textMuted,
-                  ),
+                  Icon(Icons.computer, size: 16, color: AppColors.textMuted),
                   const SizedBox(width: 8),
                   Text(host.name),
                 ],

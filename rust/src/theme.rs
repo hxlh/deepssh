@@ -53,6 +53,7 @@ pub struct TerminalTheme {
 pub struct RegexHighlight {
     pub pattern: String,
     pub color: String,
+    pub note: String,
 }
 
 #[flutter_rust_bridge::frb(ignore)]
@@ -98,6 +99,8 @@ struct TerminalThemeConfig {
 struct RegexHighlightConfig {
     pattern: String,
     color: String,
+    #[serde(default)]
+    note: String,
 }
 
 impl From<&ThemeSettings> for ThemeFile {
@@ -199,6 +202,7 @@ impl From<&RegexHighlight> for RegexHighlightConfig {
         Self {
             pattern: value.pattern.clone(),
             color: value.color.clone(),
+            note: value.note.clone(),
         }
     }
 }
@@ -208,6 +212,7 @@ impl From<RegexHighlightConfig> for RegexHighlight {
         Self {
             pattern: config.pattern,
             color: config.color,
+            note: config.note,
         }
     }
 }
@@ -238,16 +243,40 @@ fn default_theme() -> ThemeSettings {
             scrollback_lines: 10000,
             regex_highlights: vec![
                 RegexHighlight {
-                    pattern: "ERROR".to_string(),
+                    pattern: "ERROR|FATAL|Exception|Traceback".to_string(),
                     color: "#F14C4C".to_string(),
+                    note: "错误日志".to_string(),
                 },
                 RegexHighlight {
-                    pattern: "SUCCESS".to_string(),
+                    pattern: "WARN|WARNING".to_string(),
+                    color: "#F5F543".to_string(),
+                    note: "警告日志".to_string(),
+                },
+                RegexHighlight {
+                    pattern: "SUCCESS|OK|DONE".to_string(),
                     color: "#23D18B".to_string(),
+                    note: "成功状态".to_string(),
                 },
                 RegexHighlight {
-                    pattern: r"\d+".to_string(),
+                    pattern: r"\b[45]\d\d\b".to_string(),
+                    color: "#F14C4C".to_string(),
+                    note: "HTTP 错误".to_string(),
+                },
+                RegexHighlight {
+                    pattern: r"\b\d+ms\b|\b\d+\.\d+s\b".to_string(),
                     color: "#29B8DB".to_string(),
+                    note: "耗时".to_string(),
+                },
+                RegexHighlight {
+                    pattern: r"\b(?:\d{1,3}\.){3}\d{1,3}\b".to_string(),
+                    color: "#D670D6".to_string(),
+                    note: "IP 地址".to_string(),
+                },
+                RegexHighlight {
+                    pattern: r"\b[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\b"
+                        .to_string(),
+                    color: "#3B8EEA".to_string(),
+                    note: "UUID".to_string(),
                 },
             ],
         },
@@ -385,6 +414,7 @@ mod tests {
                 regex_highlights: vec![RegexHighlight {
                     pattern: "FAIL".to_string(),
                     color: "#FF0000".to_string(),
+                    note: "错误日志".to_string(),
                 }],
             },
         }

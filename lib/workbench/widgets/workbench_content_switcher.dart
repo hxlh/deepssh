@@ -33,6 +33,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
     required this.onTerminalThemeChanged,
     required this.onBackFromConfig,
     required this.sshBridge,
+    this.onSshInput,
   });
 
   final WorkbenchContentMode mode;
@@ -54,6 +55,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
   final ValueChanged<UiThemeSettings> onUiThemeChanged;
   final ValueChanged<TerminalThemeSettings> onTerminalThemeChanged;
   final VoidCallback onBackFromConfig;
+  final ValueChanged<String>? onSshInput;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +82,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
           onCloseTab: onCloseTab,
           sshBridge: sshBridge,
           terminalThemeSettings: terminalThemeSettings,
+          onSshInput: onSshInput,
         );
       case WorkbenchContentMode.themeConfig:
         return ThemeConfigPage(

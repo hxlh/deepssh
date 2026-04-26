@@ -56,14 +56,13 @@ void main() {
 
     await tester.tap(find.text('主题配置'));
     await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Inter'), 'A');
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Inter'),
-      'A',
-    );
-    await tester.enterText(
-      find.byWidgetPredicate(
-        (widget) => widget is EditableText && widget.controller.text == 'A',
-      ).first,
+      find
+          .byWidgetPredicate(
+            (widget) => widget is EditableText && widget.controller.text == 'A',
+          )
+          .first,
       'AB',
     );
     await tester.pump();
@@ -92,7 +91,8 @@ class RecordingThemeBridgeClient implements ThemeBridgeClient {
   final savedTerminal = <TerminalThemeSettings>[];
 
   @override
-  Future<({UiThemeSettings ui, TerminalThemeSettings terminal})> loadTheme() async {
+  Future<({UiThemeSettings ui, TerminalThemeSettings terminal})>
+  loadTheme() async {
     return (
       ui: UiThemeSettings.commandDeck(),
       terminal: TerminalThemeSettings.commandDeck(),
@@ -114,7 +114,8 @@ class ControlledThemeBridgeClient implements ThemeBridgeClient {
   final completedUi = <UiThemeSettings>[];
 
   @override
-  Future<({UiThemeSettings ui, TerminalThemeSettings terminal})> loadTheme() async {
+  Future<({UiThemeSettings ui, TerminalThemeSettings terminal})>
+  loadTheme() async {
     return (
       ui: UiThemeSettings.commandDeck(),
       terminal: TerminalThemeSettings.commandDeck(),

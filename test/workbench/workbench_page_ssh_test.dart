@@ -363,6 +363,115 @@ void main() {
   );
 
   testWidgets(
+    'SSH session label prefers note then current command then title',
+    (tester) async {
+      final bridge = FakeSshBridgeClient();
+      bridge.profiles.add(
+        const SshProfileItem(
+          id: 'profile-1',
+          name: 'Prod',
+          host: 'example.com',
+          port: 22,
+          username: 'root',
+          password: 'secret',
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('新增连接'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('SSH'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('连接'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('terminal1'), findsOneWidget);
+
+      await tester.tap(find.text('terminal1'), buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('编辑备注'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.bySemanticsLabel('会话备注'), '生产发布');
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('生产发布'), findsOneWidget);
+      expect(find.text('terminal1'), findsNothing);
+
+      await tester.tap(find.text('生产发布'), buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('编辑备注'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.bySemanticsLabel('会话备注'), '');
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('terminal1'), findsOneWidget);
+      expect(find.text('生产发布'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'SSH session keeps note edited while connect is pending after connect completes',
+    (tester) async {
+      final bridge = FakeSshBridgeClient();
+      bridge.profiles.add(
+        const SshProfileItem(
+          id: 'profile-1',
+          name: 'Prod',
+          host: 'example.com',
+          port: 22,
+          username: 'root',
+          password: 'secret',
+        ),
+      );
+      final connect = Completer<SshConnectionResult>();
+      bridge.connectCompleters.add(connect);
+
+      await tester.pumpWidget(
+        MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('新增连接'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('SSH'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('连接'));
+      await tester.pump();
+
+      expect(find.text('terminal1'), findsOneWidget);
+
+      await tester.tap(find.text('terminal1'), buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('编辑备注'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.bySemanticsLabel('会话备注'), '生产发布');
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('生产发布'), findsOneWidget);
+      expect(find.text('terminal1'), findsNothing);
+
+      connect.complete(
+        const SshConnectionResult(sessionId: 'session-1', title: 'Prod'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(bridge.outputStreamListenCount, 1);
+      expect(find.text('生产发布'), findsOneWidget);
+      expect(find.text('terminal1'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'closing pending SSH session cleans up connection if connect later succeeds',
     (tester) async {
       final bridge = FakeSshBridgeClient();
@@ -637,4 +746,134 @@ void main() {
       expect(utf8.decode(bridge.lastWriteData), '中文');
     },
   );
+
+  testWidgets('SSH session shows last submitted command after Enter', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
+    bridge.outputControllers['session-1'] = StreamController<List<int>>();
+
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
+
+    final terminalWidget = tester.widget<app_terminal.TerminalView>(
+      find.byType(app_terminal.TerminalView),
+    );
+
+    terminalWidget.onSshInput?.call('ls -la');
+    await tester.pump();
+    expect(find.text('ls -la'), findsNothing);
+
+    terminalWidget.onSshInput?.call('\r');
+    await tester.pump();
+
+    expect(find.text('ls -la'), findsOneWidget);
+  });
+
+  testWidgets(
+    'Ctrl+C clears pending command without replacing displayed command',
+    (tester) async {
+      final bridge = FakeSshBridgeClient();
+      bridge.profiles.add(
+        const SshProfileItem(
+          id: 'profile-1',
+          name: 'Prod',
+          host: 'example.com',
+          port: 22,
+          username: 'root',
+          password: 'secret',
+        ),
+      );
+      bridge.outputControllers['session-1'] = StreamController<List<int>>();
+
+      await tester.pumpWidget(
+        MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('新增连接'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('SSH'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('连接'));
+      await tester.pumpAndSettle();
+
+      final terminalWidget = tester.widget<app_terminal.TerminalView>(
+        find.byType(app_terminal.TerminalView),
+      );
+
+      terminalWidget.onSshInput?.call('ls -la\r');
+      await tester.pump();
+      expect(find.text('ls -la'), findsOneWidget);
+
+      terminalWidget.onSshInput?.call('pwd');
+      await tester.pump();
+      expect(find.text('pwd'), findsNothing);
+
+      terminalWidget.onSshInput?.call('\x03');
+      await tester.pump();
+
+      expect(find.text('ls -la'), findsOneWidget);
+      expect(find.text('pwd'), findsNothing);
+    },
+  );
+
+  testWidgets('Backspace removes last character from pending command', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
+    bridge.outputControllers['session-1'] = StreamController<List<int>>();
+
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
+
+    final terminalWidget = tester.widget<app_terminal.TerminalView>(
+      find.byType(app_terminal.TerminalView),
+    );
+
+    terminalWidget.onSshInput?.call('ls -l');
+    terminalWidget.onSshInput?.call('\x7F');
+    terminalWidget.onSshInput?.call('\r');
+    await tester.pump();
+
+    expect(find.text('ls -'), findsOneWidget);
+  });
 }

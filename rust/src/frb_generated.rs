@@ -547,9 +547,11 @@ impl SseDecode for crate::theme::RegexHighlight {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_pattern = <String>::sse_decode(deserializer);
         let mut var_color = <String>::sse_decode(deserializer);
+        let mut var_note = <String>::sse_decode(deserializer);
         return crate::theme::RegexHighlight {
             pattern: var_pattern,
             color: var_color,
+            note: var_note,
         };
     }
 }
@@ -737,6 +739,7 @@ impl flutter_rust_bridge::IntoDart for crate::theme::RegexHighlight {
         [
             self.pattern.into_into_dart().into_dart(),
             self.color.into_into_dart().into_dart(),
+            self.note.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -925,6 +928,7 @@ impl SseEncode for crate::theme::RegexHighlight {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.pattern, serializer);
         <String>::sse_encode(self.color, serializer);
+        <String>::sse_encode(self.note, serializer);
     }
 }
 
