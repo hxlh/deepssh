@@ -118,6 +118,10 @@ class _DefaultAppSshBridgeClientHolder implements SshBridgeClient {
   @override
   Future<void> closeSession(String sessionId) =>
       _delegate.closeSession(sessionId);
+
+  @override
+  Future<SshConnectionResult> duplicateSession(String sessionId) =>
+      _delegate.duplicateSession(sessionId);
 }
 
 class _DefaultAppThemeBridgeClientHolder implements ThemeBridgeClient {

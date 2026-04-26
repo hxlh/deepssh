@@ -25,6 +25,7 @@ class HostTree extends StatelessWidget {
     required this.onSshProfileTap,
     required this.onSshSessionTap,
     required this.onCloseSshSession,
+    required this.onDuplicateSshSession,
     required this.onCloseLocalTerminal,
     required this.onOpenThemeConfig,
     required this.themeConfigActive,
@@ -43,9 +44,35 @@ class HostTree extends StatelessWidget {
   final ValueChanged<SshProfileItem> onSshProfileTap;
   final ValueChanged<SshSessionItem> onSshSessionTap;
   final Future<void> Function(SshSessionItem) onCloseSshSession;
+  final Future<void> Function(SshSessionItem) onDuplicateSshSession;
   final Future<void> Function(LocalTerminalItem) onCloseLocalTerminal;
   final VoidCallback onOpenThemeConfig;
   final bool themeConfigActive;
+
+  Future<void> _showSessionMenu({
+    required BuildContext context,
+    required Offset position,
+    required Future<void> Function() onDuplicate,
+    required Future<void> Function() onClose,
+  }) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(position.dx, position.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      items: const [
+        PopupMenuItem<String>(value: 'duplicate', child: Text('复制')),
+        PopupMenuItem<String>(value: 'close', child: Text('关闭 SSH 会话')),
+      ],
+    );
+    if (selected == 'duplicate') {
+      await onDuplicate();
+    } else if (selected == 'close') {
+      await onClose();
+    }
+  }
 
   Future<void> _showCloseMenu({
     required BuildContext context,
@@ -118,10 +145,10 @@ class HostTree extends StatelessWidget {
                       (session) => InkWell(
                         onTap: () => onSshSessionTap(session),
                         onSecondaryTapDown: (details) {
-                          _showCloseMenu(
+                          _showSessionMenu(
                             context: context,
                             position: details.globalPosition,
-                            label: '关闭 SSH 会话',
+                            onDuplicate: () => onDuplicateSshSession(session),
                             onClose: () => onCloseSshSession(session),
                           );
                         },

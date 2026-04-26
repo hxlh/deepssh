@@ -16,9 +16,11 @@ use crate::frb_generated::StreamSink;
 
 static SESSION_STORE: Lazy<Mutex<HashMap<String, SshSession>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
-static CONNECTION_STORE: Lazy<Mutex<HashMap<String, SshConnection>>> =
+static CONNECTION_STORE: Lazy<Mutex<HashMap<String, SshChannel>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 static OUTPUT_SINK_STORE: Lazy<Mutex<HashMap<String, StreamSink<Vec<u8>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+static SSH_CLIENT_STORE: Lazy<Mutex<HashMap<String, SshConnectionInfo>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     Builder::new_multi_thread()
@@ -32,6 +34,7 @@ static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
 pub struct SshSession {
     pub session_id: String,
     pub profile_id: String,
+    pub connection_id: String,
     pub title: String,
     pub rows: u16,
     pub cols: u16,
@@ -43,8 +46,13 @@ enum SshCommand {
     Close,
 }
 
-struct SshConnection {
+struct SshChannel {
     cmd_tx: mpsc::UnboundedSender<SshCommand>,
+}
+
+struct SshConnectionInfo {
+    client: Arc<client::Handle<SshClientHandler>>,
+    session_ids: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -91,6 +99,7 @@ pub fn connect_profile(
             return Err(anyhow!("SSH authentication failed"));
         }
 
+        let connection_id = Uuid::new_v4().to_string();
         let channel = handle
             .channel_open_session()
             .await
@@ -110,6 +119,7 @@ pub fn connect_profile(
         let session = SshSession {
             session_id: session_id.clone(),
             profile_id,
+            connection_id: connection_id.clone(),
             title,
             rows,
             cols,
@@ -117,10 +127,17 @@ pub fn connect_profile(
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<SshCommand>();
         let (read_half, write_half) = channel.split();
 
+        SSH_CLIENT_STORE.lock().unwrap().insert(
+            connection_id,
+            SshConnectionInfo {
+                client: Arc::new(handle),
+                session_ids: vec![session_id.clone()],
+            },
+        );
         CONNECTION_STORE
             .lock()
             .unwrap()
-            .insert(session_id.clone(), SshConnection { cmd_tx });
+            .insert(session_id.clone(), SshChannel { cmd_tx });
         SESSION_STORE
             .lock()
             .unwrap()
@@ -137,12 +154,89 @@ pub fn connect_profile(
     })
 }
 
+pub fn duplicate_session(session_id: String) -> Result<SshSession> {
+    TOKIO_RUNTIME.block_on(async move {
+        let (connection_id, profile_id, title, rows, cols) = {
+            let sessions = SESSION_STORE.lock().unwrap();
+            let session = sessions
+                .get(&session_id)
+                .ok_or_else(|| anyhow!("Session not found"))?;
+            (
+                session.connection_id.clone(),
+                session.profile_id.clone(),
+                session.title.clone(),
+                session.rows,
+                session.cols,
+            )
+        };
+
+        let client = {
+            let store = SSH_CLIENT_STORE.lock().unwrap();
+            let conn_info = store
+                .get(&connection_id)
+                .ok_or_else(|| anyhow!("Connection not found"))?;
+            Arc::clone(&conn_info.client)
+        };
+
+        let channel = client
+            .channel_open_session()
+            .await
+            .map_err(|e| anyhow!("Channel creation failed: {:?}", e))?;
+        channel
+            .request_pty(true, "xterm", cols as u32, rows as u32, 0, 0, &[])
+            .await
+            .map_err(|e| anyhow!("PTY request failed: {:?}", e))?;
+        channel
+            .request_shell(true)
+            .await
+            .map_err(|e| anyhow!("Shell start failed: {:?}", e))?;
+
+        let new_session_id = Uuid::new_v4().to_string();
+        let session = SshSession {
+            session_id: new_session_id.clone(),
+            profile_id,
+            connection_id: connection_id.clone(),
+            title,
+            rows,
+            cols,
+        };
+
+        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<SshCommand>();
+        let (read_half, write_half) = channel.split();
+
+        CONNECTION_STORE
+            .lock()
+            .unwrap()
+            .insert(new_session_id.clone(), SshChannel { cmd_tx });
+        SESSION_STORE
+            .lock()
+            .unwrap()
+            .insert(new_session_id.clone(), session.clone());
+
+        {
+            let mut store = SSH_CLIENT_STORE.lock().unwrap();
+            if let Some(conn_info) = store.get_mut(&connection_id) {
+                conn_info.session_ids.push(new_session_id.clone());
+            }
+        }
+
+        TOKIO_RUNTIME.spawn(run_session_loop(
+            new_session_id.clone(),
+            read_half,
+            write_half,
+            cmd_rx,
+        ));
+
+        Ok(session)
+    })
+}
+
 pub fn write_to_session(session_id: String, data: Vec<u8>) -> Result<()> {
-    let connections = CONNECTION_STORE.lock().unwrap();
-    let connection = connections
+    let channels = CONNECTION_STORE.lock().unwrap();
+    let channel = channels
         .get(&session_id)
         .ok_or_else(|| anyhow!("Session not found"))?;
-    connection
+    channel
         .cmd_tx
         .send(SshCommand::Write(data))
         .map_err(|_| anyhow!("Session closed"))?;
@@ -150,11 +244,11 @@ pub fn write_to_session(session_id: String, data: Vec<u8>) -> Result<()> {
 }
 
 pub fn resize_session(session_id: String, rows: u16, cols: u16) -> Result<()> {
-    let connections = CONNECTION_STORE.lock().unwrap();
-    let connection = connections
+    let channels = CONNECTION_STORE.lock().unwrap();
+    let channel = channels
         .get(&session_id)
         .ok_or_else(|| anyhow!("Session not found"))?;
-    connection
+    channel
         .cmd_tx
         .send(SshCommand::Resize(rows, cols))
         .map_err(|_| anyhow!("Session closed"))?;
@@ -170,14 +264,36 @@ pub fn resize_session(session_id: String, rows: u16, cols: u16) -> Result<()> {
 }
 
 pub fn close_session(session_id: String) -> Result<bool> {
-    let removed_conn = CONNECTION_STORE.lock().unwrap().remove(&session_id);
-    if let Some(connection) = removed_conn.as_ref() {
-        let _ = connection.cmd_tx.send(SshCommand::Close);
+    let connection_id = SESSION_STORE
+        .lock()
+        .unwrap()
+        .get(&session_id)
+        .map(|s| s.connection_id.clone());
+
+    let removed_channel = CONNECTION_STORE.lock().unwrap().remove(&session_id);
+    if let Some(channel) = removed_channel.as_ref() {
+        let _ = channel.cmd_tx.send(SshCommand::Close);
     }
 
     let removed_session = SESSION_STORE.lock().unwrap().remove(&session_id);
     OUTPUT_SINK_STORE.lock().unwrap().remove(&session_id);
-    Ok(removed_session.is_some() || removed_conn.is_some())
+
+    if let Some(conn_id) = connection_id {
+        let should_remove = {
+            let mut client_store = SSH_CLIENT_STORE.lock().unwrap();
+            if let Some(conn_info) = client_store.get_mut(&conn_id) {
+                conn_info.session_ids.retain(|id| id != &session_id);
+                conn_info.session_ids.is_empty()
+            } else {
+                false
+            }
+        };
+        if should_remove {
+            SSH_CLIENT_STORE.lock().unwrap().remove(&conn_id);
+        }
+    }
+
+    Ok(removed_session.is_some() || removed_channel.is_some())
 }
 
 async fn run_session_loop(
@@ -215,9 +331,33 @@ async fn run_session_loop(
         }
     }
 
-    CONNECTION_STORE.lock().unwrap().remove(&session_id);
-    SESSION_STORE.lock().unwrap().remove(&session_id);
-    OUTPUT_SINK_STORE.lock().unwrap().remove(&session_id);
+    cleanup_session_after_loop(&session_id);
+}
+
+fn cleanup_session_after_loop(session_id: &str) {
+    let connection_id = SESSION_STORE
+        .lock()
+        .unwrap()
+        .get(session_id)
+        .map(|s| s.connection_id.clone());
+    CONNECTION_STORE.lock().unwrap().remove(session_id);
+    SESSION_STORE.lock().unwrap().remove(session_id);
+    OUTPUT_SINK_STORE.lock().unwrap().remove(session_id);
+
+    if let Some(conn_id) = connection_id {
+        let should_remove = {
+            let mut client_store = SSH_CLIENT_STORE.lock().unwrap();
+            if let Some(conn_info) = client_store.get_mut(&conn_id) {
+                conn_info.session_ids.retain(|id| id != session_id);
+                conn_info.session_ids.is_empty()
+            } else {
+                false
+            }
+        };
+        if should_remove {
+            SSH_CLIENT_STORE.lock().unwrap().remove(&conn_id);
+        }
+    }
 }
 
 fn push_output(session_id: &str, data: Vec<u8>) {
@@ -230,10 +370,12 @@ fn push_output(session_id: &str, data: Vec<u8>) {
 #[cfg(test)]
 fn register_session_for_test(profile_id: String, title: String) -> SshSession {
     let session_id = Uuid::new_v4().to_string();
+    let connection_id = Uuid::new_v4().to_string();
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<SshCommand>();
     let session = SshSession {
         session_id: session_id.clone(),
         profile_id,
+        connection_id: connection_id.clone(),
         title,
         rows: 24,
         cols: 80,
@@ -241,7 +383,7 @@ fn register_session_for_test(profile_id: String, title: String) -> SshSession {
     CONNECTION_STORE
         .lock()
         .unwrap()
-        .insert(session_id.clone(), SshConnection { cmd_tx });
+        .insert(session_id.clone(), SshChannel { cmd_tx });
     SESSION_STORE
         .lock()
         .unwrap()
@@ -262,6 +404,7 @@ fn clear_sessions_for_test() -> std::sync::MutexGuard<'static, ()> {
     SESSION_STORE.lock().unwrap().clear();
     CONNECTION_STORE.lock().unwrap().clear();
     OUTPUT_SINK_STORE.lock().unwrap().clear();
+    SSH_CLIENT_STORE.lock().unwrap().clear();
     guard
 }
 
@@ -320,5 +463,13 @@ mod tests {
         write_to_session(session.session_id.clone(), b"pwd\n".to_vec()).unwrap();
         resize_session(session.session_id.clone(), 30, 100).unwrap();
         assert!(close_session(session.session_id).unwrap());
+    }
+
+    #[test]
+    fn duplicate_missing_session_fails() {
+        let _guard = clear_sessions_for_test();
+
+        let result = duplicate_session("nonexistent".to_string());
+        assert!(result.is_err());
     }
 }

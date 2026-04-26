@@ -102,6 +102,10 @@ class _DefaultSshBridgeClientHolder implements SshBridgeClient {
   @override
   Future<void> closeSession(String sessionId) =>
       _delegate.closeSession(sessionId);
+
+  @override
+  Future<SshConnectionResult> duplicateSession(String sessionId) =>
+      _delegate.duplicateSession(sessionId);
 }
 
 class _DefaultThemeBridgeClientHolder implements ThemeBridgeClient {
@@ -485,6 +489,50 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     _removeSshSession(session);
   }
 
+  Future<void> _handleDuplicateSshSession(SshSessionItem session) async {
+    final sessionId = session.sessionId;
+    if (sessionId == null) return;
+
+    final nextIndex = sshSessionCounter + 1;
+    final newSession = SshSessionItem(
+      id: 'ssh-pending-$nextIndex',
+      profileId: session.profileId,
+      hostName: session.hostName,
+      title: 'terminal$nextIndex',
+      terminal: xterm.Terminal(maxLines: terminalThemeSettings.scrollbackLines),
+    );
+    final sessions =
+        sshSessionsByProfileId[session.profileId] ?? const <SshSessionItem>[];
+
+    setState(() {
+      sshSessionCounter = nextIndex;
+      sshSessionsByProfileId = {
+        ...sshSessionsByProfileId,
+        session.profileId: [...sessions, newSession],
+      };
+      terminalState = terminalState.open(_sshTabFromSession(newSession));
+      contentMode = WorkbenchContentMode.terminal;
+    });
+
+    try {
+      final result = await widget.sshBridge.duplicateSession(sessionId);
+      if (!mounted) return;
+      if (removedPendingSshSessionIds.remove(newSession.id)) {
+        try {
+          await widget.sshBridge.closeSession(result.sessionId);
+        } catch (_) {}
+        return;
+      }
+      _updateSshSession(newSession.copyWith(sessionId: result.sessionId));
+    } catch (error) {
+      if (!mounted) return;
+      _removeSshSession(newSession);
+      setState(() {
+        sshErrorMessage = 'Duplicate session failed: $error';
+      });
+    }
+  }
+
   Future<void> _handleConnectSshProfile(SshProfileItem profile) async {
     final nextIndex = sshSessionCounter + 1;
     final session = SshSessionItem(
@@ -611,6 +659,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               onSshProfileTap: (_) {},
               onSshSessionTap: _handleSshSessionTap,
               onCloseSshSession: _handleCloseSshSession,
+              onDuplicateSshSession: _handleDuplicateSshSession,
               onCloseLocalTerminal: _handleCloseLocalTerminal,
               onOpenThemeConfig: _handleOpenThemeConfig,
               themeConfigActive:

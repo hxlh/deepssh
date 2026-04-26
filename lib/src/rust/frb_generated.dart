@@ -66,7 +66,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 1217311623;
+  int get rustContentHash => -90405825;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -102,6 +102,10 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Future<void> crateProfileDeleteProfile({required String id});
+
+  Future<SshSession> crateSshSessionDuplicateSession({
+    required String sessionId,
+  });
 
   Future<List<SshProfile>> crateProfileListProfiles();
 
@@ -323,6 +327,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "delete_profile", argNames: ["id"]);
 
   @override
+  Future<SshSession> crateSshSessionDuplicateSession({
+    required String sessionId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(sessionId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 6,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_ssh_session,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateSshSessionDuplicateSessionConstMeta,
+        argValues: [sessionId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateSshSessionDuplicateSessionConstMeta =>
+      const TaskConstMeta(
+        debugName: "duplicate_session",
+        argNames: ["sessionId"],
+      );
+
+  @override
   Future<List<SshProfile>> crateProfileListProfiles() {
     return handler.executeNormal(
       NormalTask(
@@ -331,7 +368,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 7,
             port: port_,
           );
         },
@@ -358,7 +395,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 8,
             port: port_,
           );
         },
@@ -392,7 +429,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 9,
             port: port_,
           );
         },
@@ -423,7 +460,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 10,
             port: port_,
           );
         },
@@ -463,7 +500,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 11,
             port: port_,
           );
         },
@@ -497,7 +534,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 12,
             port: port_,
           );
         },
@@ -606,14 +643,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SshSession dco_decode_ssh_session(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return SshSession(
       sessionId: dco_decode_String(arr[0]),
       profileId: dco_decode_String(arr[1]),
-      title: dco_decode_String(arr[2]),
-      rows: dco_decode_u_16(arr[3]),
-      cols: dco_decode_u_16(arr[4]),
+      connectionId: dco_decode_String(arr[2]),
+      title: dco_decode_String(arr[3]),
+      rows: dco_decode_u_16(arr[4]),
+      cols: dco_decode_u_16(arr[5]),
     );
   }
 
@@ -801,12 +839,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_sessionId = sse_decode_String(deserializer);
     var var_profileId = sse_decode_String(deserializer);
+    var var_connectionId = sse_decode_String(deserializer);
     var var_title = sse_decode_String(deserializer);
     var var_rows = sse_decode_u_16(deserializer);
     var var_cols = sse_decode_u_16(deserializer);
     return SshSession(
       sessionId: var_sessionId,
       profileId: var_profileId,
+      connectionId: var_connectionId,
       title: var_title,
       rows: var_rows,
       cols: var_cols,
@@ -1023,6 +1063,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.sessionId, serializer);
     sse_encode_String(self.profileId, serializer);
+    sse_encode_String(self.connectionId, serializer);
     sse_encode_String(self.title, serializer);
     sse_encode_u_16(self.rows, serializer);
     sse_encode_u_16(self.cols, serializer);

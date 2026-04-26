@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1217311623;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -90405825;
 
 // Section: executor
 
@@ -240,6 +240,41 @@ fn wire__crate__profile__delete_profile_impl(
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
                     (move || {
                         let output_ok = crate::profile::delete_profile(api_id)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__ssh_session__duplicate_session_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "duplicate_session",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_session_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::ssh_session::duplicate_session(api_session_id)?;
                         Ok(output_ok)
                     })(),
                 )
@@ -579,12 +614,14 @@ impl SseDecode for crate::ssh_session::SshSession {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_sessionId = <String>::sse_decode(deserializer);
         let mut var_profileId = <String>::sse_decode(deserializer);
+        let mut var_connectionId = <String>::sse_decode(deserializer);
         let mut var_title = <String>::sse_decode(deserializer);
         let mut var_rows = <u16>::sse_decode(deserializer);
         let mut var_cols = <u16>::sse_decode(deserializer);
         return crate::ssh_session::SshSession {
             session_id: var_sessionId,
             profile_id: var_profileId,
+            connection_id: var_connectionId,
             title: var_title,
             rows: var_rows,
             cols: var_cols,
@@ -707,12 +744,13 @@ fn pde_ffi_dispatcher_primary_impl(
         3 => wire__crate__ssh_session__create_output_stream_impl(port, ptr, rust_vec_len, data_len),
         4 => wire__crate__profile__create_profile_impl(port, ptr, rust_vec_len, data_len),
         5 => wire__crate__profile__delete_profile_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__profile__list_profiles_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__theme__load_theme_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__ssh_session__resize_session_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__theme__save_theme_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__profile__update_profile_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__ssh_session__write_to_session_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__ssh_session__duplicate_session_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__profile__list_profiles_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__theme__load_theme_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__ssh_session__resize_session_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__theme__save_theme_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__profile__update_profile_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__ssh_session__write_to_session_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -775,6 +813,7 @@ impl flutter_rust_bridge::IntoDart for crate::ssh_session::SshSession {
         [
             self.session_id.into_into_dart().into_dart(),
             self.profile_id.into_into_dart().into_dart(),
+            self.connection_id.into_into_dart().into_dart(),
             self.title.into_into_dart().into_dart(),
             self.rows.into_into_dart().into_dart(),
             self.cols.into_into_dart().into_dart(),
@@ -945,6 +984,7 @@ impl SseEncode for crate::ssh_session::SshSession {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.session_id, serializer);
         <String>::sse_encode(self.profile_id, serializer);
+        <String>::sse_encode(self.connection_id, serializer);
         <String>::sse_encode(self.title, serializer);
         <u16>::sse_encode(self.rows, serializer);
         <u16>::sse_encode(self.cols, serializer);

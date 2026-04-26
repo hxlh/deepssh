@@ -852,6 +852,14 @@ class RecordingSshBridgeClient implements SshBridgeClient {
   Future<void> writeToSession(String sessionId, List<int> data) async {
     writes.add(utf8.decode(data));
   }
+
+  @override
+  Future<SshConnectionResult> duplicateSession(String sessionId) async {
+    return const SshConnectionResult(
+      sessionId: 'ssh-session-dup',
+      title: 'duplicated',
+    );
+  }
 }
 
 class ResizeCall {
