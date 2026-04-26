@@ -1,0 +1,52 @@
+name: Package Desktop Builds
+
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+          - os: macos-latest
+            platform: macos
+
+    runs-on: ${{ matrix.os }}
+    name: Package ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Package (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: .\build.ps1 package --release
+
+      - name: Package (macOS)
+        if: matrix.platform == 'macos'
+        run: ./build.sh package --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepssh-${{ matrix.platform }}
+          path: dist/deepssh-${{ matrix.platform }}-*
+          if-no-files-found: error
