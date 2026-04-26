@@ -3,10 +3,12 @@ import 'dart:convert';
 
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
+import 'package:deepssh/features/terminal/terminal_view.dart' as app_terminal;
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xterm/xterm.dart' as xterm;
 
 class FakeSshBridgeClient implements SshBridgeClient {
   final profiles = <SshProfileItem>[];
@@ -19,6 +21,7 @@ class FakeSshBridgeClient implements SshBridgeClient {
   Object? cancelOutputSubscriptionError;
   final closedSessionIds = <String>[];
   List<int> lastWriteData = const [];
+  final outputControllers = <String, StreamController<List<int>>>{};
 
   @override
   Future<List<SshProfileItem>> listProfiles() async => List.of(profiles);
@@ -91,6 +94,10 @@ class FakeSshBridgeClient implements SshBridgeClient {
         onCancel: () => throw cancelError,
       );
       controller.add('real ssh output\r\n'.codeUnits);
+      return controller.stream;
+    }
+    final controller = outputControllers[sessionId];
+    if (controller != null) {
       return controller.stream;
     }
     return Stream.value('real ssh output\r\n'.codeUnits);
@@ -483,6 +490,102 @@ void main() {
     expect(bridge.closeSessionCount, 1);
     expect(find.text('terminal1'), findsNothing);
     expect(find.text('example.com · terminal1'), findsNothing);
+  });
+
+  testWidgets('batches rapid SSH output before updating terminal state', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
+    bridge.outputControllers['session-1'] = StreamController<List<int>>();
+
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
+
+    final controller = bridge.outputControllers['session-1']!;
+    controller.add(utf8.encode('line 1\r\n'));
+    controller.add(utf8.encode('line 2\r\n'));
+    controller.add(utf8.encode('line 3\r\n'));
+    await tester.pump();
+
+    var terminalWidget = tester.widget<xterm.TerminalView>(
+      find.byType(xterm.TerminalView),
+    );
+    expect(
+      terminalWidget.terminal.buffer.toString(),
+      isNot(contains('line 3')),
+    );
+
+    await tester.pump(const Duration(milliseconds: 40));
+
+    terminalWidget = tester.widget<xterm.TerminalView>(
+      find.byType(xterm.TerminalView),
+    );
+    final text = terminalWidget.terminal.buffer.toString();
+    expect(text, contains('line 1'));
+    expect(text, contains('line 2'));
+    expect(text, contains('line 3'));
+  });
+
+  testWidgets('does not retain large SSH output in tab history', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
+    bridge.outputControllers['session-1'] = StreamController<List<int>>();
+
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
+
+    final largeOutput = '${'tidb'.padRight(2048, 'x')}\r\n';
+    bridge.outputControllers['session-1']!.add(utf8.encode(largeOutput));
+    await tester.pump(const Duration(milliseconds: 40));
+
+    final terminalWidget = tester.widget<xterm.TerminalView>(
+      find.byType(xterm.TerminalView),
+    );
+    expect(terminalWidget.terminal.buffer.toString(), contains('tidb'));
+
+    final appTerminalWidget = tester.widget<app_terminal.TerminalView>(
+      find.byType(app_terminal.TerminalView),
+    );
+    expect(appTerminalWidget.tab.history, isEmpty);
   });
 
   testWidgets(

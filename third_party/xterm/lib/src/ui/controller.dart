@@ -126,13 +126,16 @@ class TerminalController with ChangeNotifier {
   TerminalHighlight highlight({
     required CellAnchor p1,
     required CellAnchor p2,
-    required Color color,
+    Color? color,
+    Color? foregroundColor,
+    Color? backgroundColor,
   }) {
     final highlight = TerminalHighlight(
       this,
       p1: p1,
       p2: p2,
-      color: color,
+      foregroundColor: foregroundColor,
+      backgroundColor: backgroundColor ?? color,
     );
 
     _highlights.add(highlight);
@@ -154,13 +157,18 @@ class TerminalHighlight with Disposable {
 
   final CellAnchor p2;
 
-  final Color color;
+  final Color? foregroundColor;
+
+  final Color? backgroundColor;
+
+  Color get color => backgroundColor ?? foregroundColor ?? const Color(0x00000000);
 
   TerminalHighlight(
     this.owner, {
     required this.p1,
     required this.p2,
-    required this.color,
+    this.foregroundColor,
+    this.backgroundColor,
   });
 
   /// Returns the range of the highlight. May be null if the anchors that

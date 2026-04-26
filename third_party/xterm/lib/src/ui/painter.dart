@@ -173,19 +173,26 @@ class TerminalPainter {
   /// Paints the character in the cell represented by [cellData] to [canvas] at
   /// [offset].
   @pragma('vm:prefer-inline')
-  void paintCellForeground(Canvas canvas, Offset offset, CellData cellData) {
+  void paintCellForeground(
+    Canvas canvas,
+    Offset offset,
+    CellData cellData, {
+    Color? foregroundColor,
+  }) {
     final charCode = cellData.content & CellContent.codepointMask;
     if (charCode == 0) return;
 
-    final cacheKey = cellData.getHash() ^ _textScaler.hashCode;
+    final cacheKey =
+        cellData.getHash() ^ _textScaler.hashCode ^ (foregroundColor?.hashCode ?? 0);
     var paragraph = _paragraphCache.getLayoutFromCache(cacheKey);
 
     if (paragraph == null) {
       final cellFlags = cellData.flags;
 
-      var color = cellFlags & CellFlags.inverse == 0
-          ? resolveForegroundColor(cellData.foreground)
-          : resolveBackgroundColor(cellData.background);
+      var color = foregroundColor ??
+          (cellFlags & CellFlags.inverse == 0
+              ? resolveForegroundColor(cellData.foreground)
+              : resolveBackgroundColor(cellData.background));
 
       if (cellData.flags & CellFlags.faint != 0) {
         color = color.withOpacity(0.5);

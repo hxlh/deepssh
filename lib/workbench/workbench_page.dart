@@ -107,7 +107,8 @@ class _DefaultSshBridgeClientHolder implements SshBridgeClient {
 class _DefaultThemeBridgeClientHolder implements ThemeBridgeClient {
   const _DefaultThemeBridgeClientHolder();
 
-  static final InMemoryThemeBridgeClient _delegate = InMemoryThemeBridgeClient();
+  static final InMemoryThemeBridgeClient _delegate =
+      InMemoryThemeBridgeClient();
 
   @override
   Future<({UiThemeSettings ui, TerminalThemeSettings terminal})> loadTheme() =>
@@ -133,12 +134,15 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   Map<String, List<SshSessionItem>> sshSessionsByProfileId = const {};
   int sshSessionCounter = 0;
   final sshOutputSubscriptions = <String, StreamSubscription<String>>{};
+  final sshOutputBuffers = <String, StringBuffer>{};
+  final sshOutputFlushTimers = <String, Timer>{};
   final closingSshSessionIds = <String>{};
   final removedPendingSshSessionIds = <String>{};
   SshProfileItem? editingSshProfile;
   String? sshErrorMessage;
   UiThemeSettings uiThemeSettings = UiThemeSettings.commandDeck();
-  TerminalThemeSettings terminalThemeSettings = TerminalThemeSettings.commandDeck();
+  TerminalThemeSettings terminalThemeSettings =
+      TerminalThemeSettings.commandDeck();
   bool _themeSaveInFlight = false;
   bool _themeSaveQueued = false;
 
@@ -151,6 +155,9 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
 
   @override
   void dispose() {
+    for (final timer in sshOutputFlushTimers.values) {
+      timer.cancel();
+    }
     for (final subscription in sshOutputSubscriptions.values) {
       subscription.cancel();
     }
@@ -342,6 +349,51 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     return lines.skip(lines.length - sshSessionHistoryLineLimit).join('\n');
   }
 
+  void _scheduleSshOutputFlush(SshSessionItem session) {
+    if (sshOutputFlushTimers.containsKey(session.id)) return;
+    sshOutputFlushTimers[session.id] = Timer(
+      const Duration(milliseconds: 16),
+      () {
+        sshOutputFlushTimers.remove(session.id);
+        _flushSshOutput(session);
+      },
+    );
+  }
+
+  void _flushSshOutput(SshSessionItem session) {
+    final buffer = sshOutputBuffers.remove(session.id);
+    if (buffer == null || !mounted) return;
+    final text = buffer.toString();
+    if (text.isEmpty) return;
+
+    final sessions =
+        sshSessionsByProfileId[session.profileId] ?? const <SshSessionItem>[];
+    SshSessionItem? updatedSession;
+    final nextSessions = [
+      for (final item in sessions)
+        if (item.id == session.id)
+          updatedSession = item.copyWith(
+            history: item.terminal == null
+                ? _appendSshHistory(item.history, text)
+                : item.history,
+          )
+        else
+          item,
+    ];
+    if (updatedSession == null) return;
+    final terminal = updatedSession.terminal;
+    if (terminal != null) {
+      terminal.write(text);
+    }
+    setState(() {
+      sshSessionsByProfileId = {
+        ...sshSessionsByProfileId,
+        session.profileId: nextSessions,
+      };
+      terminalState = terminalState.update(_sshTabFromSession(updatedSession!));
+    });
+  }
+
   void _startSshOutputSubscription(SshSessionItem session) {
     final sessionId = session.sessionId;
     if (sessionId == null || sshOutputSubscriptions.containsKey(session.id)) {
@@ -353,35 +405,16 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         .listen(
           (text) {
             if (!mounted || text.isEmpty) return;
-            final sessions =
-                sshSessionsByProfileId[session.profileId] ??
-                const <SshSessionItem>[];
-            SshSessionItem? updatedSession;
-            final nextSessions = [
-              for (final item in sessions)
-                if (item.id == session.id)
-                  updatedSession = item.copyWith(
-                    history: _appendSshHistory(item.history, text),
-                  )
-                else
-                  item,
-            ];
-            if (updatedSession == null) return;
-            final terminal = updatedSession.terminal;
-            if (terminal != null) {
-              terminal.write(text);
-            }
-            setState(() {
-              sshSessionsByProfileId = {
-                ...sshSessionsByProfileId,
-                session.profileId: nextSessions,
-              };
-              terminalState = terminalState.update(
-                _sshTabFromSession(updatedSession!),
-              );
-            });
+            final buffer = sshOutputBuffers.putIfAbsent(
+              session.id,
+              StringBuffer.new,
+            );
+            buffer.write(text);
+            _scheduleSshOutputFlush(session);
           },
           onDone: () {
+            sshOutputFlushTimers.remove(session.id)?.cancel();
+            _flushSshOutput(session);
             sshOutputSubscriptions.remove(session.id);
           },
         );
@@ -408,6 +441,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     final nextSessions = sessions
         .where((item) => item.id != session.id)
         .toList();
+    sshOutputFlushTimers.remove(session.id)?.cancel();
+    sshOutputBuffers.remove(session.id);
     setState(() {
       sshSessionsByProfileId = {
         ...sshSessionsByProfileId,
@@ -457,9 +492,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       profileId: profile.id,
       hostName: profile.host,
       title: 'terminal$nextIndex',
-      terminal: xterm.Terminal(
-        maxLines: terminalThemeSettings.scrollbackLines,
-      ),
+      terminal: xterm.Terminal(maxLines: terminalThemeSettings.scrollbackLines),
     );
     final sessions =
         sshSessionsByProfileId[profile.id] ?? const <SshSessionItem>[];
@@ -549,10 +582,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       final ui = uiThemeSettings;
       final terminal = terminalThemeSettings;
       try {
-        await widget.themeBridge.saveTheme(
-          ui: ui,
-          terminal: terminal,
-        );
+        await widget.themeBridge.saveTheme(ui: ui, terminal: terminal);
       } catch (_) {
         // Ignore persistence errors so the UI keeps responding.
       }
@@ -587,11 +617,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                   contentMode == WorkbenchContentMode.themeConfig,
             ),
           ),
-          VerticalDivider(
-            width: 1,
-            thickness: 1,
-            color: AppColors.border,
-          ),
+          VerticalDivider(width: 1, thickness: 1, color: AppColors.border),
           Expanded(
             child: WorkbenchContentSwitcher(
               mode: contentMode,

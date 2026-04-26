@@ -409,6 +409,15 @@ void main() {
     expect(terminalView(tester).cursorBlinkVisible, isFalse);
   });
 
+  test('reports cursor position using one-based coordinates', () {
+    final output = <String>[];
+    final terminal = xterm.Terminal(onOutput: output.add);
+
+    terminal.write('\x1b[6n');
+
+    expect(output, ['\x1b[1;1R']);
+  });
+
   testWidgets('keeps cursor visible until 500ms after latest input', (
     tester,
   ) async {
@@ -565,6 +574,134 @@ void main() {
     expect(terminalView(tester).cursorBlinkVisible, isTrue);
     await tester.pump(const Duration(milliseconds: 600));
     expect(terminalView(tester).cursorBlinkVisible, isTrue);
+  });
+
+  testWidgets('highlights terminal output that matches regex rules', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final theme = _defaultTerminalTheme.copyWith(
+      regexHighlights: const [
+        RegexHighlight(pattern: 'ERROR', color: Color(0xFFF14C4C)),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: theme,
+          ),
+        ),
+      ),
+    );
+
+    terminal.write('2026-04-26 ERROR request failed\r\n');
+    await tester.pump(const Duration(milliseconds: 120));
+
+    final controller = terminalView(tester).controller;
+    expect(controller, isNotNull);
+    expect(controller!.highlights, hasLength(1));
+    final range = controller.highlights.single.range!;
+    expect(range.begin.x, 11);
+    expect(range.end.x, 16);
+    expect(
+      controller.highlights.single.foregroundColor,
+      const Color(0xFFF14C4C),
+    );
+    expect(controller.highlights.single.backgroundColor, isNull);
+  });
+
+  testWidgets('skips invalid regex highlight rules', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final theme = _defaultTerminalTheme.copyWith(
+      regexHighlights: const [
+        RegexHighlight(pattern: '[', color: Color(0xFFF5F543)),
+        RegexHighlight(pattern: 'WARN', color: Color(0xFFF5F543)),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: theme,
+          ),
+        ),
+      ),
+    );
+
+    terminal.write('WARN slow request\r\n');
+    await tester.pump(const Duration(milliseconds: 120));
+
+    final controller = terminalView(tester).controller!;
+    expect(controller.highlights, hasLength(1));
+    expect(controller.highlights.single.range!.begin.x, 0);
+    expect(controller.highlights.single.range!.end.x, 4);
+  });
+
+  testWidgets('debounces regex highlighting during rapid terminal output', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final theme = _defaultTerminalTheme.copyWith(
+      regexHighlights: const [
+        RegexHighlight(pattern: 'ERROR', color: Color(0xFFF14C4C)),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: theme,
+          ),
+        ),
+      ),
+    );
+
+    terminal.write('path/a.dart\r\n');
+    terminal.write('path/b.dart\r\n');
+    terminal.write('path/c.dart ERROR\r\n');
+    await tester.pump();
+
+    final controller = terminalView(tester).controller!;
+    expect(controller.highlights, isEmpty);
+
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(controller.highlights, hasLength(1));
+    expect(controller.highlights.single.range!.begin.x, 12);
+    expect(controller.highlights.single.range!.end.x, 17);
   });
 
   testWidgets('coalesces rapid SSH terminal viewport resize events', (

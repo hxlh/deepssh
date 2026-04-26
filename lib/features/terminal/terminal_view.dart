@@ -30,8 +30,11 @@ class TerminalView extends StatefulWidget {
 class _TerminalViewState extends State<TerminalView> {
   final inputFocusNode = FocusNode();
   final textController = TextEditingController();
+  final terminalController = xterm.TerminalController();
+  final regexHighlights = <xterm.TerminalHighlight>[];
   late final xterm.Terminal terminal;
   Timer? _resizeDebounce;
+  Timer? _regexHighlightDebounce;
   Timer? _cursorIdleTimer;
   Timer? _cursorBlinkTimer;
   bool _cursorVisible = true;
@@ -43,6 +46,7 @@ class _TerminalViewState extends State<TerminalView> {
     _applyCursorBlinkMode();
     terminal.addListener(_handleTerminalChanged);
     textController.addListener(_handleTextEditingChanged);
+    _refreshRegexHighlights();
 
     if (widget.tab.sourceType == TerminalSourceType.ssh) {
       if (widget.tab.terminal == null && widget.tab.history.isNotEmpty) {
@@ -98,6 +102,52 @@ class _TerminalViewState extends State<TerminalView> {
 
   void _handleTerminalChanged() {
     _resetCursorBlinkIdle();
+    _scheduleRegexHighlightsRefresh();
+  }
+
+  void _scheduleRegexHighlightsRefresh() {
+    _regexHighlightDebounce?.cancel();
+    _regexHighlightDebounce = Timer(const Duration(milliseconds: 80), () {
+      if (mounted) {
+        _refreshRegexHighlights();
+      }
+    });
+  }
+
+  void _refreshRegexHighlights() {
+    for (final highlight in regexHighlights) {
+      highlight.dispose();
+    }
+    regexHighlights.clear();
+
+    for (final rule in widget.terminalThemeSettings.regexHighlights) {
+      if (rule.pattern.isEmpty) continue;
+      final regex = _compileRegex(rule.pattern);
+      if (regex == null) continue;
+
+      final lines = terminal.buffer.lines;
+      for (var row = 0; row < lines.length; row++) {
+        final lineText = lines[row].getText();
+        for (final match in regex.allMatches(lineText)) {
+          if (match.start == match.end) continue;
+          regexHighlights.add(
+            terminalController.highlight(
+              p1: terminal.buffer.createAnchor(match.start, row),
+              p2: terminal.buffer.createAnchor(match.end, row),
+              foregroundColor: rule.color,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  RegExp? _compileRegex(String pattern) {
+    try {
+      return RegExp(pattern);
+    } on FormatException {
+      return null;
+    }
   }
 
   void _applyCursorBlinkMode() {
@@ -242,6 +292,11 @@ class _TerminalViewState extends State<TerminalView> {
         widget.terminalThemeSettings.cursorBlink) {
       _applyCursorBlinkMode();
     }
+    if (oldWidget.terminalThemeSettings.regexHighlights !=
+        widget.terminalThemeSettings.regexHighlights) {
+      _regexHighlightDebounce?.cancel();
+      _refreshRegexHighlights();
+    }
     if (oldSessionId != sessionId && sessionId != null) {
       _bindSshSession(sessionId);
     }
@@ -259,8 +314,14 @@ class _TerminalViewState extends State<TerminalView> {
   @override
   void dispose() {
     _resizeDebounce?.cancel();
+    _regexHighlightDebounce?.cancel();
     _cursorIdleTimer?.cancel();
     _cursorBlinkTimer?.cancel();
+    for (final highlight in regexHighlights) {
+      highlight.dispose();
+    }
+    regexHighlights.clear();
+    terminalController.dispose();
     terminal.removeListener(_handleTerminalChanged);
     inputFocusNode.dispose();
     textController.dispose();
@@ -292,6 +353,7 @@ class _TerminalViewState extends State<TerminalView> {
               onPointerDown: (_) => _focusInputProxy(),
               child: xterm.TerminalView(
                 terminal,
+                controller: terminalController,
                 focusNode: inputFocusNode,
                 hardwareKeyboardOnly: true,
                 cursorType: _xtermCursorType(settings.cursorStyle),

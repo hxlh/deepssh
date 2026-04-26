@@ -287,6 +287,14 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
                 termSettings.copyWith(regexHighlights: highlights),
               );
             },
+            onRemove: () {
+              final highlights = List<RegexHighlight>.from(
+                termSettings.regexHighlights,
+              )..removeAt(entry.key);
+              _updateTerm(
+                termSettings.copyWith(regexHighlights: highlights),
+              );
+            },
           ),
         ),
         const SizedBox(height: 8),
@@ -886,12 +894,14 @@ class _RegexRuleRow extends StatelessWidget {
     required this.color,
     required this.onPatternChanged,
     required this.onColorChanged,
+    required this.onRemove,
   });
 
   final String pattern;
   final Color color;
   final ValueChanged<String> onPatternChanged;
   final ValueChanged<Color> onColorChanged;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -899,14 +909,29 @@ class _RegexRuleRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Expanded(
-            child: _TextInput(value: pattern, onChanged: onPatternChanged),
+          Flexible(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 390),
+              child: _TextInput(value: pattern, onChanged: onPatternChanged),
+            ),
           ),
           const SizedBox(width: 8),
           ColorPickerField(
             value: color,
             onChanged: onColorChanged,
             compact: true,
+          ),
+          const SizedBox(width: 8),
+          Tooltip(
+            message: '移除正则规则',
+            child: IconButton(
+              onPressed: onRemove,
+              icon: const Icon(Icons.close, size: 16),
+              color: AppColors.textMuted,
+              hoverColor: AppColors.tabHover,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+            ),
           ),
         ],
       ),

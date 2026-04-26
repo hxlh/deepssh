@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:xterm/src/core/buffer/cell_offset.dart';
 import 'package:xterm/src/core/buffer/range.dart';
 import 'package:xterm/src/core/buffer/segment.dart';
+import 'package:xterm/src/core/cell.dart';
 import 'package:xterm/src/core/mouse/button.dart';
 import 'package:xterm/src/core/mouse/button_state.dart';
 import 'package:xterm/src/terminal.dart';
@@ -423,6 +424,13 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     final effectFirstLine = firstLine.clamp(0, lines.length - 1);
     final effectLastLine = lastLine.clamp(0, lines.length - 1);
 
+    _paintHighlightBackgrounds(
+      canvas,
+      _controller.highlights,
+      effectFirstLine,
+      effectLastLine,
+    );
+
     for (var i = effectFirstLine; i <= effectLastLine; i++) {
       _painter.paintLine(
         canvas,
@@ -430,6 +438,13 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         lines[i],
       );
     }
+
+    _paintHighlightForegrounds(
+      canvas,
+      _controller.highlights,
+      effectFirstLine,
+      effectLastLine,
+    );
 
     if (_terminal.buffer.absoluteCursorY >= effectFirstLine &&
         _terminal.buffer.absoluteCursorY <= effectLastLine) {
@@ -446,13 +461,6 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         );
       }
     }
-
-    _paintHighlights(
-      canvas,
-      _controller.highlights,
-      effectFirstLine,
-      effectLastLine,
-    );
 
     if (_controller.selection != null) {
       _paintSelection(
@@ -518,13 +526,15 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     }
   }
 
-  void _paintHighlights(
+  void _paintHighlightBackgrounds(
     Canvas canvas,
     List<TerminalHighlight> highlights,
     int firstLine,
     int lastLine,
   ) {
-    for (var highlight in _controller.highlights) {
+    for (var highlight in highlights) {
+      final color = highlight.backgroundColor;
+      if (color == null) continue;
       final range = highlight.range?.normalized;
 
       if (range == null ||
@@ -542,7 +552,56 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
           break;
         }
 
-        _paintSegment(canvas, segment, highlight.color);
+        _paintSegment(canvas, segment, color);
+      }
+    }
+  }
+
+  void _paintHighlightForegrounds(
+    Canvas canvas,
+    List<TerminalHighlight> highlights,
+    int firstLine,
+    int lastLine,
+  ) {
+    final cellData = CellData.empty();
+
+    for (var highlight in highlights) {
+      final color = highlight.foregroundColor;
+      if (color == null) continue;
+      final range = highlight.range?.normalized;
+
+      if (range == null ||
+          range.begin.y > lastLine ||
+          range.end.y < firstLine) {
+        continue;
+      }
+
+      for (var segment in range.toSegments()) {
+        if (segment.line < firstLine) {
+          continue;
+        }
+
+        if (segment.line > lastLine) {
+          break;
+        }
+
+        final line = _terminal.buffer.lines[segment.line];
+        final start = segment.start ?? 0;
+        final end = segment.end ?? _terminal.viewWidth;
+
+        for (var i = start; i < end && i < line.length; i++) {
+          line.getCellData(i, cellData);
+          final cellOffset = Offset(
+            i * _painter.cellSize.width,
+            segment.line * _painter.cellSize.height + _lineOffset,
+          );
+          _painter.paintCellForeground(
+            canvas,
+            cellOffset,
+            cellData,
+            foregroundColor: color,
+          );
+        }
       }
     }
   }

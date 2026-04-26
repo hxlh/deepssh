@@ -4,6 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('command deck terminal theme includes common log regex rules', () {
+    final patterns = TerminalThemeSettings.commandDeck()
+        .regexHighlights
+        .map((highlight) => highlight.pattern)
+        .toList();
+
+    expect(patterns, contains('ERROR|FATAL|Exception|Traceback'));
+    expect(patterns, contains('WARN|WARNING'));
+    expect(patterns, contains(r'\b[45]\d\d\b'));
+    expect(patterns, contains(r'\b\d+ms\b|\b\d+\.\d+s\b'));
+  });
+
   testWidgets('text input changes are emitted as the user types', (tester) async {
     UiThemeSettings? savedUi;
 
@@ -59,5 +71,38 @@ void main() {
     await tester.pump();
 
     expect(find.widgetWithText(TextFormField, 'Loaded Font'), findsOneWidget);
+  });
+
+  testWidgets('removes regex highlight rules from terminal settings', (
+    tester,
+  ) async {
+    TerminalThemeSettings? savedTerminal;
+    final terminalSettings = TerminalThemeSettings.commandDeck().copyWith(
+      regexHighlights: const [
+        RegexHighlight(pattern: 'ERROR', color: Color(0xFFF14C4C)),
+        RegexHighlight(pattern: 'WARN', color: Color(0xFFF5F543)),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ThemeConfigPage(
+            uiSettings: UiThemeSettings.commandDeck(),
+            terminalSettings: terminalSettings,
+            onUiSettingsChanged: (_) {},
+            onTerminalSettingsChanged: (settings) => savedTerminal = settings,
+            onBack: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.byTooltip('移除正则规则').first);
+    await tester.tap(find.byTooltip('移除正则规则').first);
+    await tester.pump();
+
+    expect(savedTerminal?.regexHighlights, hasLength(1));
+    expect(savedTerminal?.regexHighlights.single.pattern, 'WARN');
   });
 }

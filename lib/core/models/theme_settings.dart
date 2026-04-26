@@ -149,9 +149,25 @@ class TerminalThemeSettings {
     cursorColor: Color(0xFF3794FF),
     scrollbackLines: 10000,
     regexHighlights: [
-      RegexHighlight(pattern: 'ERROR', color: Color(0xFFF14C4C)),
-      RegexHighlight(pattern: 'SUCCESS', color: Color(0xFF23D18B)),
-      RegexHighlight(pattern: r'\d+', color: Color(0xFF29B8DB)),
+      RegexHighlight(
+        pattern: 'ERROR|FATAL|Exception|Traceback',
+        color: Color(0xFFF14C4C),
+      ),
+      RegexHighlight(pattern: 'WARN|WARNING', color: Color(0xFFF5F543)),
+      RegexHighlight(pattern: 'SUCCESS|OK|DONE', color: Color(0xFF23D18B)),
+      RegexHighlight(pattern: r'\b[45]\d\d\b', color: Color(0xFFF14C4C)),
+      RegexHighlight(
+        pattern: r'\b\d+ms\b|\b\d+\.\d+s\b',
+        color: Color(0xFF29B8DB),
+      ),
+      RegexHighlight(
+        pattern: r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
+        color: Color(0xFFD670D6),
+      ),
+      RegexHighlight(
+        pattern: r'\b[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\b',
+        color: Color(0xFF3B8EEA),
+      ),
     ],
   );
 
