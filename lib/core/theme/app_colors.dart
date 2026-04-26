@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/theme_settings.dart';
 
 abstract final class AppColors {
+  static String fontFamily = 'Inter';
+  static int fontSize = 14;
   static Color background = const Color(0xFF1E1E1E);
   static Color panel = const Color(0xFF252526);
   static Color sidebar = const Color(0xFF181818);
@@ -16,6 +18,8 @@ abstract final class AppColors {
   static Color selection = const Color(0xFF094771);
 
   static void applyUi(UiThemeSettings settings) {
+    fontFamily = settings.fontFamily;
+    fontSize = settings.fontSize;
     background = settings.background;
     panel = settings.panel;
     sidebar = settings.sidebar;
