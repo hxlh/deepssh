@@ -57,3 +57,5 @@ rust/target
 .claude/
 CLAUDE.md
 docs/superpowers
+.mcp.json
+figma-plugin

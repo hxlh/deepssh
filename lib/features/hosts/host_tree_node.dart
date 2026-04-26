@@ -39,7 +39,7 @@ class HostTreeNode extends StatelessWidget {
                     size: 18,
                     color: AppColors.textMuted,
                   ),
-                  const Icon(
+                  Icon(
                     Icons.computer,
                     size: 16,
                     color: AppColors.textMuted,
@@ -89,7 +89,7 @@ class _TerminalRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.terminal, size: 16, color: AppColors.textMuted),
+            Icon(Icons.terminal, size: 16, color: AppColors.textMuted),
             const SizedBox(width: 8),
             Expanded(
               child: Text(terminal.title, overflow: TextOverflow.ellipsis),

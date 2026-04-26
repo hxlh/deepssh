@@ -38,3 +38,15 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+# Ensure the Rust crate (deepssh_rust) is built before the runner, then copy
+# the resulting DLL next to the runner executable so flutter_rust_bridge can
+# dlopen it at runtime.
+add_dependencies(${BINARY_NAME} deepssh_rust)
+
+add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${RUST_DLL_PATH}"
+    "$<TARGET_FILE_DIR:${BINARY_NAME}>"
+  COMMENT "Copying deepssh_rust.dll next to ${BINARY_NAME}.exe"
+)

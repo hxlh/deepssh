@@ -18,7 +18,7 @@ class Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: AppSpacing.sidebarWidth,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.sidebar,
         border: Border(right: BorderSide(color: AppColors.border)),
       ),
@@ -29,7 +29,7 @@ class Sidebar extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     'EXPLORER',
                     style: TextStyle(

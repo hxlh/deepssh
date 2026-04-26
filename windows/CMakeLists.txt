@@ -49,6 +49,26 @@ endfunction()
 set(FLUTTER_MANAGED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/flutter")
 add_subdirectory(${FLUTTER_MANAGED_DIR})
 
+# === Rust crate (deepssh_rust) integration ===
+# Build the Rust crate via cargo so the runner target can depend on it. The
+# DLL is copied next to the runner executable from runner/CMakeLists.txt where
+# the runner target is defined.
+set(RUST_CRATE_DIR "${CMAKE_SOURCE_DIR}/../rust")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "$<CONFIG>" STREQUAL "Debug")
+  set(RUST_CARGO_PROFILE_DIR "debug")
+  set(RUST_CARGO_PROFILE_FLAG "")
+else()
+  set(RUST_CARGO_PROFILE_DIR "release")
+  set(RUST_CARGO_PROFILE_FLAG "--release")
+endif()
+set(RUST_DLL_PATH "${RUST_CRATE_DIR}/target/${RUST_CARGO_PROFILE_DIR}/deepssh_rust.dll")
+
+add_custom_target(deepssh_rust ALL
+  COMMAND cargo build ${RUST_CARGO_PROFILE_FLAG}
+  WORKING_DIRECTORY "${RUST_CRATE_DIR}"
+  COMMENT "Building deepssh_rust crate (${RUST_CARGO_PROFILE_DIR})"
+)
+
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 
@@ -86,6 +106,11 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endif()
+
+# Install the Rust crate DLL alongside the bundled plugin libraries.
+install(FILES "${RUST_DLL_PATH}"
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  COMPONENT Runtime)
 
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")

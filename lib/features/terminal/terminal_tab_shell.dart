@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/models/theme_settings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../workbench/widgets/empty_state.dart';
 import '../../workbench/widgets/tab_strip.dart';
@@ -14,20 +15,22 @@ class TerminalTabShell extends StatelessWidget {
     required this.onSelectTab,
     required this.onCloseTab,
     required this.sshBridge,
+    required this.terminalThemeSettings,
   });
 
   final TerminalState state;
   final ValueChanged<String> onSelectTab;
   final ValueChanged<String> onCloseTab;
   final SshBridgeClient sshBridge;
+  final TerminalThemeSettings terminalThemeSettings;
 
   @override
   Widget build(BuildContext context) {
     final activeTab = state.activeTab;
     if (activeTab == null) {
-      return const DecoratedBox(
+      return DecoratedBox(
         decoration: BoxDecoration(color: AppColors.panel),
-        child: EmptyState(),
+        child: const EmptyState(),
       );
     }
 
@@ -41,11 +44,12 @@ class TerminalTabShell extends StatelessWidget {
         ),
         Expanded(
           child: DecoratedBox(
-            decoration: const BoxDecoration(color: AppColors.panel),
+            decoration: BoxDecoration(color: AppColors.panel),
             child: TerminalView(
               key: ValueKey(activeTab.id),
               tab: activeTab,
               sshBridge: sshBridge,
+              terminalThemeSettings: terminalThemeSettings,
             ),
           ),
         ),

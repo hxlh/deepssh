@@ -6,15 +6,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart' as xterm;
 
+import '../../core/models/theme_settings.dart';
 import '../../core/theme/app_colors.dart';
 import '../ssh/ssh_bridge.dart';
 import 'terminal_state.dart';
 
 class TerminalView extends StatefulWidget {
-  const TerminalView({super.key, required this.tab, required this.sshBridge});
+  const TerminalView({
+    super.key,
+    required this.tab,
+    required this.sshBridge,
+    required this.terminalThemeSettings,
+  });
 
   final OpenTerminalTab tab;
   final SshBridgeClient sshBridge;
+  final TerminalThemeSettings terminalThemeSettings;
 
   @override
   State<TerminalView> createState() => _TerminalViewState();
@@ -25,11 +32,16 @@ class _TerminalViewState extends State<TerminalView> {
   final textController = TextEditingController();
   late final xterm.Terminal terminal;
   Timer? _resizeDebounce;
-
+  Timer? _cursorIdleTimer;
+  Timer? _cursorBlinkTimer;
+  bool _cursorVisible = true;
   @override
   void initState() {
     super.initState();
-    terminal = widget.tab.terminal ?? xterm.Terminal(maxLines: 3000);
+    terminal = widget.tab.terminal ??
+        xterm.Terminal(maxLines: widget.terminalThemeSettings.scrollbackLines);
+    _applyCursorBlinkMode();
+    terminal.addListener(_handleTerminalChanged);
     textController.addListener(_handleTextEditingChanged);
 
     if (widget.tab.sourceType == TerminalSourceType.ssh) {
@@ -84,6 +96,40 @@ class _TerminalViewState extends State<TerminalView> {
     });
   }
 
+  void _handleTerminalChanged() {
+    _resetCursorBlinkIdle();
+  }
+
+  void _applyCursorBlinkMode() {
+    terminal.setCursorBlinkMode(widget.terminalThemeSettings.cursorBlink);
+    _resetCursorBlinkIdle();
+  }
+
+  void _setCursorBlinkVisible(bool visible) {
+    if (_cursorVisible == visible) return;
+    setState(() {
+      _cursorVisible = visible;
+    });
+  }
+
+  void _resetCursorBlinkIdle() {
+    _cursorIdleTimer?.cancel();
+    _cursorBlinkTimer?.cancel();
+    _setCursorBlinkVisible(true);
+    if (!widget.terminalThemeSettings.cursorBlink) return;
+
+    _cursorIdleTimer = Timer(const Duration(milliseconds: 500), () {
+      _setCursorBlinkVisible(false);
+      _cursorBlinkTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        _setCursorBlinkVisible(!_cursorVisible);
+      });
+    });
+  }
+
+  Color _terminalSelectionColor(TerminalThemeSettings settings) {
+    return settings.selectionColor.withValues(alpha: 0.45);
+  }
+
   void _handleTextEditingChanged() {
     final value = textController.value;
     logDebug(
@@ -98,6 +144,7 @@ class _TerminalViewState extends State<TerminalView> {
       return;
     }
     logDebug('[terminal:edit] commit text=${jsonEncode(value.text)}');
+    _resetCursorBlinkIdle();
     terminal.textInput(value.text);
     textController.clear();
   }
@@ -124,6 +171,7 @@ class _TerminalViewState extends State<TerminalView> {
           logDebug(
             '[terminal:key] ctrl-letter commit=${jsonEncode(controlText)}',
           );
+          _resetCursorBlinkIdle();
           terminal.textInput(controlText);
           return KeyEventResult.handled;
         }
@@ -136,6 +184,7 @@ class _TerminalViewState extends State<TerminalView> {
           logDebug(
             '[terminal:key] ctrl-letter commit=${jsonEncode(controlText)}',
           );
+          _resetCursorBlinkIdle();
           terminal.textInput(controlText);
           return KeyEventResult.handled;
         }
@@ -170,6 +219,9 @@ class _TerminalViewState extends State<TerminalView> {
       shift: HardwareKeyboard.instance.isShiftPressed,
     );
     logDebug('[terminal:key] keyInput key=$key handled=$handled');
+    if (handled) {
+      _resetCursorBlinkIdle();
+    }
     return handled ? KeyEventResult.handled : KeyEventResult.ignored;
   }
 
@@ -186,6 +238,10 @@ class _TerminalViewState extends State<TerminalView> {
     super.didUpdateWidget(oldWidget);
     final oldSessionId = oldWidget.tab.sessionId;
     final sessionId = widget.tab.sessionId;
+    if (oldWidget.terminalThemeSettings.cursorBlink !=
+        widget.terminalThemeSettings.cursorBlink) {
+      _applyCursorBlinkMode();
+    }
     if (oldSessionId != sessionId && sessionId != null) {
       _bindSshSession(sessionId);
     }
@@ -203,13 +259,28 @@ class _TerminalViewState extends State<TerminalView> {
   @override
   void dispose() {
     _resizeDebounce?.cancel();
+    _cursorIdleTimer?.cancel();
+    _cursorBlinkTimer?.cancel();
+    terminal.removeListener(_handleTerminalChanged);
     inputFocusNode.dispose();
     textController.dispose();
     super.dispose();
   }
 
+  xterm.TerminalCursorType _xtermCursorType(CursorStyle style) {
+    switch (style) {
+      case CursorStyle.block:
+        return xterm.TerminalCursorType.block;
+      case CursorStyle.underline:
+        return xterm.TerminalCursorType.underline;
+      case CursorStyle.bar:
+        return xterm.TerminalCursorType.verticalBar;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final settings = widget.terminalThemeSettings;
     return Container(
       color: AppColors.panel,
       padding: const EdgeInsets.all(12),
@@ -221,32 +292,39 @@ class _TerminalViewState extends State<TerminalView> {
               onPointerDown: (_) => _focusInputProxy(),
               child: xterm.TerminalView(
                 terminal,
-                autofocus: true,
+                focusNode: inputFocusNode,
                 hardwareKeyboardOnly: true,
-                theme: const xterm.TerminalTheme(
-                  cursor: AppColors.accent,
-                  selection: AppColors.selection,
-                  foreground: AppColors.textPrimary,
-                  background: AppColors.panel,
-                  black: Color(0xFF000000),
-                  red: Color(0xFFCD3131),
-                  green: Color(0xFF0DBC79),
-                  yellow: Color(0xFFE5E510),
-                  blue: Color(0xFF2472C8),
-                  magenta: Color(0xFFBC3FBC),
-                  cyan: Color(0xFF11A8CD),
-                  white: Color(0xFFE5E5E5),
-                  brightBlack: Color(0xFF666666),
-                  brightRed: Color(0xFFF14C4C),
-                  brightGreen: Color(0xFF23D18B),
-                  brightYellow: Color(0xFFF5F543),
-                  brightBlue: Color(0xFF3B8EEA),
-                  brightMagenta: Color(0xFFD670D6),
-                  brightCyan: Color(0xFF29B8DB),
-                  brightWhite: Color(0xFFE5E5E5),
-                  searchHitBackground: Color(0xFF264F78),
-                  searchHitBackgroundCurrent: Color(0xFF515C6A),
-                  searchHitForeground: AppColors.textPrimary,
+                cursorType: _xtermCursorType(settings.cursorStyle),
+                alwaysShowCursor: false,
+                cursorBlinkVisible: _cursorVisible,
+                textStyle: xterm.TerminalStyle(
+                  fontSize: settings.fontSize.toDouble(),
+                  fontFamily: settings.fontFamily,
+                ),
+                theme: xterm.TerminalTheme(
+                  cursor: settings.cursorColor,
+                  selection: _terminalSelectionColor(settings),
+                  foreground: settings.foreground,
+                  background: settings.terminalBackground,
+                  black: const Color(0xFF000000),
+                  red: const Color(0xFFCD3131),
+                  green: const Color(0xFF0DBC79),
+                  yellow: const Color(0xFFE5E510),
+                  blue: const Color(0xFF2472C8),
+                  magenta: const Color(0xFFBC3FBC),
+                  cyan: const Color(0xFF11A8CD),
+                  white: const Color(0xFFE5E5E5),
+                  brightBlack: const Color(0xFF666666),
+                  brightRed: const Color(0xFFF14C4C),
+                  brightGreen: const Color(0xFF23D18B),
+                  brightYellow: const Color(0xFFF5F543),
+                  brightBlue: const Color(0xFF3B8EEA),
+                  brightMagenta: const Color(0xFFD670D6),
+                  brightCyan: const Color(0xFF29B8DB),
+                  brightWhite: const Color(0xFFE5E5E5),
+                  searchHitBackground: const Color(0xFF264F78),
+                  searchHitBackgroundCurrent: const Color(0xFF515C6A),
+                  searchHitForeground: settings.foreground,
                 ),
               ),
             ),

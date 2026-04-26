@@ -12,6 +12,7 @@ import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 import 'profile.dart';
 import 'ssh_session.dart';
+import 'theme.dart';
 
 abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RustLibApiImplPlatform({
@@ -36,13 +37,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  ThemeSettings dco_decode_box_autoadd_theme_settings(dynamic raw);
+
+  @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<RegexHighlight> dco_decode_list_regex_highlight(dynamic raw);
+
+  @protected
   List<SshProfile> dco_decode_list_ssh_profile(dynamic raw);
+
+  @protected
+  RegexHighlight dco_decode_regex_highlight(dynamic raw);
 
   @protected
   SshProfile dco_decode_ssh_profile(dynamic raw);
@@ -51,10 +61,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SshSession dco_decode_ssh_session(dynamic raw);
 
   @protected
+  TerminalTheme dco_decode_terminal_theme(dynamic raw);
+
+  @protected
+  ThemeSettings dco_decode_theme_settings(dynamic raw);
+
+  @protected
   int dco_decode_u_16(dynamic raw);
 
   @protected
+  int dco_decode_u_32(dynamic raw);
+
+  @protected
   int dco_decode_u_8(dynamic raw);
+
+  @protected
+  UiTheme dco_decode_ui_theme(dynamic raw);
 
   @protected
   void dco_decode_unit(dynamic raw);
@@ -74,13 +96,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  ThemeSettings sse_decode_box_autoadd_theme_settings(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<RegexHighlight> sse_decode_list_regex_highlight(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<SshProfile> sse_decode_list_ssh_profile(SseDeserializer deserializer);
+
+  @protected
+  RegexHighlight sse_decode_regex_highlight(SseDeserializer deserializer);
 
   @protected
   SshProfile sse_decode_ssh_profile(SseDeserializer deserializer);
@@ -89,10 +124,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SshSession sse_decode_ssh_session(SseDeserializer deserializer);
 
   @protected
+  TerminalTheme sse_decode_terminal_theme(SseDeserializer deserializer);
+
+  @protected
+  ThemeSettings sse_decode_theme_settings(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_u_16(SseDeserializer deserializer);
 
   @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_u_8(SseDeserializer deserializer);
+
+  @protected
+  UiTheme sse_decode_ui_theme(SseDeserializer deserializer);
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
@@ -119,11 +166,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_theme_settings(
+    ThemeSettings self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_regex_highlight(
+    List<RegexHighlight> self,
     SseSerializer serializer,
   );
 
@@ -134,16 +193,34 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_regex_highlight(
+    RegexHighlight self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_ssh_profile(SshProfile self, SseSerializer serializer);
 
   @protected
   void sse_encode_ssh_session(SshSession self, SseSerializer serializer);
 
   @protected
+  void sse_encode_terminal_theme(TerminalTheme self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_theme_settings(ThemeSettings self, SseSerializer serializer);
+
+  @protected
   void sse_encode_u_16(int self, SseSerializer serializer);
 
   @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ui_theme(UiTheme self, SseSerializer serializer);
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);

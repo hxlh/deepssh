@@ -8,21 +8,30 @@ import '../core/models/local_terminal_item.dart';
 import '../core/models/ssh_profile_item.dart';
 import '../core/models/ssh_session_item.dart';
 import '../core/models/terminal_item.dart';
+import '../core/models/theme_settings.dart';
 import '../core/theme/app_colors.dart';
 import '../features/hosts/host_tree.dart';
 import '../features/hosts/host_tree_state.dart';
 import '../features/ssh/ssh_bridge.dart';
 import '../features/ssh_profiles/ssh_profile_form_page.dart';
 import '../features/terminal/terminal_state.dart';
+import '../features/theme/theme_bridge.dart';
 import 'widgets/add_connection_button.dart';
 import 'widgets/sidebar.dart';
 import 'widgets/workbench_content_switcher.dart';
 
 class WorkbenchPage extends StatefulWidget {
-  const WorkbenchPage({super.key, SshBridgeClient? sshBridge})
-    : sshBridge = sshBridge ?? const _DefaultSshBridgeClientHolder();
+  const WorkbenchPage({
+    super.key,
+    SshBridgeClient? sshBridge,
+    ThemeBridgeClient? themeBridge,
+    this.onThemeChanged,
+  }) : sshBridge = sshBridge ?? const _DefaultSshBridgeClientHolder(),
+       themeBridge = themeBridge ?? const _DefaultThemeBridgeClientHolder();
 
   final SshBridgeClient sshBridge;
+  final ThemeBridgeClient themeBridge;
+  final VoidCallback? onThemeChanged;
 
   @override
   State<WorkbenchPage> createState() => _WorkbenchPageState();
@@ -95,6 +104,22 @@ class _DefaultSshBridgeClientHolder implements SshBridgeClient {
       _delegate.closeSession(sessionId);
 }
 
+class _DefaultThemeBridgeClientHolder implements ThemeBridgeClient {
+  const _DefaultThemeBridgeClientHolder();
+
+  static final InMemoryThemeBridgeClient _delegate = InMemoryThemeBridgeClient();
+
+  @override
+  Future<({UiThemeSettings ui, TerminalThemeSettings terminal})> loadTheme() =>
+      _delegate.loadTheme();
+
+  @override
+  Future<void> saveTheme({
+    required UiThemeSettings ui,
+    required TerminalThemeSettings terminal,
+  }) => _delegate.saveTheme(ui: ui, terminal: terminal);
+}
+
 class _WorkbenchPageState extends State<WorkbenchPage> {
   static const int sshSessionHistoryLineLimit = 3000;
 
@@ -112,11 +137,16 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   final removedPendingSshSessionIds = <String>{};
   SshProfileItem? editingSshProfile;
   String? sshErrorMessage;
+  UiThemeSettings uiThemeSettings = UiThemeSettings.commandDeck();
+  TerminalThemeSettings terminalThemeSettings = TerminalThemeSettings.commandDeck();
+  bool _themeSaveInFlight = false;
+  bool _themeSaveQueued = false;
 
   @override
   void initState() {
     super.initState();
     loadSshProfiles();
+    loadInitialTheme();
   }
 
   @override
@@ -133,6 +163,22 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     setState(() {
       sshProfiles = profiles;
     });
+  }
+
+  Future<void> loadInitialTheme() async {
+    try {
+      final loaded = await widget.themeBridge.loadTheme();
+      if (!mounted) return;
+      AppColors.applyUi(loaded.ui);
+      AppColors.applyTerminal(loaded.terminal);
+      setState(() {
+        uiThemeSettings = loaded.ui;
+        terminalThemeSettings = loaded.terminal;
+      });
+      widget.onThemeChanged?.call();
+    } catch (_) {
+      // Keep built-in defaults if persistence is unavailable.
+    }
   }
 
   void _handleHostToggle(String hostId) {
@@ -411,7 +457,9 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       profileId: profile.id,
       hostName: profile.host,
       title: 'terminal$nextIndex',
-      terminal: xterm.Terminal(maxLines: sshSessionHistoryLineLimit),
+      terminal: xterm.Terminal(
+        maxLines: terminalThemeSettings.scrollbackLines,
+      ),
     );
     final sessions =
         sshSessionsByProfileId[profile.id] ?? const <SshSessionItem>[];
@@ -459,6 +507,59 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     });
   }
 
+  void _handleOpenThemeConfig() {
+    setState(() {
+      contentMode = WorkbenchContentMode.themeConfig;
+    });
+  }
+
+  void _handleBackFromConfig() {
+    setState(() {
+      contentMode = WorkbenchContentMode.terminal;
+    });
+  }
+
+  void _handleUiThemeChanged(UiThemeSettings settings) {
+    AppColors.applyUi(settings);
+    setState(() {
+      uiThemeSettings = settings;
+    });
+    widget.onThemeChanged?.call();
+    _persistTheme();
+  }
+
+  void _handleTerminalThemeChanged(TerminalThemeSettings settings) {
+    AppColors.applyTerminal(settings);
+    setState(() {
+      terminalThemeSettings = settings;
+    });
+    widget.onThemeChanged?.call();
+    _persistTheme();
+  }
+
+  Future<void> _persistTheme() async {
+    if (_themeSaveInFlight) {
+      _themeSaveQueued = true;
+      return;
+    }
+
+    _themeSaveInFlight = true;
+    do {
+      _themeSaveQueued = false;
+      final ui = uiThemeSettings;
+      final terminal = terminalThemeSettings;
+      try {
+        await widget.themeBridge.saveTheme(
+          ui: ui,
+          terminal: terminal,
+        );
+      } catch (_) {
+        // Ignore persistence errors so the UI keeps responding.
+      }
+    } while (_themeSaveQueued);
+    _themeSaveInFlight = false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -481,9 +582,12 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               onSshSessionTap: _handleSshSessionTap,
               onCloseSshSession: _handleCloseSshSession,
               onCloseLocalTerminal: _handleCloseLocalTerminal,
+              onOpenThemeConfig: _handleOpenThemeConfig,
+              themeConfigActive:
+                  contentMode == WorkbenchContentMode.themeConfig,
             ),
           ),
-          const VerticalDivider(
+          VerticalDivider(
             width: 1,
             thickness: 1,
             color: AppColors.border,
@@ -495,6 +599,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               sshProfiles: sshProfiles,
               sshErrorMessage: sshErrorMessage,
               editingSshProfile: editingSshProfile,
+              uiThemeSettings: uiThemeSettings,
+              terminalThemeSettings: terminalThemeSettings,
               onSelectTab: _handleTabSelect,
               onCloseTab: _handleTabClose,
               onAddSshProfile: _handleAddSshProfile,
@@ -503,6 +609,9 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               onDeleteSshProfile: _handleDeleteSshProfile,
               onCancelSshForm: _handleCancelSshForm,
               onSaveSshProfile: _handleSaveSshProfile,
+              onUiThemeChanged: _handleUiThemeChanged,
+              onTerminalThemeChanged: _handleTerminalThemeChanged,
+              onBackFromConfig: _handleBackFromConfig,
               sshBridge: widget.sshBridge,
             ),
           ),

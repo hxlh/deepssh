@@ -78,7 +78,7 @@ class SshProfilesPage extends StatelessWidget {
             child: ListView.separated(
               itemCount: profiles.length,
               separatorBuilder: (_, _) =>
-                  const Divider(color: AppColors.border),
+                  Divider(color: AppColors.border),
               itemBuilder: (context, index) {
                 final profile = profiles[index];
                 return ListTile(

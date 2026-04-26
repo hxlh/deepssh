@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../core/models/ssh_profile_item.dart';
+import '../../core/models/theme_settings.dart';
 import '../../features/ssh/ssh_bridge.dart';
 import '../../features/ssh_profiles/ssh_profile_form_page.dart';
 import '../../features/ssh_profiles/ssh_profiles_page.dart';
 import '../../features/terminal/terminal_tab_shell.dart';
 import '../../features/terminal/terminal_state.dart';
+import '../../features/theme_config/theme_config_page.dart';
 
-enum WorkbenchContentMode { terminal, sshProfiles, sshProfileForm }
+enum WorkbenchContentMode { terminal, sshProfiles, sshProfileForm, themeConfig }
 
 class WorkbenchContentSwitcher extends StatelessWidget {
   const WorkbenchContentSwitcher({
@@ -17,6 +19,8 @@ class WorkbenchContentSwitcher extends StatelessWidget {
     required this.sshProfiles,
     required this.sshErrorMessage,
     required this.editingSshProfile,
+    required this.uiThemeSettings,
+    required this.terminalThemeSettings,
     required this.onSelectTab,
     required this.onCloseTab,
     required this.onAddSshProfile,
@@ -25,6 +29,9 @@ class WorkbenchContentSwitcher extends StatelessWidget {
     required this.onDeleteSshProfile,
     required this.onCancelSshForm,
     required this.onSaveSshProfile,
+    required this.onUiThemeChanged,
+    required this.onTerminalThemeChanged,
+    required this.onBackFromConfig,
     required this.sshBridge,
   });
 
@@ -33,6 +40,8 @@ class WorkbenchContentSwitcher extends StatelessWidget {
   final List<SshProfileItem> sshProfiles;
   final String? sshErrorMessage;
   final SshProfileItem? editingSshProfile;
+  final UiThemeSettings uiThemeSettings;
+  final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String> onSelectTab;
   final ValueChanged<String> onCloseTab;
   final SshBridgeClient sshBridge;
@@ -42,6 +51,9 @@ class WorkbenchContentSwitcher extends StatelessWidget {
   final ValueChanged<SshProfileItem> onDeleteSshProfile;
   final VoidCallback onCancelSshForm;
   final ValueChanged<SshProfileDraft> onSaveSshProfile;
+  final ValueChanged<UiThemeSettings> onUiThemeChanged;
+  final ValueChanged<TerminalThemeSettings> onTerminalThemeChanged;
+  final VoidCallback onBackFromConfig;
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +79,15 @@ class WorkbenchContentSwitcher extends StatelessWidget {
           onSelectTab: onSelectTab,
           onCloseTab: onCloseTab,
           sshBridge: sshBridge,
+          terminalThemeSettings: terminalThemeSettings,
+        );
+      case WorkbenchContentMode.themeConfig:
+        return ThemeConfigPage(
+          uiSettings: uiThemeSettings,
+          terminalSettings: terminalThemeSettings,
+          onUiSettingsChanged: onUiThemeChanged,
+          onTerminalSettingsChanged: onTerminalThemeChanged,
+          onBack: onBackFromConfig,
         );
     }
   }

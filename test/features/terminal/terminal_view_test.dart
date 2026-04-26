@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:deepssh/core/models/ssh_profile_item.dart';
+import 'package:deepssh/core/models/theme_settings.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/terminal/terminal_state.dart';
 import 'package:deepssh/features/terminal/terminal_tab_shell.dart';
@@ -9,6 +11,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xterm/xterm.dart' as xterm;
+
+final TerminalThemeSettings _defaultTerminalTheme =
+    TerminalThemeSettings.commandDeck();
 
 void main() {
   testWidgets('enables text input so IME composition can enter SSH terminals', (
@@ -25,7 +30,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TerminalView(tab: tab, sshBridge: InMemorySshBridgeClient()),
+          body: TerminalView(
+            tab: tab,
+            sshBridge: InMemorySshBridgeClient(),
+            terminalThemeSettings: _defaultTerminalTheme,
+          ),
         ),
       ),
     );
@@ -120,7 +129,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TerminalView(tab: tab, sshBridge: RecordingSshBridgeClient()),
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: _defaultTerminalTheme,
+          ),
         ),
       ),
     );
@@ -147,7 +160,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TerminalView(tab: tab, sshBridge: bridge),
+          body: TerminalView(
+            tab: tab,
+            sshBridge: bridge,
+            terminalThemeSettings: _defaultTerminalTheme,
+          ),
         ),
       ),
     );
@@ -175,7 +192,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TerminalView(tab: tab, sshBridge: bridge),
+          body: TerminalView(
+            tab: tab,
+            sshBridge: bridge,
+            terminalThemeSettings: _defaultTerminalTheme,
+          ),
         ),
       ),
     );
@@ -200,7 +221,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TerminalView(tab: tab, sshBridge: bridge),
+          body: TerminalView(
+            tab: tab,
+            sshBridge: bridge,
+            terminalThemeSettings: _defaultTerminalTheme,
+          ),
         ),
       ),
     );
@@ -229,7 +254,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TerminalView(tab: tab, sshBridge: bridge),
+          body: TerminalView(
+            tab: tab,
+            sshBridge: bridge,
+            terminalThemeSettings: _defaultTerminalTheme,
+          ),
         ),
       ),
     );
@@ -292,6 +321,252 @@ void main() {
     },
   );
 
+  testWidgets('applies cursor style and blink settings to SSH terminal view', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final theme = _defaultTerminalTheme.copyWith(
+      cursorStyle: CursorStyle.underline,
+      cursorBlink: true,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: theme,
+          ),
+        ),
+      ),
+    );
+
+    final terminalWidget = tester.widget<xterm.TerminalView>(
+      find.byType(xterm.TerminalView),
+    );
+    expect(terminalWidget.cursorType, xterm.TerminalCursorType.underline);
+    expect(terminalWidget.alwaysShowCursor, isFalse);
+    expect(
+      terminalWidget.theme.selection,
+      theme.selectionColor.withValues(alpha: 0.45),
+    );
+    expect(terminal.cursorBlinkMode, isTrue);
+  });
+
+  test('keeps underline and bar cursor painting on the active input row', () {
+    final painterSource = File(
+      'third_party/xterm/lib/src/ui/painter.dart',
+    ).readAsStringSync();
+
+    expect(
+      painterSource,
+      contains('Offset(offset.dx, offset.dy + _cellSize.height - 1)'),
+    );
+    expect(painterSource, contains('offset.dx + _cellSize.width'));
+    expect(painterSource, contains('offset.dy + _cellSize.height - 1'));
+    expect(painterSource, contains('Offset(offset.dx, offset.dy)'));
+    expect(
+      painterSource,
+      contains('Offset(offset.dx, offset.dy + _cellSize.height)'),
+    );
+  });
+
+  testWidgets('toggles terminal cursor visibility while blink is enabled', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final theme = _defaultTerminalTheme.copyWith(cursorBlink: true);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: theme,
+          ),
+        ),
+      ),
+    );
+
+    expect(terminalView(tester).cursorBlinkVisible, isTrue);
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(terminalView(tester).cursorBlinkVisible, isFalse);
+  });
+
+  testWidgets('keeps cursor visible until 500ms after latest input', (
+    tester,
+  ) async {
+    final binding = TestWidgetsFlutterBinding.ensureInitialized();
+    final bridge = RecordingSshBridgeClient();
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final theme = _defaultTerminalTheme.copyWith(cursorBlink: true);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: bridge,
+            terminalThemeSettings: theme,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('terminal-input-proxy')));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    binding.testTextInput.enterText('a');
+    await binding.idle();
+    expect(terminalView(tester).cursorBlinkVisible, isTrue);
+
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(terminalView(tester).cursorBlinkVisible, isTrue);
+
+    await tester.pump(const Duration(milliseconds: 101));
+    expect(terminalView(tester).cursorBlinkVisible, isFalse);
+    expect(bridge.writes.join(), 'a');
+  });
+  testWidgets('keeps cursor visible while terminal output moves cursor', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final theme = _defaultTerminalTheme.copyWith(cursorBlink: true);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: theme,
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(terminalView(tester).cursorBlinkVisible, isFalse);
+
+    terminal.write('a');
+    await tester.pump();
+    expect(terminalView(tester).cursorBlinkVisible, isTrue);
+
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(terminalView(tester).cursorBlinkVisible, isTrue);
+
+    await tester.pump(const Duration(milliseconds: 101));
+    expect(terminalView(tester).cursorBlinkVisible, isFalse);
+  });
+
+  testWidgets('cursor blink does not override terminal hidden cursor mode', (
+    tester,
+  ) async {
+    final binding = TestWidgetsFlutterBinding.ensureInitialized();
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.setCursorVisibleMode(false);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final theme = _defaultTerminalTheme.copyWith(cursorBlink: true);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: theme,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('terminal-input-proxy')));
+
+    binding.testTextInput.enterText('a');
+    await binding.idle();
+    expect(terminal.cursorVisibleMode, isFalse);
+    await tester.pump(const Duration(milliseconds: 501));
+
+    expect(terminal.cursorVisibleMode, isFalse);
+  });
+
+  testWidgets('stops toggling terminal cursor when blink is disabled', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final blinkingTheme = _defaultTerminalTheme.copyWith(cursorBlink: true);
+    final steadyTheme = _defaultTerminalTheme.copyWith(cursorBlink: false);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: blinkingTheme,
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(terminalView(tester).cursorBlinkVisible, isFalse);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: steadyTheme,
+          ),
+        ),
+      ),
+    );
+    expect(terminalView(tester).cursorBlinkVisible, isTrue);
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(terminalView(tester).cursorBlinkVisible, isTrue);
+  });
+
   testWidgets('coalesces rapid SSH terminal viewport resize events', (
     tester,
   ) async {
@@ -324,6 +599,10 @@ void main() {
   });
 }
 
+xterm.TerminalView terminalView(WidgetTester tester) {
+  return tester.widget<xterm.TerminalView>(find.byType(xterm.TerminalView));
+}
+
 Widget _terminalApp({
   required double width,
   required double height,
@@ -335,7 +614,11 @@ Widget _terminalApp({
       body: SizedBox(
         width: width,
         height: height,
-        child: TerminalView(tab: tab, sshBridge: bridge),
+        child: TerminalView(
+          tab: tab,
+          sshBridge: bridge,
+          terminalThemeSettings: _defaultTerminalTheme,
+        ),
       ),
     ),
   );
@@ -352,6 +635,7 @@ Widget _terminalShellApp({
         onSelectTab: (_) {},
         onCloseTab: (_) {},
         sshBridge: bridge,
+        terminalThemeSettings: _defaultTerminalTheme,
       ),
     ),
   );
