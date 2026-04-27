@@ -85,6 +85,28 @@ flutter_mode_arg() {
   printf -- '--%s' "$1"
 }
 
+cargo_mode_arg() {
+  case "$1" in
+    debug) printf '' ;;
+    profile|release) printf -- '--release' ;;
+    *)
+      echo "Unsupported mode: $1" >&2
+      exit 1
+      ;;
+  esac
+}
+
+cargo_target_dir() {
+  case "$1" in
+    debug) printf 'debug' ;;
+    profile|release) printf 'release' ;;
+    *)
+      echo "Unsupported mode: $1" >&2
+      exit 1
+      ;;
+  esac
+}
+
 run_fmt() {
   cargo fmt --manifest-path rust/Cargo.toml
   dart format lib test
@@ -96,6 +118,7 @@ run_build() {
   local mode="$1"
   local platform
   platform="$(platform_name)"
+  cargo build $(cargo_mode_arg "$mode") --manifest-path rust/Cargo.toml
   flutter build "$platform" "$(flutter_mode_arg "$mode")"
 }
 
@@ -151,6 +174,14 @@ run_package() {
       exit 1
     fi
     cp -R "${apps[@]}" "$target/"
+    local rust_lib="rust/target/$(cargo_target_dir "$mode")/libdeepssh_rust.dylib"
+    for app in "${apps[@]}"; do
+      local app_name
+      app_name="$(basename "$app")"
+      local frameworks_dir="$target/$app_name/Contents/Frameworks"
+      mkdir -p "$frameworks_dir"
+      cp "$rust_lib" "$frameworks_dir/"
+    done
   else
     cp -R "$source"/. "$target/"
   fi
