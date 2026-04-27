@@ -8,7 +8,7 @@ import '../ssh/ssh_bridge.dart';
 import 'terminal_state.dart';
 import 'terminal_view.dart';
 
-class TerminalTabShell extends StatelessWidget {
+class TerminalTabShell extends StatefulWidget {
   const TerminalTabShell({
     super.key,
     required this.state,
@@ -27,8 +27,32 @@ class TerminalTabShell extends StatelessWidget {
   final ValueChanged<String>? onSshInput;
 
   @override
+  State<TerminalTabShell> createState() => _TerminalTabShellState();
+}
+
+class _TerminalTabShellState extends State<TerminalTabShell> {
+  bool _findVisible = false;
+  String _findQuery = '';
+  bool _findCaseSensitive = false;
+  bool _findWholeWord = false;
+  bool _findUseRegex = false;
+
+  void _openFind(String selectedText) {
+    setState(() {
+      _findVisible = true;
+      if (selectedText.isNotEmpty) {
+        _findQuery = selectedText;
+      }
+    });
+  }
+
+  void _closeFind() {
+    setState(() => _findVisible = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final activeTab = state.activeTab;
+    final activeTab = widget.state.activeTab;
     if (activeTab == null) {
       return DecoratedBox(
         decoration: BoxDecoration(color: AppColors.panel),
@@ -39,10 +63,10 @@ class TerminalTabShell extends StatelessWidget {
     return Column(
       children: [
         TabStrip(
-          tabs: state.tabs,
-          activeTabId: state.activeTabId,
-          onSelect: onSelectTab,
-          onClose: onCloseTab,
+          tabs: widget.state.tabs,
+          activeTabId: widget.state.activeTabId,
+          onSelect: widget.onSelectTab,
+          onClose: widget.onCloseTab,
         ),
         Expanded(
           child: DecoratedBox(
@@ -50,9 +74,23 @@ class TerminalTabShell extends StatelessWidget {
             child: TerminalView(
               key: ValueKey(activeTab.id),
               tab: activeTab,
-              sshBridge: sshBridge,
-              terminalThemeSettings: terminalThemeSettings,
-              onSshInput: onSshInput,
+              sshBridge: widget.sshBridge,
+              terminalThemeSettings: widget.terminalThemeSettings,
+              onSshInput: widget.onSshInput,
+              findVisible: _findVisible,
+              findQuery: _findQuery,
+              findCaseSensitive: _findCaseSensitive,
+              findWholeWord: _findWholeWord,
+              findUseRegex: _findUseRegex,
+              onFindOpened: _openFind,
+              onFindClosed: _closeFind,
+              onFindQueryChanged: (query) => setState(() => _findQuery = query),
+              onFindCaseSensitiveChanged: (value) =>
+                  setState(() => _findCaseSensitive = value),
+              onFindWholeWordChanged: (value) =>
+                  setState(() => _findWholeWord = value),
+              onFindUseRegexChanged: (value) =>
+                  setState(() => _findUseRegex = value),
             ),
           ),
         ),

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/models/theme_settings.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
+import 'package:deepssh/features/terminal/terminal_find.dart';
 import 'package:deepssh/features/terminal/terminal_state.dart';
 import 'package:deepssh/features/terminal/terminal_tab_shell.dart';
 import 'package:deepssh/features/terminal/terminal_view.dart';
@@ -16,6 +17,240 @@ final TerminalThemeSettings _defaultTerminalTheme =
     TerminalThemeSettings.commandDeck();
 
 void main() {
+  test('find session keeps highlight columns after empty terminal cells', () {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.write('prefix\x1b[20Gpingcap/tidb\r\n');
+    final controller = xterm.TerminalController();
+    final session = TerminalFindSession(
+      terminal: terminal,
+      terminalController: controller,
+      searchHitBackground: Colors.blue,
+      searchHitBackgroundCurrent: Colors.orange,
+    );
+
+    session.setQuery('pingcap');
+
+    expect(session.matchCount, 1);
+    final range = controller.highlights.single.range!;
+    expect(range.begin.x, 19);
+    expect(range.end.x, 26);
+
+    session.dispose();
+    controller.dispose();
+  });
+
+  test('find session matches queries across terminal rows', () {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.write('alpha\r\nbeta\r\n');
+    final controller = xterm.TerminalController();
+    final session = TerminalFindSession(
+      terminal: terminal,
+      terminalController: controller,
+      searchHitBackground: Colors.blue,
+      searchHitBackgroundCurrent: Colors.orange,
+    );
+
+    session.setQuery('alpha\r\nbeta');
+
+    expect(session.matchCount, 1);
+    expect(session.currentMatchRow, 0);
+    expect(controller.highlights, hasLength(1));
+    final range = controller.highlights.single.range!;
+    expect(range.begin.x, 0);
+    expect(range.begin.y, 0);
+    expect(range.end.x, 4);
+    expect(range.end.y, 1);
+
+    session.dispose();
+    controller.dispose();
+  });
+
+  testWidgets('seeds full multi-line find query from terminal selection', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.write('alpha\r\nbeta\r\n');
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: _defaultTerminalTheme,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final controller = terminalView(tester).controller!;
+    controller.setSelection(
+      terminal.buffer.createAnchor(0, 0),
+      terminal.buffer.createAnchor(4, 1),
+    );
+    await tester.pump();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF, character: 'f');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    final findInput = find.descendant(
+      of: find.byType(TerminalFindBar),
+      matching: find.byType(TextField),
+    );
+    final textField = tester.widget<TextField>(findInput);
+    expect(textField.controller!.text, r'alpha\nbeta');
+  });
+  testWidgets('seeds find query from current terminal selection on Ctrl+F', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.write('alpha beta gamma\r\n');
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: _defaultTerminalTheme,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final controller = terminalView(tester).controller!;
+    controller.setSelection(
+      terminal.buffer.createAnchor(6, 0),
+      terminal.buffer.createAnchor(10, 0),
+    );
+    await tester.pump();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF, character: 'f');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TerminalFindBar), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'beta'), findsOneWidget);
+  });
+
+  testWidgets(
+    'does not clamp find scroll to bottom for lower scrollback matches',
+    (tester) async {
+      final terminal = xterm.Terminal(maxLines: 3000);
+      for (var i = 0; i < 110; i++) {
+        terminal.write('line $i\r\n');
+      }
+      terminal.write('needle target\r\n');
+      for (var i = 110; i < 130; i++) {
+        terminal.write('line $i\r\n');
+      }
+      final tab = OpenTerminalTab.ssh(
+        id: 'ssh-tab-1',
+        hostName: 'host1',
+        title: 'terminal1',
+        sessionId: 'session-1',
+        terminal: terminal,
+      );
+
+      await tester.pumpWidget(
+        _terminalApp(
+          width: 800,
+          height: 260,
+          tab: tab,
+          bridge: RecordingSshBridgeClient(),
+          theme: _defaultTerminalTheme.copyWith(fontSize: 20),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollController = terminalView(tester).scrollController!;
+      final bottomOffset = scrollController.offset;
+      expect(bottomOffset, greaterThan(0));
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF, character: 'f');
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyF);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+
+      final findInput = find.descendant(
+        of: find.byType(TerminalFindBar),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(findInput, 'needle');
+      await tester.pumpAndSettle();
+
+      expect(scrollController.offset, lessThan(bottomOffset));
+    },
+  );
+
+  testWidgets('scrolls current find match into view when query changes', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.write('needle target\r\n');
+    for (var i = 0; i < 80; i++) {
+      terminal.write('line $i\r\n');
+    }
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      _terminalApp(
+        width: 800,
+        height: 260,
+        tab: tab,
+        bridge: RecordingSshBridgeClient(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scrollController = terminalView(tester).scrollController!;
+    final bottomOffset = scrollController.offset;
+    expect(bottomOffset, greaterThan(0));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF, character: 'f');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    final findInput = find.descendant(
+      of: find.byType(TerminalFindBar),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(findInput, 'needle');
+    await tester.pumpAndSettle();
+
+    expect(scrollController.offset, lessThan(bottomOffset));
+  });
+
   testWidgets('enables text input so IME composition can enter SSH terminals', (
     tester,
   ) async {
@@ -45,6 +280,63 @@ void main() {
     expect(terminalWidget.hardwareKeyboardOnly, isTrue);
     expect(find.byKey(const Key('terminal-input-proxy')), findsOneWidget);
     expect(find.byType(xterm.TerminalView), findsOneWidget);
+  });
+
+  testWidgets('keeps terminal find open when switching tabs', (tester) async {
+    final firstTerminal = xterm.Terminal(maxLines: 3000);
+    firstTerminal.write('first needle match\r\n');
+    final secondTerminal = xterm.Terminal(maxLines: 3000);
+    secondTerminal.write('second needle match\r\n');
+    var state = TerminalState(
+      tabs: [
+        OpenTerminalTab.ssh(
+          id: 'ssh-tab-1',
+          hostName: 'host1',
+          title: 'terminal1',
+          sessionId: 'session-1',
+          terminal: firstTerminal,
+        ),
+        OpenTerminalTab.ssh(
+          id: 'ssh-tab-2',
+          hostName: 'host2',
+          title: 'terminal2',
+          sessionId: 'session-2',
+          terminal: secondTerminal,
+        ),
+      ],
+      activeTabId: 'ssh-tab-1',
+    );
+    final bridge = RecordingSshBridgeClient();
+
+    await tester.pumpWidget(_terminalShellApp(state: state, bridge: bridge));
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF, character: 'f');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    final findInput = find.descendant(
+      of: find.byType(TerminalFindBar),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(findInput, 'needle');
+    await tester.pumpAndSettle();
+    expect(find.byType(TerminalFindBar), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'needle'), findsOneWidget);
+
+    state = state.activate('ssh-tab-2');
+    await tester.pumpWidget(_terminalShellApp(state: state, bridge: bridge));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TerminalFindBar), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'needle'), findsOneWidget);
+    final controller = terminalView(tester).controller!;
+    expect(controller.highlights, hasLength(1));
+    final range = controller.highlights.single.range!;
+    expect(range.begin.x, 7);
+    expect(range.end.x, 13);
   });
 
   testWidgets('restores SSH terminal history when switching tabs', (
@@ -743,6 +1035,7 @@ Widget _terminalApp({
   required double height,
   required OpenTerminalTab tab,
   required SshBridgeClient bridge,
+  TerminalThemeSettings? theme,
 }) {
   return MaterialApp(
     home: Scaffold(
@@ -752,7 +1045,7 @@ Widget _terminalApp({
         child: TerminalView(
           tab: tab,
           sshBridge: bridge,
-          terminalThemeSettings: _defaultTerminalTheme,
+          terminalThemeSettings: theme ?? _defaultTerminalTheme,
         ),
       ),
     ),
