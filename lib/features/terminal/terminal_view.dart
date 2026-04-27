@@ -10,6 +10,7 @@ import 'package:xterm/xterm.dart' as xterm;
 import '../../core/models/theme_settings.dart';
 import '../../core/theme/app_colors.dart';
 import '../ssh/ssh_bridge.dart';
+import 'terminal_find.dart';
 import 'terminal_state.dart';
 
 class TerminalView extends StatefulWidget {
@@ -19,12 +20,34 @@ class TerminalView extends StatefulWidget {
     required this.sshBridge,
     required this.terminalThemeSettings,
     this.onSshInput,
+    this.findVisible = false,
+    this.findQuery = '',
+    this.findCaseSensitive = false,
+    this.findWholeWord = false,
+    this.findUseRegex = false,
+    this.onFindOpened,
+    this.onFindClosed,
+    this.onFindQueryChanged,
+    this.onFindCaseSensitiveChanged,
+    this.onFindWholeWordChanged,
+    this.onFindUseRegexChanged,
   });
 
   final OpenTerminalTab tab;
   final SshBridgeClient sshBridge;
   final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String>? onSshInput;
+  final bool findVisible;
+  final String findQuery;
+  final bool findCaseSensitive;
+  final bool findWholeWord;
+  final bool findUseRegex;
+  final ValueChanged<String>? onFindOpened;
+  final VoidCallback? onFindClosed;
+  final ValueChanged<String>? onFindQueryChanged;
+  final ValueChanged<bool>? onFindCaseSensitiveChanged;
+  final ValueChanged<bool>? onFindWholeWordChanged;
+  final ValueChanged<bool>? onFindUseRegexChanged;
 
   @override
   State<TerminalView> createState() => _TerminalViewState();
@@ -41,6 +64,9 @@ class _TerminalViewState extends State<TerminalView> {
   Timer? _cursorIdleTimer;
   Timer? _cursorBlinkTimer;
   bool _cursorVisible = true;
+  final _findScrollController = ScrollController();
+  TerminalFindSession? _findSession;
+  bool _localFindVisible = false;
   @override
   void initState() {
     super.initState();
@@ -67,6 +93,7 @@ class _TerminalViewState extends State<TerminalView> {
       terminal.write(r'$ echo hello from xterm.dart\r\n');
       terminal.write('hello from xterm.dart\r\n');
     }
+    _syncFindSession();
   }
 
   void logDebug(String message) {
@@ -204,6 +231,23 @@ class _TerminalViewState extends State<TerminalView> {
     _resetCursorBlinkIdle();
     terminal.textInput(value.text);
     textController.clear();
+  }
+
+  KeyEventResult _handleTerminalKeyEvent(FocusNode focusNode, KeyEvent event) {
+    logDebug(
+      '[terminal:find:key] type=${event.runtimeType} '
+      'logical=${event.logicalKey.keyLabel} '
+      'ctrl=${HardwareKeyboard.instance.isControlPressed}',
+    );
+    if (event is KeyDownEvent &&
+        HardwareKeyboard.instance.isControlPressed &&
+        !HardwareKeyboard.instance.isAltPressed &&
+        event.logicalKey == LogicalKeyboardKey.keyF) {
+      logDebug('[terminal:find] opening find bar via Ctrl+F');
+      _openFind();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   KeyEventResult _handleProxyKeyEvent(FocusNode focusNode, KeyEvent event) {
@@ -365,6 +409,96 @@ class _TerminalViewState extends State<TerminalView> {
     });
   }
 
+  void _openFind() {
+    logDebug('[terminal:find] _openFind called');
+    final selection = terminalController.selection;
+    final selectedText = selection == null
+        ? ''
+        : terminal.buffer.getText(selection);
+    final hasGlobalFindOwner = widget.onFindOpened != null;
+    if (hasGlobalFindOwner) {
+      widget.onFindOpened!(selectedText);
+    } else {
+      _localFindVisible = true;
+      _ensureFindSession(query: selectedText.isNotEmpty ? selectedText : null);
+      setState(() {});
+    }
+  }
+
+  void _closeFind() {
+    widget.onFindClosed?.call();
+    _localFindVisible = false;
+    _findSession?.dispose();
+    _findSession = null;
+    if (widget.onFindClosed == null) {
+      setState(() {});
+    }
+    _focusInputProxy();
+  }
+
+  bool get _effectiveFindVisible => widget.findVisible || _localFindVisible;
+
+  String get _effectiveFindQuery =>
+      widget.findVisible ? widget.findQuery : _findSession?.query ?? '';
+
+  bool get _effectiveFindCaseSensitive => widget.findVisible
+      ? widget.findCaseSensitive
+      : _findSession?.caseSensitive ?? false;
+
+  bool get _effectiveFindWholeWord => widget.findVisible
+      ? widget.findWholeWord
+      : _findSession?.wholeWord ?? false;
+
+  bool get _effectiveFindUseRegex => widget.findVisible
+      ? widget.findUseRegex
+      : _findSession?.useRegex ?? false;
+
+  void _ensureFindSession({String? query}) {
+    _findSession ??= TerminalFindSession(
+      terminal: terminal,
+      terminalController: terminalController,
+      searchHitBackground: const Color(0xFF264F78),
+      searchHitBackgroundCurrent: const Color(0xFF515C6A),
+    );
+    _findSession!.setCaseSensitive(_effectiveFindCaseSensitive);
+    _findSession!.setWholeWord(_effectiveFindWholeWord);
+    _findSession!.setUseRegex(_effectiveFindUseRegex);
+    _findSession!.setQuery(query ?? _effectiveFindQuery);
+  }
+
+  void _syncFindSession() {
+    if (!_effectiveFindVisible) {
+      _findSession?.dispose();
+      _findSession = null;
+      return;
+    }
+    _ensureFindSession();
+  }
+
+  void _scrollToCurrentMatch() {
+    final session = _findSession;
+    if (session == null || !_findScrollController.hasClients) return;
+    final matchRow = session.currentMatchRow;
+    if (matchRow == null) return;
+
+    final position = _findScrollController.position;
+    final lineCount = terminal.buffer.lines.length;
+    if (lineCount == 0) return;
+
+    final lineHeight =
+        (position.maxScrollExtent + position.viewportDimension) / lineCount;
+    final targetOffset =
+        (matchRow * lineHeight) -
+        ((position.viewportDimension - lineHeight) / 2);
+    final scrollOffset = targetOffset.clamp(0.0, position.maxScrollExtent);
+
+    _findScrollController.animateTo(
+      scrollOffset,
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+    );
+  }
+
   @override
   void didUpdateWidget(TerminalView oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -381,6 +515,18 @@ class _TerminalViewState extends State<TerminalView> {
     }
     if (oldSessionId != sessionId && sessionId != null) {
       _bindSshSession(sessionId);
+    }
+    final findChanged =
+        oldWidget.findVisible != widget.findVisible ||
+        oldWidget.findQuery != widget.findQuery ||
+        oldWidget.findCaseSensitive != widget.findCaseSensitive ||
+        oldWidget.findWholeWord != widget.findWholeWord ||
+        oldWidget.findUseRegex != widget.findUseRegex;
+    _syncFindSession();
+    if (findChanged) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scrollToCurrentMatch();
+      });
     }
     if (widget.tab.terminal == null &&
         widget.tab.history.startsWith(oldWidget.tab.history)) {
@@ -403,6 +549,8 @@ class _TerminalViewState extends State<TerminalView> {
       highlight.dispose();
     }
     regexHighlights.clear();
+    _findSession?.dispose();
+    _findScrollController.dispose();
     terminalController.dispose();
     terminal.removeListener(_handleTerminalChanged);
     inputFocusNode.dispose();
@@ -442,8 +590,10 @@ class _TerminalViewState extends State<TerminalView> {
               child: xterm.TerminalView(
                 terminal,
                 controller: terminalController,
+                scrollController: _findScrollController,
                 focusNode: inputFocusNode,
                 hardwareKeyboardOnly: true,
+                onKeyEvent: _handleTerminalKeyEvent,
                 cursorType: _xtermCursorType(settings.cursorStyle),
                 alwaysShowCursor: false,
                 cursorBlinkVisible: _cursorVisible,
@@ -505,6 +655,41 @@ class _TerminalViewState extends State<TerminalView> {
               ),
             ),
           ),
+          if (_effectiveFindVisible && _findSession != null)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: TerminalFindBar(
+                session: _findSession!,
+                fontSize: widget.terminalThemeSettings.fontSize.toDouble(),
+                onClose: _closeFind,
+                onQueryChanged: (query) {
+                  widget.onFindQueryChanged?.call(query);
+                  _findSession!.setQuery(query);
+                  _scrollToCurrentMatch();
+                },
+                onNext: () {
+                  _findSession!.nextMatch();
+                  _scrollToCurrentMatch();
+                },
+                onPrevious: () {
+                  _findSession!.previousMatch();
+                  _scrollToCurrentMatch();
+                },
+                onCaseSensitiveToggled: (value) {
+                  widget.onFindCaseSensitiveChanged?.call(value);
+                  _findSession!.setCaseSensitive(value);
+                },
+                onWholeWordToggled: (value) {
+                  widget.onFindWholeWordChanged?.call(value);
+                  _findSession!.setWholeWord(value);
+                },
+                onUseRegexToggled: (value) {
+                  widget.onFindUseRegexChanged?.call(value);
+                  _findSession!.setUseRegex(value);
+                },
+              ),
+            ),
         ],
       ),
     );
