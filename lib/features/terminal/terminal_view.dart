@@ -243,8 +243,13 @@ class _TerminalViewState extends State<TerminalView> {
         HardwareKeyboard.instance.isControlPressed &&
         !HardwareKeyboard.instance.isAltPressed &&
         event.logicalKey == LogicalKeyboardKey.keyF) {
-      logDebug('[terminal:find] opening find bar via Ctrl+F');
-      _openFind();
+      if (_effectiveFindVisible) {
+        logDebug('[terminal:find] closing find bar via Ctrl+F');
+        _closeFind();
+      } else {
+        logDebug('[terminal:find] opening find bar via Ctrl+F');
+        _openFind();
+      }
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
