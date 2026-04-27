@@ -282,6 +282,91 @@ void main() {
     expect(find.byType(xterm.TerminalView), findsOneWidget);
   });
 
+  testWidgets('closes terminal find when Ctrl+F is pressed while open', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.write('needle match\r\n');
+    final state = TerminalState(
+      tabs: [
+        OpenTerminalTab.ssh(
+          id: 'ssh-tab-1',
+          hostName: 'host1',
+          title: 'terminal1',
+          sessionId: 'session-1',
+          terminal: terminal,
+        ),
+      ],
+      activeTabId: 'ssh-tab-1',
+    );
+
+    await tester.pumpWidget(
+      _terminalShellApp(state: state, bridge: RecordingSshBridgeClient()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF, character: 'f');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TerminalFindBar), findsOneWidget);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF, character: 'f');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TerminalFindBar), findsNothing);
+  });
+
+  testWidgets('closes terminal find from the find input with Ctrl+F', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.write('needle match\r\n');
+    final state = TerminalState(
+      tabs: [
+        OpenTerminalTab.ssh(
+          id: 'ssh-tab-1',
+          hostName: 'host1',
+          title: 'terminal1',
+          sessionId: 'session-1',
+          terminal: terminal,
+        ),
+      ],
+      activeTabId: 'ssh-tab-1',
+    );
+
+    await tester.pumpWidget(
+      _terminalShellApp(state: state, bridge: RecordingSshBridgeClient()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF, character: 'f');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    final findInput = find.descendant(
+      of: find.byType(TerminalFindBar),
+      matching: find.byType(TextField),
+    );
+    await tester.tap(findInput);
+    await tester.pump();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF, character: 'f');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TerminalFindBar), findsNothing);
+  });
+
   testWidgets('keeps terminal find open when switching tabs', (tester) async {
     final firstTerminal = xterm.Terminal(maxLines: 3000);
     firstTerminal.write('first needle match\r\n');

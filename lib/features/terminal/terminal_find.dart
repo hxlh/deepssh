@@ -283,6 +283,12 @@ class _TerminalFindBarState extends State<TerminalFindBar> {
     return Focus(
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent || event is KeyRepeatEvent) {
+          if (HardwareKeyboard.instance.isControlPressed &&
+              !HardwareKeyboard.instance.isAltPressed &&
+              event.logicalKey == LogicalKeyboardKey.keyF) {
+            widget.onClose();
+            return KeyEventResult.handled;
+          }
           if (event.logicalKey == LogicalKeyboardKey.escape) {
             widget.onClose();
             return KeyEventResult.handled;
