@@ -30,6 +30,9 @@ class HostTree extends StatelessWidget {
     required this.onCloseLocalTerminal,
     required this.onOpenThemeConfig,
     required this.themeConfigActive,
+    this.onReorderProfiles,
+    this.onReorderSessions,
+    this.onReorderLocalTerminals,
   });
 
   final HostTreeState state;
@@ -50,6 +53,10 @@ class HostTree extends StatelessWidget {
   final Future<void> Function(LocalTerminalItem) onCloseLocalTerminal;
   final VoidCallback onOpenThemeConfig;
   final bool themeConfigActive;
+  final void Function(int oldIndex, int newIndex)? onReorderProfiles;
+  final void Function(String profileId, int oldIndex, int newIndex)?
+      onReorderSessions;
+  final void Function(int oldIndex, int newIndex)? onReorderLocalTerminals;
 
   static const Color _menuAccent = Color(0xFFFFB280);
   static const double _menuItemHeight = 32;
@@ -153,175 +160,225 @@ class HostTree extends StatelessWidget {
     }
   }
 
+  Widget _sessionItem(BuildContext context, SshSessionItem session) {
+    return InkWell(
+      onTap: () => onSshSessionTap(session),
+      onSecondaryTapDown: (details) {
+        _showSshSessionMenu(
+          context: context,
+          position: details.globalPosition,
+          onEditNote: () => onEditSshSessionNote(session),
+          onDuplicate: () => onDuplicateSshSession(session),
+          onClose: () => onCloseSshSession(session),
+        );
+      },
+      child: Container(
+        height: AppSpacing.itemHeight,
+        margin: const EdgeInsets.fromLTRB(24, 2, 8, 2),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: selectedTerminalId == session.id
+              ? AppColors.selection
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppSpacing.radius),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.terminal, size: 16, color: AppColors.textMuted),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                session.displayTitle,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _localTerminalItem(
+      BuildContext context, LocalTerminalItem terminal) {
+    return InkWell(
+      onTap: () => onLocalTerminalTap(terminal),
+      onSecondaryTapDown: (details) {
+        _showCloseMenu(
+          context: context,
+          position: details.globalPosition,
+          label: '关闭终端',
+          onClose: () => onCloseLocalTerminal(terminal),
+        );
+      },
+      child: Container(
+        height: AppSpacing.itemHeight,
+        margin: const EdgeInsets.fromLTRB(24, 2, 8, 2),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: selectedTerminalId == terminal.id
+              ? AppColors.selection
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppSpacing.radius),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.terminal, size: 16, color: AppColors.textMuted),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(terminal.title, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _profileHeader(SshProfileItem profile) {
+    return InkWell(
+      onTap: () => onSshProfileTap(profile),
+      child: Container(
+        height: AppSpacing.itemHeight,
+        margin: const EdgeInsets.fromLTRB(8, 2, 8, 2),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            Icon(Icons.computer, size: 16, color: AppColors.textMuted),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(profile.name, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Expanded(
-          child: ListView(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            children: [
-              if (sshProfiles.isEmpty)
-                ...state.hosts.map((host) {
-                  return HostTreeNode(
-                    host: host,
-                    expanded: state.isExpanded(host.id),
-                    selectedTerminalId: selectedTerminalId,
-                    onToggle: () => onToggleHost(host.id),
-                    onTerminalTap: onTerminalTap,
-                  );
-                })
-              else
-                ...sshProfiles.expand((profile) {
-                  final sessions =
-                      sshSessionsByProfileId[profile.id] ??
-                      const <SshSessionItem>[];
-                  return [
-                    InkWell(
-                      onTap: () => onSshProfileTap(profile),
-                      child: Container(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (sshProfiles.isEmpty)
+                  ...state.hosts.map((host) {
+                    return HostTreeNode(
+                      host: host,
+                      expanded: state.isExpanded(host.id),
+                      selectedTerminalId: selectedTerminalId,
+                      onToggle: () => onToggleHost(host.id),
+                      onTerminalTap: onTerminalTap,
+                    );
+                  })
+                else
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    itemCount: sshProfiles.length,
+                    onReorder: onReorderProfiles ?? (_, __) {},
+                    itemBuilder: (context, profileIndex) {
+                      final profile = sshProfiles[profileIndex];
+                      final sessions =
+                          sshSessionsByProfileId[profile.id] ??
+                              const <SshSessionItem>[];
+                      return Column(
+                        key: ValueKey('profile-${profile.id}'),
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ReorderableDragStartListener(
+                            index: profileIndex,
+                            child: _profileHeader(profile),
+                          ),
+                          if (sessions.isNotEmpty)
+                            ReorderableListView.builder(
+                              shrinkWrap: true,
+                              physics:
+                                  const NeverScrollableScrollPhysics(),
+                              buildDefaultDragHandles: false,
+                              itemCount: sessions.length,
+                              onReorder: (oldIndex, newIndex) {
+                                onReorderSessions?.call(
+                                  profile.id,
+                                  oldIndex,
+                                  newIndex,
+                                );
+                              },
+                              itemBuilder: (context, sessionIndex) {
+                                return ReorderableDragStartListener(
+                                  index: sessionIndex,
+                                  key: ValueKey(
+                                    'session-${sessions[sessionIndex].id}',
+                                  ),
+                                  child: _sessionItem(
+                                    context,
+                                    sessions[sessionIndex],
+                                  ),
+                                );
+                              },
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                if (localTerminals.isNotEmpty) ...[
+                  InkWell(
+                    onTap: onToggleLocal,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: SizedBox(
                         height: AppSpacing.itemHeight,
-                        margin: const EdgeInsets.fromLTRB(8, 2, 8, 2),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: Row(
                           children: [
                             Icon(
-                              Icons.computer,
+                              localExpanded
+                                  ? Icons.expand_more
+                                  : Icons.chevron_right,
+                              size: 18,
+                              color: AppColors.textMuted,
+                            ),
+                            Icon(
+                              Icons.laptop,
                               size: 16,
                               color: AppColors.textMuted,
                             ),
                             const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                profile.name,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
+                            const Text('Local'),
                           ],
                         ),
                       ),
                     ),
-                    ...sessions.map(
-                      (session) => InkWell(
-                        onTap: () => onSshSessionTap(session),
-                        onSecondaryTapDown: (details) {
-                          _showSshSessionMenu(
-                            context: context,
-                            position: details.globalPosition,
-                            onEditNote: () => onEditSshSessionNote(session),
-                            onDuplicate: () => onDuplicateSshSession(session),
-                            onClose: () => onCloseSshSession(session),
-                          );
-                        },
-                        child: Container(
-                          height: AppSpacing.itemHeight,
-                          margin: const EdgeInsets.fromLTRB(24, 2, 8, 2),
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          decoration: BoxDecoration(
-                            color: selectedTerminalId == session.id
-                                ? AppColors.selection
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radius,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.terminal,
-                                size: 16,
-                                color: AppColors.textMuted,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  session.displayTitle,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ];
-                }),
-              if (localTerminals.isNotEmpty) ...[
-                InkWell(
-                  onTap: onToggleLocal,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: SizedBox(
-                      height: AppSpacing.itemHeight,
-                      child: Row(
-                        children: [
-                          Icon(
-                            localExpanded
-                                ? Icons.expand_more
-                                : Icons.chevron_right,
-                            size: 18,
-                            color: AppColors.textMuted,
-                          ),
-                          Icon(
-                            Icons.laptop,
-                            size: 16,
-                            color: AppColors.textMuted,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text('Local'),
-                        ],
-                      ),
-                    ),
                   ),
-                ),
-                if (localExpanded)
-                  ...localTerminals.map(
-                    (terminal) => InkWell(
-                      onTap: () => onLocalTerminalTap(terminal),
-                      onSecondaryTapDown: (details) {
-                        _showCloseMenu(
-                          context: context,
-                          position: details.globalPosition,
-                          label: '关闭终端',
-                          onClose: () => onCloseLocalTerminal(terminal),
+                  if (localExpanded)
+                    ReorderableListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      buildDefaultDragHandles: false,
+                      itemCount: localTerminals.length,
+                      onReorder: onReorderLocalTerminals ?? (_, __) {},
+                      itemBuilder: (context, index) {
+                        return ReorderableDragStartListener(
+                          index: index,
+                          key: ValueKey('local-${localTerminals[index].id}'),
+                          child: _localTerminalItem(
+                            context,
+                            localTerminals[index],
+                          ),
                         );
                       },
-                      child: Container(
-                        height: AppSpacing.itemHeight,
-                        margin: const EdgeInsets.fromLTRB(24, 2, 8, 2),
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          color: selectedTerminalId == terminal.id
-                              ? AppColors.selection
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radius,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.terminal,
-                              size: 16,
-                              color: AppColors.textMuted,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                terminal.title,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
-                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
-        _ThemeConfigButton(active: themeConfigActive, onTap: onOpenThemeConfig),
+        _ThemeConfigButton(
+          active: themeConfigActive,
+          onTap: onOpenThemeConfig,
+        ),
       ],
     );
   }

@@ -143,4 +143,12 @@ class TerminalState {
     final nextActiveId = nextTabs.isEmpty ? null : nextTabs.last.id;
     return TerminalState(tabs: nextTabs, activeTabId: nextActiveId);
   }
+
+  TerminalState reorder(int oldIndex, int newIndex) {
+    final nextTabs = [...tabs];
+    final tab = nextTabs.removeAt(oldIndex);
+    final insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
+    nextTabs.insert(insertAt, tab);
+    return TerminalState(tabs: nextTabs, activeTabId: activeTabId);
+  }
 }
