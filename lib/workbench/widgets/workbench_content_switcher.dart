@@ -23,6 +23,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
     required this.terminalThemeSettings,
     required this.onSelectTab,
     required this.onCloseTab,
+    required this.onReorderTab,
     required this.onAddSshProfile,
     required this.onConnectSshProfile,
     required this.onEditSshProfile,
@@ -45,6 +46,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
   final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String> onSelectTab;
   final ValueChanged<String> onCloseTab;
+  final void Function(int oldIndex, int newIndex) onReorderTab;
   final SshBridgeClient sshBridge;
   final VoidCallback onAddSshProfile;
   final ValueChanged<SshProfileItem> onConnectSshProfile;
@@ -80,6 +82,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
           state: terminalState,
           onSelectTab: onSelectTab,
           onCloseTab: onCloseTab,
+          onReorderTab: onReorderTab,
           sshBridge: sshBridge,
           terminalThemeSettings: terminalThemeSettings,
           onSshInput: onSshInput,

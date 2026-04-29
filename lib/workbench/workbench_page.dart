@@ -294,6 +294,46 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     });
   }
 
+  void _handleTabReorder(int oldIndex, int newIndex) {
+    setState(() {
+      terminalState = terminalState.reorder(oldIndex, newIndex);
+    });
+  }
+
+  void _handleReorderProfiles(int oldIndex, int newIndex) {
+    setState(() {
+      final next = [...sshProfiles];
+      final item = next.removeAt(oldIndex);
+      final insertAt =
+          newIndex > oldIndex ? newIndex - 1 : newIndex;
+      next.insert(insertAt, item);
+      sshProfiles = next;
+    });
+  }
+
+  void _handleReorderSessions(
+      String profileId, int oldIndex, int newIndex) {
+    setState(() {
+      final sessions = [...?sshSessionsByProfileId[profileId]];
+      final item = sessions.removeAt(oldIndex);
+      final sInsertAt =
+          newIndex > oldIndex ? newIndex - 1 : newIndex;
+      sessions.insert(sInsertAt, item);
+      sshSessionsByProfileId = {...sshSessionsByProfileId, profileId: sessions};
+    });
+  }
+
+  void _handleReorderLocalTerminals(int oldIndex, int newIndex) {
+    setState(() {
+      final next = [...localTerminals];
+      final item = next.removeAt(oldIndex);
+      final ltInsertAt =
+          newIndex > oldIndex ? newIndex - 1 : newIndex;
+      next.insert(ltInsertAt, item);
+      localTerminals = next;
+    });
+  }
+
   void _createLocalTerminal() {
     final nextIndex = localTerminalCounter + 1;
     final terminal = LocalTerminalItem(
@@ -784,6 +824,9 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               onOpenThemeConfig: _handleOpenThemeConfig,
               themeConfigActive:
                   contentMode == WorkbenchContentMode.themeConfig,
+              onReorderProfiles: _handleReorderProfiles,
+              onReorderSessions: _handleReorderSessions,
+              onReorderLocalTerminals: _handleReorderLocalTerminals,
             ),
           ),
           VerticalDivider(width: 1, thickness: 1, color: AppColors.border),
@@ -798,6 +841,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               terminalThemeSettings: terminalThemeSettings,
               onSelectTab: _handleTabSelect,
               onCloseTab: _handleTabClose,
+              onReorderTab: _handleTabReorder,
               onAddSshProfile: _handleAddSshProfile,
               onConnectSshProfile: _handleConnectSshProfile,
               onEditSshProfile: _handleEditSshProfile,
