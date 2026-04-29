@@ -1147,6 +1147,7 @@ Widget _terminalShellApp({
         state: state,
         onSelectTab: (_) {},
         onCloseTab: (_) {},
+        onReorderTab: (_, __) {},
         sshBridge: bridge,
         terminalThemeSettings: _defaultTerminalTheme,
       ),

@@ -14,6 +14,7 @@ class TerminalTabShell extends StatefulWidget {
     required this.state,
     required this.onSelectTab,
     required this.onCloseTab,
+    required this.onReorderTab,
     required this.sshBridge,
     required this.terminalThemeSettings,
     this.onSshInput,
@@ -22,6 +23,7 @@ class TerminalTabShell extends StatefulWidget {
   final TerminalState state;
   final ValueChanged<String> onSelectTab;
   final ValueChanged<String> onCloseTab;
+  final void Function(int oldIndex, int newIndex) onReorderTab;
   final SshBridgeClient sshBridge;
   final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String>? onSshInput;
@@ -67,6 +69,7 @@ class _TerminalTabShellState extends State<TerminalTabShell> {
           activeTabId: widget.state.activeTabId,
           onSelect: widget.onSelectTab,
           onClose: widget.onCloseTab,
+          onReorder: widget.onReorderTab,
         ),
         Expanded(
           child: DecoratedBox(

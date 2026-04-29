@@ -11,12 +11,14 @@ class TabStrip extends StatelessWidget {
     required this.activeTabId,
     required this.onSelect,
     required this.onClose,
+    required this.onReorder,
   });
 
   final List<OpenTerminalTab> tabs;
   final String? activeTabId;
   final ValueChanged<String> onSelect;
   final ValueChanged<String> onClose;
+  final void Function(int oldIndex, int newIndex) onReorder;
 
   @override
   Widget build(BuildContext context) {
@@ -26,17 +28,23 @@ class TabStrip extends StatelessWidget {
         color: AppColors.background,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
-      child: ListView.builder(
+      child: ReorderableListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: tabs.length,
+        onReorder: onReorder,
+        buildDefaultDragHandles: false,
         itemBuilder: (context, index) {
           final tab = tabs[index];
           final active = tab.id == activeTabId;
-          return _TabItem(
-            tab: tab,
-            active: active,
-            onSelect: () => onSelect(tab.id),
-            onClose: () => onClose(tab.id),
+          return ReorderableDragStartListener(
+            key: ValueKey(tab.id),
+            index: index,
+            child: _TabItem(
+              tab: tab,
+              active: active,
+              onSelect: () => onSelect(tab.id),
+              onClose: () => onClose(tab.id),
+            ),
           );
         },
       ),
