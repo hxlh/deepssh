@@ -242,6 +242,14 @@ class _TerminalViewState extends State<TerminalView> {
     if (event is KeyDownEvent &&
         HardwareKeyboard.instance.isControlPressed &&
         !HardwareKeyboard.instance.isAltPressed &&
+        event.logicalKey == LogicalKeyboardKey.keyC &&
+        _copySelectionIfNotEmpty()) {
+      logDebug('[terminal:find:key] copied selection via Ctrl+C');
+      return KeyEventResult.handled;
+    }
+    if (event is KeyDownEvent &&
+        HardwareKeyboard.instance.isControlPressed &&
+        !HardwareKeyboard.instance.isAltPressed &&
         event.logicalKey == LogicalKeyboardKey.keyF) {
       if (_effectiveFindVisible) {
         logDebug('[terminal:find] closing find bar via Ctrl+F');
@@ -388,12 +396,17 @@ class _TerminalViewState extends State<TerminalView> {
     });
   }
 
-  void _copySelection() {
+  bool _copySelectionIfNotEmpty() {
     final selection = terminalController.selection;
-    if (selection == null) return;
+    if (selection == null) return false;
     final text = terminal.buffer.getText(selection);
-    if (text.isEmpty) return;
+    if (text.isEmpty) return false;
     Clipboard.setData(ClipboardData(text: text));
+    return true;
+  }
+
+  void _copySelection() {
+    _copySelectionIfNotEmpty();
   }
 
   void _pasteFromClipboard() {
