@@ -173,6 +173,86 @@ void main() {
     expect(savedTerminal?.regexHighlights.single.note, '异常');
   });
 
+  testWidgets('reorders regex highlight rules from terminal settings', (
+    tester,
+  ) async {
+    TerminalThemeSettings? savedTerminal;
+    final terminalSettings = TerminalThemeSettings.commandDeck().copyWith(
+      regexHighlights: const [
+        RegexHighlight(
+          pattern: 'ERROR',
+          color: Color(0xFFF14C4C),
+          note: '错误日志',
+        ),
+        RegexHighlight(pattern: 'WARN', color: Color(0xFFF5F543), note: '警告日志'),
+        RegexHighlight(pattern: 'INFO', color: Color(0xFF23D18B), note: '普通日志'),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ThemeConfigPage(
+            uiSettings: UiThemeSettings.commandDeck(),
+            terminalSettings: terminalSettings,
+            onUiSettingsChanged: (_) {},
+            onTerminalSettingsChanged: (settings) => savedTerminal = settings,
+            onBack: () {},
+          ),
+        ),
+      ),
+    );
+
+    final reorderable = tester.widget<ReorderableListView>(
+      find.byType(ReorderableListView),
+    );
+    reorderable.onReorder(0, 3);
+    await tester.pump();
+
+    expect(
+      savedTerminal?.regexHighlights.map((highlight) => highlight.pattern),
+      ['WARN', 'INFO', 'ERROR'],
+    );
+  });
+
+  testWidgets('keeps regex highlight input focused while settings rebuild', (
+    tester,
+  ) async {
+    var terminalSettings = TerminalThemeSettings.commandDeck().copyWith(
+      regexHighlights: const [
+        RegexHighlight(pattern: '', color: Color(0xFFF14C4C), note: ''),
+      ],
+    );
+
+    Widget app() {
+      return MaterialApp(
+        home: Scaffold(
+          body: ThemeConfigPage(
+            uiSettings: UiThemeSettings.commandDeck(),
+            terminalSettings: terminalSettings,
+            onUiSettingsChanged: (_) {},
+            onTerminalSettingsChanged: (settings) => terminalSettings = settings,
+            onBack: () {},
+          ),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(app());
+    final regexFields = find.descendant(
+      of: find.byType(ReorderableListView),
+      matching: find.byType(TextFormField),
+    );
+    await tester.ensureVisible(regexFields.first);
+    await tester.tap(regexFields.first);
+    await tester.enterText(regexFields.first, 'E');
+    await tester.pumpWidget(app());
+    await tester.pump();
+
+    expect(terminalSettings.regexHighlights.single.pattern, 'E');
+    expect(tester.testTextInput.isVisible, isTrue);
+  });
+
   testWidgets('adds regex highlight rule with empty note', (tester) async {
     TerminalThemeSettings? savedTerminal;
     final terminalSettings = TerminalThemeSettings.commandDeck().copyWith(

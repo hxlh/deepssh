@@ -28,12 +28,14 @@ class ThemeConfigPage extends StatefulWidget {
 class _ThemeConfigPageState extends State<ThemeConfigPage> {
   late UiThemeSettings uiSettings;
   late TerminalThemeSettings termSettings;
+  final _regexRuleKeys = <Key>[];
 
   @override
   void initState() {
     super.initState();
     uiSettings = widget.uiSettings;
     termSettings = widget.terminalSettings;
+    _syncRegexRuleKeys(termSettings.regexHighlights.length);
   }
 
   @override
@@ -44,6 +46,16 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
     }
     if (oldWidget.terminalSettings != widget.terminalSettings) {
       termSettings = widget.terminalSettings;
+      _syncRegexRuleKeys(termSettings.regexHighlights.length);
+    }
+  }
+
+  void _syncRegexRuleKeys(int count) {
+    while (_regexRuleKeys.length < count) {
+      _regexRuleKeys.add(UniqueKey());
+    }
+    if (_regexRuleKeys.length > count) {
+      _regexRuleKeys.removeRange(count, _regexRuleKeys.length);
     }
   }
 
@@ -243,54 +255,81 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
         const SizedBox(height: 16),
         const _SectionLabel('正则高亮'),
         const SizedBox(height: 8),
-        ...termSettings.regexHighlights.asMap().entries.map(
-          (entry) => _RegexRuleRow(
-            pattern: entry.value.pattern,
-            note: entry.value.note,
-            color: entry.value.color,
-            onPatternChanged: (v) {
+        SizedBox(
+          height: termSettings.regexHighlights.length * 40,
+          child: ReorderableListView.builder(
+            buildDefaultDragHandles: false,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: termSettings.regexHighlights.length,
+            onReorder: (oldIndex, newIndex) {
               final highlights = List<RegexHighlight>.from(
                 termSettings.regexHighlights,
               );
-              highlights[entry.key] = entry.value.copyWith(pattern: v);
+              if (oldIndex < newIndex) newIndex -= 1;
+              final item = highlights.removeAt(oldIndex);
+              final key = _regexRuleKeys.removeAt(oldIndex);
+              highlights.insert(newIndex, item);
+              _regexRuleKeys.insert(newIndex, key);
               _updateTerm(termSettings.copyWith(regexHighlights: highlights));
             },
-            onNoteChanged: (v) {
-              final highlights = List<RegexHighlight>.from(
-                termSettings.regexHighlights,
+            itemBuilder: (context, index) {
+              final highlight = termSettings.regexHighlights[index];
+              return _RegexRuleRow(
+                key: _regexRuleKeys[index],
+                index: index,
+                pattern: highlight.pattern,
+                note: highlight.note,
+                color: highlight.color,
+                onPatternChanged: (v) {
+                  final highlights = List<RegexHighlight>.from(
+                    termSettings.regexHighlights,
+                  );
+                  highlights[index] = highlight.copyWith(pattern: v);
+                  _updateTerm(termSettings.copyWith(regexHighlights: highlights));
+                },
+                onNoteChanged: (v) {
+                  final highlights = List<RegexHighlight>.from(
+                    termSettings.regexHighlights,
+                  );
+                  highlights[index] = highlight.copyWith(note: v);
+                  _updateTerm(termSettings.copyWith(regexHighlights: highlights));
+                },
+                onColorChanged: (c) {
+                  final highlights = List<RegexHighlight>.from(
+                    termSettings.regexHighlights,
+                  );
+                  highlights[index] = highlight.copyWith(color: c);
+                  _updateTerm(termSettings.copyWith(regexHighlights: highlights));
+                },
+                onRemove: () {
+                  final highlights = List<RegexHighlight>.from(
+                    termSettings.regexHighlights,
+                  )..removeAt(index);
+                  _regexRuleKeys.removeAt(index);
+                  _updateTerm(termSettings.copyWith(regexHighlights: highlights));
+                },
               );
-              highlights[entry.key] = entry.value.copyWith(note: v);
-              _updateTerm(termSettings.copyWith(regexHighlights: highlights));
-            },
-            onColorChanged: (c) {
-              final highlights = List<RegexHighlight>.from(
-                termSettings.regexHighlights,
-              );
-              highlights[entry.key] = entry.value.copyWith(color: c);
-              _updateTerm(termSettings.copyWith(regexHighlights: highlights));
-            },
-            onRemove: () {
-              final highlights = List<RegexHighlight>.from(
-                termSettings.regexHighlights,
-              )..removeAt(entry.key);
-              _updateTerm(termSettings.copyWith(regexHighlights: highlights));
             },
           ),
         ),
         const SizedBox(height: 8),
         TextButton.icon(
-          onPressed: () => _updateTerm(
-            termSettings.copyWith(
-              regexHighlights: [
-                ...termSettings.regexHighlights,
-                const RegexHighlight(
-                  pattern: '',
-                  color: Color(0xFFFFFFFF),
-                  note: '',
-                ),
-              ],
-            ),
-          ),
+          onPressed: () {
+            _regexRuleKeys.add(UniqueKey());
+            _updateTerm(
+              termSettings.copyWith(
+                regexHighlights: [
+                  ...termSettings.regexHighlights,
+                  const RegexHighlight(
+                    pattern: '',
+                    color: Color(0xFFFFFFFF),
+                    note: '',
+                  ),
+                ],
+              ),
+            );
+          },
           icon: const Icon(Icons.add, size: 16),
           label: const Text('添加规则'),
           style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
@@ -858,6 +897,8 @@ class _ColorField extends StatelessWidget {
 
 class _RegexRuleRow extends StatelessWidget {
   const _RegexRuleRow({
+    super.key,
+    required this.index,
     required this.pattern,
     required this.note,
     required this.color,
@@ -867,6 +908,7 @@ class _RegexRuleRow extends StatelessWidget {
     required this.onRemove,
   });
 
+  final int index;
   final String pattern;
   final String note;
   final Color color;
@@ -881,6 +923,18 @@ class _RegexRuleRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
+          ReorderableDragStartListener(
+            index: index,
+            child: Tooltip(
+              message: '拖动调整优先级',
+              child: Icon(
+                Icons.drag_indicator,
+                size: 18,
+                color: AppColors.textMuted,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           Flexible(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 280),
