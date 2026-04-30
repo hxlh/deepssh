@@ -14,6 +14,7 @@ import '../core/models/tunnel_config_item.dart';
 import '../core/theme/app_colors.dart';
 import '../features/hosts/host_tree.dart';
 import '../features/hosts/host_tree_state.dart';
+import '../features/local_terminal/local_terminal_bridge.dart';
 import '../features/ssh/ssh_bridge.dart';
 import '../features/ssh_profiles/ssh_profile_form_page.dart';
 import '../features/terminal/terminal_state.dart';
@@ -28,15 +29,20 @@ class WorkbenchPage extends StatefulWidget {
   const WorkbenchPage({
     super.key,
     SshBridgeClient? sshBridge,
+    LocalTerminalBridgeClient? localTerminalBridge,
     TunnelBridgeClient? tunnelBridge,
     ThemeBridgeClient? themeBridge,
     this.onThemeChanged,
     this.errorLogger,
   }) : sshBridge = sshBridge ?? const _DefaultSshBridgeClientHolder(),
+       localTerminalBridge =
+           localTerminalBridge ??
+           const _DefaultLocalTerminalBridgeClientHolder(),
        tunnelBridge = tunnelBridge ?? const _DefaultTunnelBridgeClientHolder(),
        themeBridge = themeBridge ?? const _DefaultThemeBridgeClientHolder();
 
   final SshBridgeClient sshBridge;
+  final LocalTerminalBridgeClient localTerminalBridge;
   final TunnelBridgeClient tunnelBridge;
   final ThemeBridgeClient themeBridge;
   final VoidCallback? onThemeChanged;
@@ -144,12 +150,10 @@ class _DefaultTunnelBridgeClientHolder implements TunnelBridgeClient {
   Future<void> deleteTunnel(String id) => _delegate.deleteTunnel(id);
 
   @override
-  Future<TunnelConfigItem> startTunnel(String id) =>
-      _delegate.startTunnel(id);
+  Future<TunnelConfigItem> startTunnel(String id) => _delegate.startTunnel(id);
 
   @override
-  Future<TunnelConfigItem> stopTunnel(String id) =>
-      _delegate.stopTunnel(id);
+  Future<TunnelConfigItem> stopTunnel(String id) => _delegate.stopTunnel(id);
 }
 
 class _DefaultSshBridgeClientHolder implements SshBridgeClient {
@@ -230,6 +234,39 @@ class _DefaultSshBridgeClientHolder implements SshBridgeClient {
       _delegate.duplicateSession(sessionId);
 }
 
+class _DefaultLocalTerminalBridgeClientHolder
+    implements LocalTerminalBridgeClient {
+  const _DefaultLocalTerminalBridgeClientHolder();
+
+  static final RustLocalTerminalBridgeClient _delegate =
+      RustLocalTerminalBridgeClient();
+
+  @override
+  Future<LocalTerminalConnectionResult> spawnLocalTerminal({
+    int? rows,
+    int? cols,
+  }) => _delegate.spawnLocalTerminal(rows: rows, cols: cols);
+
+  @override
+  Stream<List<int>> outputStream(String sessionId) =>
+      _delegate.outputStream(sessionId);
+
+  @override
+  Future<void> writeToSession(String sessionId, List<int> data) =>
+      _delegate.writeToSession(sessionId, data);
+
+  @override
+  Future<void> resizeSession({
+    required String sessionId,
+    required int rows,
+    required int cols,
+  }) => _delegate.resizeSession(sessionId: sessionId, rows: rows, cols: cols);
+
+  @override
+  Future<void> closeSession(String sessionId) =>
+      _delegate.closeSession(sessionId);
+}
+
 class _DefaultThemeBridgeClientHolder implements ThemeBridgeClient {
   const _DefaultThemeBridgeClientHolder();
 
@@ -264,6 +301,11 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   final sshOutputFlushTimers = <String, Timer>{};
   final closingSshSessionIds = <String>{};
   final removedPendingSshSessionIds = <String>{};
+  final localOutputSubscriptions = <String, StreamSubscription<String>>{};
+  final localOutputBuffers = <String, StringBuffer>{};
+  final localOutputFlushTimers = <String, Timer>{};
+  final closingLocalTerminalIds = <String>{};
+  final removedPendingLocalTerminalIds = <String>{};
   final _sshCommandBuffers = <String, String>{};
   SshProfileItem? editingSshProfile;
   String? sshErrorMessage;
@@ -294,7 +336,13 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     for (final timer in sshOutputFlushTimers.values) {
       timer.cancel();
     }
+    for (final timer in localOutputFlushTimers.values) {
+      timer.cancel();
+    }
     for (final subscription in sshOutputSubscriptions.values) {
+      subscription.cancel();
+    }
+    for (final subscription in localOutputSubscriptions.values) {
       subscription.cancel();
     }
     super.dispose();
@@ -382,15 +430,34 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     });
   }
 
-  void _handleLocalTerminalTap(LocalTerminalItem terminal) {
-    final tab = OpenTerminalTab.local(id: terminal.id, title: terminal.title);
+  OpenTerminalTab _localTabFromTerminal(LocalTerminalItem terminal) {
+    return OpenTerminalTab.local(
+      id: terminal.id,
+      title: terminal.title,
+      sessionId: terminal.sessionId,
+      terminal: terminal.terminal,
+    );
+  }
+
+  void _showLocalTerminalError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _replaceLocalTerminal(LocalTerminalItem terminal) {
     setState(() {
-      terminalState = terminalState.open(tab);
-      contentMode = WorkbenchContentMode.terminal;
+      localTerminals = [
+        for (final item in localTerminals)
+          item.id == terminal.id ? terminal : item,
+      ];
+      terminalState = terminalState.update(_localTabFromTerminal(terminal));
     });
   }
 
-  Future<void> _handleCloseLocalTerminal(LocalTerminalItem terminal) async {
+  void _removeLocalTerminal(LocalTerminalItem terminal) {
+    localOutputFlushTimers.remove(terminal.id)?.cancel();
+    localOutputBuffers.remove(terminal.id);
     setState(() {
       localTerminals = [
         for (final item in localTerminals)
@@ -398,6 +465,105 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       ];
       terminalState = terminalState.close(terminal.id);
     });
+  }
+
+  void _scheduleLocalOutputFlush(LocalTerminalItem terminal) {
+    if (localOutputFlushTimers.containsKey(terminal.id)) return;
+    localOutputFlushTimers[terminal.id] = Timer(
+      const Duration(milliseconds: 16),
+      () {
+        localOutputFlushTimers.remove(terminal.id);
+        _flushLocalOutput(terminal);
+      },
+    );
+  }
+
+  void _flushLocalOutput(LocalTerminalItem terminal) {
+    final buffer = localOutputBuffers.remove(terminal.id);
+    if (buffer == null || !mounted) return;
+    final text = buffer.toString();
+    if (text.isEmpty) return;
+
+    LocalTerminalItem? updatedTerminal;
+    for (final item in localTerminals) {
+      if (item.id == terminal.id) {
+        updatedTerminal = item;
+        break;
+      }
+    }
+    if (updatedTerminal == null) return;
+    updatedTerminal.terminal?.write(text);
+    setState(() {
+      terminalState = terminalState.update(
+        _localTabFromTerminal(updatedTerminal!),
+      );
+    });
+  }
+
+  void _startLocalOutputSubscription(LocalTerminalItem terminal) {
+    final sessionId = terminal.sessionId;
+    if (sessionId == null ||
+        localOutputSubscriptions.containsKey(terminal.id)) {
+      return;
+    }
+    localOutputSubscriptions[terminal.id] = widget.localTerminalBridge
+        .outputStream(sessionId)
+        .transform(utf8.decoder)
+        .listen(
+          (text) {
+            if (!mounted || text.isEmpty) return;
+            final buffer = localOutputBuffers.putIfAbsent(
+              terminal.id,
+              StringBuffer.new,
+            );
+            buffer.write(text);
+            _scheduleLocalOutputFlush(terminal);
+          },
+          onDone: () {
+            localOutputFlushTimers.remove(terminal.id)?.cancel();
+            _flushLocalOutput(terminal);
+            localOutputSubscriptions.remove(terminal.id);
+          },
+        );
+  }
+
+  void _handleLocalTerminalTap(LocalTerminalItem terminal) {
+    setState(() {
+      terminalState = terminalState.open(_localTabFromTerminal(terminal));
+      contentMode = WorkbenchContentMode.terminal;
+    });
+  }
+
+  Future<void> _handleCloseLocalTerminal(LocalTerminalItem terminal) async {
+    if (!closingLocalTerminalIds.add(terminal.id)) {
+      return;
+    }
+
+    final sessionId = terminal.sessionId;
+    if (sessionId == null) {
+      removedPendingLocalTerminalIds.add(terminal.id);
+      _removeLocalTerminal(terminal);
+      closingLocalTerminalIds.remove(terminal.id);
+      return;
+    }
+
+    try {
+      await widget.localTerminalBridge.closeSession(sessionId);
+    } catch (error, stackTrace) {
+      unawaited(_errorLogger.error('local_terminal.close', error, stackTrace));
+      closingLocalTerminalIds.remove(terminal.id);
+      if (!mounted) return;
+      _showLocalTerminalError('Close local terminal failed: $error');
+      return;
+    }
+
+    try {
+      await localOutputSubscriptions.remove(terminal.id)?.cancel();
+    } catch (_) {}
+
+    closingLocalTerminalIds.remove(terminal.id);
+    if (!mounted) return;
+    _removeLocalTerminal(terminal);
   }
 
   void _handleTabSelect(String tabId) {
@@ -408,6 +574,12 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   }
 
   void _handleTabClose(String tabId) {
+    for (final terminal in localTerminals) {
+      if (terminal.id == tabId) {
+        unawaited(_handleCloseLocalTerminal(terminal));
+        return;
+      }
+    }
     setState(() {
       terminalState = terminalState.close(tabId);
     });
@@ -449,27 +621,55 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     });
   }
 
-  void _createLocalTerminal() {
+  Future<void> _createLocalTerminal() async {
     final nextIndex = localTerminalCounter + 1;
     final terminal = LocalTerminalItem(
       id: 'local-terminal-$nextIndex',
       title: 'terminal$nextIndex',
+      terminal: xterm.Terminal(maxLines: terminalThemeSettings.scrollbackLines),
     );
-    final tab = OpenTerminalTab.local(id: terminal.id, title: terminal.title);
 
     setState(() {
       localTerminalCounter = nextIndex;
       localExpanded = true;
       localTerminals = [...localTerminals, terminal];
-      terminalState = terminalState.open(tab);
+      terminalState = terminalState.open(_localTabFromTerminal(terminal));
       contentMode = WorkbenchContentMode.terminal;
     });
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
+    try {
+      final result = await widget.localTerminalBridge.spawnLocalTerminal(
+        rows: terminal.terminal?.viewHeight,
+        cols: terminal.terminal?.viewWidth,
+      );
+      if (!mounted) return;
+      if (removedPendingLocalTerminalIds.remove(terminal.id)) {
+        await widget.localTerminalBridge.closeSession(result.sessionId);
+        return;
+      }
+      final currentTerminal = localTerminals.firstWhere(
+        (item) => item.id == terminal.id,
+      );
+      final updatedTerminal = currentTerminal.copyWith(
+        sessionId: result.sessionId,
+      );
+      _replaceLocalTerminal(updatedTerminal);
+      _startLocalOutputSubscription(updatedTerminal);
+    } catch (error, stackTrace) {
+      unawaited(_errorLogger.error('local_terminal.spawn', error, stackTrace));
+      if (!mounted) return;
+      _removeLocalTerminal(terminal);
+      _showLocalTerminalError('Local terminal failed: $error');
+    }
   }
 
   void _handleAddConnection(AddConnectionAction action) {
     switch (action) {
       case AddConnectionAction.localTerminal:
-        _createLocalTerminal();
+        unawaited(_createLocalTerminal());
         break;
       case AddConnectionAction.ssh:
         setState(() {
@@ -1119,6 +1319,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               onTerminalThemeChanged: _handleTerminalThemeChanged,
               onBackFromConfig: _handleBackFromConfig,
               sshBridge: widget.sshBridge,
+              localTerminalBridge: widget.localTerminalBridge,
               onSshInput: _handleSshInput,
             ),
           ),

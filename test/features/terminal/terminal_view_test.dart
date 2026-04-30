@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/models/theme_settings.dart';
+import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/terminal/terminal_find.dart';
 import 'package:deepssh/features/terminal/terminal_state.dart';
@@ -105,6 +106,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: _defaultTerminalTheme,
           ),
         ),
@@ -149,6 +151,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: _defaultTerminalTheme,
           ),
         ),
@@ -190,6 +193,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: _defaultTerminalTheme,
           ),
         ),
@@ -328,6 +332,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: InMemorySshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: _defaultTerminalTheme,
           ),
         ),
@@ -574,6 +579,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: _defaultTerminalTheme,
           ),
         ),
@@ -605,6 +611,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: bridge,
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: _defaultTerminalTheme,
           ),
         ),
@@ -637,6 +644,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: bridge,
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: _defaultTerminalTheme,
           ),
         ),
@@ -685,6 +693,7 @@ void main() {
             body: TerminalView(
               tab: tab,
               sshBridge: bridge,
+              localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
               terminalThemeSettings: _defaultTerminalTheme,
             ),
           ),
@@ -726,6 +735,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: bridge,
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: _defaultTerminalTheme,
           ),
         ),
@@ -759,6 +769,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: bridge,
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: _defaultTerminalTheme,
           ),
         ),
@@ -845,6 +856,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: theme,
           ),
         ),
@@ -900,6 +912,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: theme,
           ),
         ),
@@ -941,6 +954,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: bridge,
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: theme,
           ),
         ),
@@ -979,6 +993,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: theme,
           ),
         ),
@@ -1019,6 +1034,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: theme,
           ),
         ),
@@ -1054,6 +1070,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: blinkingTheme,
           ),
         ),
@@ -1068,6 +1085,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: steadyTheme,
           ),
         ),
@@ -1101,6 +1119,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: theme,
           ),
         ),
@@ -1147,6 +1166,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: theme,
           ),
         ),
@@ -1191,6 +1211,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: theme,
           ),
         ),
@@ -1229,6 +1250,7 @@ void main() {
           body: TerminalView(
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             terminalThemeSettings: theme,
           ),
         ),
@@ -1301,6 +1323,7 @@ Widget _terminalApp({
         child: TerminalView(
           tab: tab,
           sshBridge: bridge,
+          localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
           terminalThemeSettings: theme ?? _defaultTerminalTheme,
         ),
       ),
@@ -1320,6 +1343,7 @@ Widget _terminalShellApp({
         onCloseTab: (_) {},
         onReorderTab: (_, __) {},
         sshBridge: bridge,
+        localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
         terminalThemeSettings: _defaultTerminalTheme,
       ),
     ),

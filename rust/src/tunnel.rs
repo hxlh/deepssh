@@ -376,7 +376,7 @@ async fn remote_target_is_open_via_ssh(
         .channel_open_direct_tcpip(target_host.to_string(), target_port.into(), "127.0.0.1", 0)
         .await
     {
-        Ok(mut channel) => {
+        Ok(channel) => {
             let _ = channel.eof().await;
             true
         }

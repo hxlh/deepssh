@@ -8,6 +8,7 @@ import 'package:xterm/xterm.dart' as xterm;
 
 import '../../core/models/theme_settings.dart';
 import '../../core/theme/app_colors.dart';
+import '../local_terminal/local_terminal_bridge.dart';
 import '../ssh/ssh_bridge.dart';
 import 'terminal_find.dart';
 import 'terminal_state.dart';
@@ -17,8 +18,10 @@ class TerminalView extends StatefulWidget {
     super.key,
     required this.tab,
     required this.sshBridge,
+    required this.localTerminalBridge,
     required this.terminalThemeSettings,
     this.onSshInput,
+    this.onLocalInput,
     this.findVisible = false,
     this.findQuery = '',
     this.findCaseSensitive = false,
@@ -34,8 +37,10 @@ class TerminalView extends StatefulWidget {
 
   final OpenTerminalTab tab;
   final SshBridgeClient sshBridge;
+  final LocalTerminalBridgeClient localTerminalBridge;
   final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String>? onSshInput;
+  final ValueChanged<String>? onLocalInput;
   final bool findVisible;
   final String findQuery;
   final bool findCaseSensitive;
@@ -91,12 +96,13 @@ class _TerminalViewState extends State<TerminalView> {
       if (sessionId != null) {
         _bindSshSession(sessionId);
       }
+    } else if (widget.tab.sourceType == TerminalSourceType.local) {
+      final sessionId = widget.tab.sessionId;
+      if (sessionId != null) {
+        _bindLocalSession(sessionId);
+      }
     } else {
       terminal.write('Connected to ${widget.tab.welcomeTarget}\r\n');
-      terminal.write('DeepSSH UI prototype terminal\r\n');
-      terminal.write('\r\n');
-      terminal.write(r'$ echo hello from xterm.dart\r\n');
-      terminal.write('hello from xterm.dart\r\n');
     }
     _syncFindSession();
   }
@@ -121,6 +127,33 @@ class _TerminalViewState extends State<TerminalView> {
     _resizeDebounce?.cancel();
     _resizeDebounce = Timer(const Duration(milliseconds: 80), () {
       widget.sshBridge.resizeSession(
+        sessionId: sessionId,
+        rows: height,
+        cols: width,
+      );
+    });
+  }
+
+  void _bindLocalSession(String sessionId) {
+    terminal.onResize = (width, height, _, _) {
+      _syncLocalSize(sessionId, width, height);
+    };
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.tab.sessionId == sessionId) {
+        _syncLocalSize(sessionId, terminal.viewWidth, terminal.viewHeight);
+      }
+    });
+    terminal.onOutput = (data) {
+      _resetCursorBlinkIdle();
+      widget.onLocalInput?.call(data);
+      widget.localTerminalBridge.writeToSession(sessionId, utf8.encode(data));
+    };
+  }
+
+  void _syncLocalSize(String sessionId, int width, int height) {
+    _resizeDebounce?.cancel();
+    _resizeDebounce = Timer(const Duration(milliseconds: 80), () {
+      widget.localTerminalBridge.resizeSession(
         sessionId: sessionId,
         rows: height,
         cols: width,
@@ -493,7 +526,11 @@ class _TerminalViewState extends State<TerminalView> {
       _refreshRegexHighlights();
     }
     if (oldSessionId != sessionId && sessionId != null) {
-      _bindSshSession(sessionId);
+      if (widget.tab.sourceType == TerminalSourceType.ssh) {
+        _bindSshSession(sessionId);
+      } else if (widget.tab.sourceType == TerminalSourceType.local) {
+        _bindLocalSession(sessionId);
+      }
     }
     final findChanged =
         oldWidget.findVisible != widget.findVisible ||

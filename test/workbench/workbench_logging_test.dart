@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:deepssh/core/logging/app_logger.dart';
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/models/theme_settings.dart';
+import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/theme/theme_bridge.dart';
+import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +23,8 @@ void main() {
         home: WorkbenchPage(
           sshBridge: FakeSshBridgeClient(),
           themeBridge: FailingThemeBridgeClient(),
+          localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+          tunnelBridge: InMemoryTunnelBridgeClient(),
           errorLogger: logger,
         ),
       ),
@@ -58,6 +62,8 @@ void main() {
             connectError: StateError('connect failed'),
           ),
           themeBridge: FakeThemeBridgeClient(),
+          localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+          tunnelBridge: InMemoryTunnelBridgeClient(),
           errorLogger: logger,
         ),
       ),
@@ -102,6 +108,8 @@ void main() {
         home: WorkbenchPage(
           sshBridge: bridge,
           themeBridge: FakeThemeBridgeClient(),
+          localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+          tunnelBridge: InMemoryTunnelBridgeClient(),
           errorLogger: logger,
         ),
       ),
@@ -161,6 +169,8 @@ void main() {
           home: WorkbenchPage(
             sshBridge: bridge,
             themeBridge: FakeThemeBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            tunnelBridge: InMemoryTunnelBridgeClient(),
             errorLogger: logger,
           ),
         ),

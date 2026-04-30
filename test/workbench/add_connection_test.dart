@@ -1,13 +1,26 @@
+import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
+import 'package:deepssh/features/theme/theme_bridge.dart';
+import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+Widget _workbenchApp() {
+  return MaterialApp(
+    home: WorkbenchPage(
+      localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+      tunnelBridge: InMemoryTunnelBridgeClient(),
+      themeBridge: InMemoryThemeBridgeClient(),
+    ),
+  );
+}
+
 void main() {
   testWidgets('opens SSH profiles page from add connection menu', (
     tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: WorkbenchPage()));
+    await tester.pumpWidget(_workbenchApp());
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
@@ -21,7 +34,7 @@ void main() {
   testWidgets('creates local terminals from add connection menu', (
     tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: WorkbenchPage()));
+    await tester.pumpWidget(_workbenchApp());
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
@@ -44,7 +57,7 @@ void main() {
   testWidgets(
     'right-click close removes local terminal from explorer and tabs',
     (tester) async {
-      await tester.pumpWidget(const MaterialApp(home: WorkbenchPage()));
+      await tester.pumpWidget(_workbenchApp());
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
@@ -72,7 +85,7 @@ void main() {
   testWidgets(
     'returns to terminal mode when local terminal is created from SSH page',
     (tester) async {
-      await tester.pumpWidget(const MaterialApp(home: WorkbenchPage()));
+      await tester.pumpWidget(_workbenchApp());
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
@@ -94,7 +107,7 @@ void main() {
   testWidgets('opens tunnel connections page from add connection menu', (
     tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: WorkbenchPage()));
+    await tester.pumpWidget(_workbenchApp());
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();

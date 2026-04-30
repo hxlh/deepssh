@@ -27,13 +27,20 @@ class OpenTerminalTab {
     );
   }
 
-  factory OpenTerminalTab.local({required String id, required String title}) {
+  factory OpenTerminalTab.local({
+    required String id,
+    required String title,
+    String? sessionId,
+    xterm.Terminal? terminal,
+  }) {
     return OpenTerminalTab(
       id: id,
       hostId: 'local',
       hostName: 'local',
       title: title,
       sourceType: TerminalSourceType.local,
+      sessionId: sessionId,
+      terminal: terminal,
     );
   }
 
