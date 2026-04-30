@@ -290,7 +290,9 @@ fn load_theme_from_disk() -> Result<ThemeSettings> {
     let content = match fs::read_to_string(&path) {
         Ok(content) => content,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(default_theme()),
-        Err(error) => return Err(error).with_context(|| format!("Failed to read {}", path.display())),
+        Err(error) => {
+            return Err(error).with_context(|| format!("Failed to read {}", path.display()))
+        }
     };
     let file: ThemeFile = serde_yaml::from_str(&content)
         .with_context(|| format!("Failed to parse {}", path.display()))?;
@@ -318,20 +320,32 @@ fn ensure_theme_loaded(store: &mut ThemeStore) -> Result<()> {
 }
 
 pub fn load_theme() -> Result<ThemeSettings> {
-    let mut store = THEME_STORE.lock().unwrap();
-    ensure_theme_loaded(&mut store)?;
-    Ok(store
-        .settings
-        .clone()
-        .expect("Theme settings should be initialized"))
+    let result = (|| {
+        let mut store = THEME_STORE.lock().unwrap();
+        ensure_theme_loaded(&mut store)?;
+        Ok(store
+            .settings
+            .clone()
+            .expect("Theme settings should be initialized"))
+    })();
+    if let Err(error) = &result {
+        crate::app_log::log_error("theme.load", error);
+    }
+    result
 }
 
 pub fn save_theme(settings: ThemeSettings) -> Result<()> {
-    let mut store = THEME_STORE.lock().unwrap();
-    write_theme_to_disk(&settings)?;
-    store.settings = Some(settings);
-    store.initialized = true;
-    Ok(())
+    let result = (|| {
+        let mut store = THEME_STORE.lock().unwrap();
+        write_theme_to_disk(&settings)?;
+        store.settings = Some(settings);
+        store.initialized = true;
+        Ok(())
+    })();
+    if let Err(error) = &result {
+        crate::app_log::log_error("theme.save", error);
+    }
+    result
 }
 
 #[cfg(test)]
@@ -371,6 +385,10 @@ mod tests {
 
         fn config_path(&self) -> std::path::PathBuf {
             self.path().join("config").join("theme_settings.yaml")
+        }
+
+        fn log_dir(&self) -> std::path::PathBuf {
+            self.path().join("config").join("log")
         }
     }
 
@@ -481,6 +499,28 @@ mod tests {
         assert!(yaml.contains("preset_name: Updated"));
         assert!(yaml.contains("background: '#123456'"));
         assert!(!yaml.contains("preset_name: Custom\n"));
+    }
+
+    #[test]
+    fn logs_theme_load_errors() {
+        let _guard = clear_theme_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+        fs::create_dir_all(workspace.path().join("config")).unwrap();
+        fs::write(workspace.config_path(), "ui: [").unwrap();
+
+        let result = load_theme();
+
+        assert!(result.is_err());
+        let log_file = fs::read_dir(workspace.log_dir())
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let log = fs::read_to_string(log_file).unwrap();
+        assert!(log.contains("ERROR backend theme.load"));
+        assert!(log.contains("Failed to parse"));
     }
 
     #[test]
