@@ -1,10 +1,12 @@
-use std::{fs, path::Path, sync::Mutex};
+use std::{fs, sync::Mutex};
 
 use anyhow::{Context, Result};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
-const CONFIG_PATH: &str = "config/theme_settings.yaml";
+use crate::config_path::config_file_path;
+
+const CONFIG_FILE_NAME: &str = "theme_settings.yaml";
 
 static THEME_STORE: Lazy<Mutex<ThemeStore>> = Lazy::new(|| Mutex::new(ThemeStore::default()));
 
@@ -284,25 +286,25 @@ fn default_theme() -> ThemeSettings {
 }
 
 fn load_theme_from_disk() -> Result<ThemeSettings> {
-    let path = Path::new(CONFIG_PATH);
-    let content = match fs::read_to_string(path) {
+    let path = config_file_path(CONFIG_FILE_NAME)?;
+    let content = match fs::read_to_string(&path) {
         Ok(content) => content,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(default_theme()),
-        Err(error) => return Err(error).with_context(|| format!("Failed to read {CONFIG_PATH}")),
+        Err(error) => return Err(error).with_context(|| format!("Failed to read {}", path.display())),
     };
-    let file: ThemeFile =
-        serde_yaml::from_str(&content).with_context(|| format!("Failed to parse {CONFIG_PATH}"))?;
+    let file: ThemeFile = serde_yaml::from_str(&content)
+        .with_context(|| format!("Failed to parse {}", path.display()))?;
     Ok(ThemeSettings::from(file))
 }
 
 fn write_theme_to_disk(settings: &ThemeSettings) -> Result<()> {
-    let path = Path::new(CONFIG_PATH);
+    let path = config_file_path(CONFIG_FILE_NAME)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|| format!("Failed to create {parent:?}"))?;
     }
     let file = ThemeFile::from(settings);
     let content = serde_yaml::to_string(&file).context("Failed to serialize theme settings")?;
-    fs::write(path, content).with_context(|| format!("Failed to write {CONFIG_PATH}"))?;
+    fs::write(&path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }
 

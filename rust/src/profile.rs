@@ -1,11 +1,13 @@
-use std::{fs, path::Path, sync::Mutex};
+use std::{fs, sync::Mutex};
 
 use anyhow::{anyhow, Context, Result};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-const CONFIG_PATH: &str = "config/ssh_profiles.yaml";
+use crate::config_path::config_file_path;
+
+const CONFIG_FILE_NAME: &str = "ssh_profiles.yaml";
 
 static PROFILE_STORE: Lazy<Mutex<ProfileStore>> = Lazy::new(|| Mutex::new(ProfileStore::default()));
 
@@ -69,14 +71,14 @@ impl From<&SshProfile> for SshProfileConfig {
 }
 
 fn load_profiles_from_disk() -> Result<Vec<SshProfile>> {
-    let path = Path::new(CONFIG_PATH);
-    let content = match fs::read_to_string(path) {
+    let path = config_file_path(CONFIG_FILE_NAME)?;
+    let content = match fs::read_to_string(&path) {
         Ok(content) => content,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(error) => return Err(error).with_context(|| format!("Failed to read {CONFIG_PATH}")),
+        Err(error) => return Err(error).with_context(|| format!("Failed to read {}", path.display())),
     };
-    let file: SshProfilesFile =
-        serde_yaml::from_str(&content).with_context(|| format!("Failed to parse {CONFIG_PATH}"))?;
+    let file: SshProfilesFile = serde_yaml::from_str(&content)
+        .with_context(|| format!("Failed to parse {}", path.display()))?;
     Ok(file
         .profiles
         .into_iter()
@@ -85,7 +87,7 @@ fn load_profiles_from_disk() -> Result<Vec<SshProfile>> {
 }
 
 fn write_profiles_to_disk(profiles: &[SshProfile]) -> Result<()> {
-    let path = Path::new(CONFIG_PATH);
+    let path = config_file_path(CONFIG_FILE_NAME)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|| format!("Failed to create {parent:?}"))?;
     }
@@ -93,7 +95,7 @@ fn write_profiles_to_disk(profiles: &[SshProfile]) -> Result<()> {
         profiles: profiles.iter().map(SshProfileConfig::from).collect(),
     };
     let content = serde_yaml::to_string(&file).context("Failed to serialize SSH profiles")?;
-    fs::write(path, content).with_context(|| format!("Failed to write {CONFIG_PATH}"))?;
+    fs::write(&path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }
 
