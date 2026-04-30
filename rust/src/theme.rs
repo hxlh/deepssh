@@ -335,11 +335,8 @@ pub fn save_theme(settings: ThemeSettings) -> Result<()> {
 }
 
 #[cfg(test)]
-static TEST_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
-
-#[cfg(test)]
 fn clear_theme_for_test() -> std::sync::MutexGuard<'static, ()> {
-    let guard = TEST_LOCK.lock().unwrap();
+    let guard = crate::test_support::WORKSPACE_LOCK.lock().unwrap();
     let mut store = THEME_STORE.lock().unwrap();
     store.settings = None;
     store.initialized = false;

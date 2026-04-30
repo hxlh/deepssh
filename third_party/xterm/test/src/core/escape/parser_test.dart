@@ -13,5 +13,11 @@ void main() {
       parser.write('\x1b[8;24;80t');
       verify(parser.handler.resize(80, 24));
     });
+
+    test('can parse colon-separated truecolor foreground SGR', () {
+      final parser = EscapeParser(MockEscapeHandler());
+      parser.write('\x1b[38:2::255:128:64m');
+      verify(parser.handler.setForegroundColorRgb(255, 128, 64));
+    });
   });
 }

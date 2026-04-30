@@ -19,6 +19,7 @@ abstract class SshBridgeClient {
     required int port,
     required String username,
     required String password,
+    required String termType,
   });
 
   Future<SshProfileItem> updateProfile({
@@ -28,11 +29,16 @@ abstract class SshBridgeClient {
     required int port,
     required String username,
     required String password,
+    required String termType,
   });
 
   Future<void> deleteProfile(String id);
 
-  Future<SshConnectionResult> connectProfile(String id);
+  Future<SshConnectionResult> connectProfile(
+    String id, {
+    int? rows,
+    int? cols,
+  });
 
   Stream<List<int>> outputStream(String sessionId);
 
@@ -72,6 +78,7 @@ class RustSshBridgeClient implements SshBridgeClient {
     required int port,
     required String username,
     required String password,
+    required String termType,
   }) async {
     await _ensureInitialized();
     final profile = await rust_profile.createProfile(
@@ -80,6 +87,7 @@ class RustSshBridgeClient implements SshBridgeClient {
       port: port,
       username: username,
       password: password,
+      termType: termType,
     );
     return _toItem(profile);
   }
@@ -92,6 +100,7 @@ class RustSshBridgeClient implements SshBridgeClient {
     required int port,
     required String username,
     required String password,
+    required String termType,
   }) async {
     await _ensureInitialized();
     final profile = await rust_profile.updateProfile(
@@ -101,6 +110,7 @@ class RustSshBridgeClient implements SshBridgeClient {
       port: port,
       username: username,
       password: password,
+      termType: termType,
     );
     return _toItem(profile);
   }
@@ -112,7 +122,11 @@ class RustSshBridgeClient implements SshBridgeClient {
   }
 
   @override
-  Future<SshConnectionResult> connectProfile(String id) async {
+  Future<SshConnectionResult> connectProfile(
+    String id, {
+    int? rows,
+    int? cols,
+  }) async {
     await _ensureInitialized();
     final profiles = await rust_profile.listProfiles();
     final profile = profiles.firstWhere((profile) => profile.id == id);
@@ -123,6 +137,9 @@ class RustSshBridgeClient implements SshBridgeClient {
       port: profile.port,
       username: profile.username,
       password: profile.password,
+      termType: profile.termType,
+      rows: rows ?? 24,
+      cols: cols ?? 80,
     );
     return SshConnectionResult(
       sessionId: session.sessionId,
@@ -180,6 +197,7 @@ class RustSshBridgeClient implements SshBridgeClient {
       port: profile.port,
       username: profile.username,
       password: profile.password,
+      termType: profile.termType,
     );
   }
 }
@@ -200,6 +218,7 @@ class InMemorySshBridgeClient implements SshBridgeClient {
     required int port,
     required String username,
     required String password,
+    required String termType,
   }) async {
     final profile = SshProfileItem(
       id: 'profile-${_nextProfileId++}',
@@ -208,6 +227,7 @@ class InMemorySshBridgeClient implements SshBridgeClient {
       port: port,
       username: username,
       password: password,
+      termType: termType,
     );
     _profiles.add(profile);
     return profile;
@@ -221,6 +241,7 @@ class InMemorySshBridgeClient implements SshBridgeClient {
     required int port,
     required String username,
     required String password,
+    required String termType,
   }) async {
     final index = _profiles.indexWhere((profile) => profile.id == id);
     if (index == -1) {
@@ -233,6 +254,7 @@ class InMemorySshBridgeClient implements SshBridgeClient {
       port: port,
       username: username,
       password: password,
+      termType: termType,
     );
     _profiles[index] = profile;
     return profile;
@@ -244,7 +266,11 @@ class InMemorySshBridgeClient implements SshBridgeClient {
   }
 
   @override
-  Future<SshConnectionResult> connectProfile(String id) async {
+  Future<SshConnectionResult> connectProfile(
+    String id, {
+    int? rows,
+    int? cols,
+  }) async {
     final profile = _profiles.firstWhere((profile) => profile.id == id);
     return SshConnectionResult(
       sessionId: 'ssh-session-${_nextSessionId++}',

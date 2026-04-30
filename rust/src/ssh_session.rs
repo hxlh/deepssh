@@ -38,6 +38,7 @@ pub struct SshSession {
     pub title: String,
     pub rows: u16,
     pub cols: u16,
+    pub term_type: String,
 }
 
 enum SshCommand {
@@ -69,6 +70,10 @@ impl client::Handler for SshClientHandler {
     }
 }
 
+fn pty_term_type(term_type: &str) -> String {
+    term_type.to_string()
+}
+
 pub fn create_output_stream(session_id: String, sink: StreamSink<Vec<u8>>) {
     OUTPUT_SINK_STORE.lock().unwrap().insert(session_id, sink);
 }
@@ -80,6 +85,9 @@ pub fn connect_profile(
     port: u16,
     username: String,
     password: String,
+    term_type: String,
+    rows: u16,
+    cols: u16,
 ) -> Result<SshSession> {
     TOKIO_RUNTIME.block_on(async move {
         let addr = format!("{}:{}", host, port);
@@ -104,10 +112,9 @@ pub fn connect_profile(
             .channel_open_session()
             .await
             .map_err(|e| anyhow!("SSH channel creation failed: {:?}", e))?;
-        let rows = 24;
-        let cols = 80;
+        let pty_term_type = pty_term_type(&term_type);
         channel
-            .request_pty(true, "xterm", cols as u32, rows as u32, 0, 0, &[])
+            .request_pty(true, &pty_term_type, cols as u32, rows as u32, 0, 0, &[])
             .await
             .map_err(|e| anyhow!("PTY request failed: {:?}", e))?;
         channel
@@ -123,6 +130,7 @@ pub fn connect_profile(
             title,
             rows,
             cols,
+            term_type,
         };
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<SshCommand>();
         let (read_half, write_half) = channel.split();
@@ -156,7 +164,7 @@ pub fn connect_profile(
 
 pub fn duplicate_session(session_id: String) -> Result<SshSession> {
     TOKIO_RUNTIME.block_on(async move {
-        let (connection_id, profile_id, title, rows, cols) = {
+        let (connection_id, profile_id, title, rows, cols, term_type) = {
             let sessions = SESSION_STORE.lock().unwrap();
             let session = sessions
                 .get(&session_id)
@@ -167,6 +175,7 @@ pub fn duplicate_session(session_id: String) -> Result<SshSession> {
                 session.title.clone(),
                 session.rows,
                 session.cols,
+                session.term_type.clone(),
             )
         };
 
@@ -182,8 +191,9 @@ pub fn duplicate_session(session_id: String) -> Result<SshSession> {
             .channel_open_session()
             .await
             .map_err(|e| anyhow!("Channel creation failed: {:?}", e))?;
+        let pty_term_type = pty_term_type(&term_type);
         channel
-            .request_pty(true, "xterm", cols as u32, rows as u32, 0, 0, &[])
+            .request_pty(true, &pty_term_type, cols as u32, rows as u32, 0, 0, &[])
             .await
             .map_err(|e| anyhow!("PTY request failed: {:?}", e))?;
         channel
@@ -199,6 +209,7 @@ pub fn duplicate_session(session_id: String) -> Result<SshSession> {
             title,
             rows,
             cols,
+            term_type,
         };
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<SshCommand>();
@@ -368,7 +379,7 @@ fn push_output(session_id: &str, data: Vec<u8>) {
 }
 
 #[cfg(test)]
-fn register_session_for_test(profile_id: String, title: String) -> SshSession {
+fn register_session_for_test(profile_id: String, title: String, term_type: String) -> SshSession {
     let session_id = Uuid::new_v4().to_string();
     let connection_id = Uuid::new_v4().to_string();
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<SshCommand>();
@@ -379,6 +390,7 @@ fn register_session_for_test(profile_id: String, title: String) -> SshSession {
         title,
         rows: 24,
         cols: 80,
+        term_type,
     };
     CONNECTION_STORE
         .lock()
@@ -426,6 +438,9 @@ mod tests {
             1,
             "user".to_string(),
             "pass".to_string(),
+            "xterm-truecolor".to_string(),
+            24,
+            80,
         );
 
         assert!(result.is_err());
@@ -456,9 +471,22 @@ mod tests {
     }
 
     #[test]
+    fn uses_selected_term_type_as_pty_term_type() {
+        assert_eq!(pty_term_type("xterm-truecolor"), "xterm-truecolor");
+        assert_eq!(pty_term_type("xterm-256color"), "xterm-256color");
+        assert_eq!(pty_term_type("xterm-color"), "xterm-color");
+    }
+
+    #[test]
     fn registers_test_session_and_sends_commands() {
         let _guard = clear_sessions_for_test();
-        let session = register_session_for_test("profile-1".to_string(), "Prod".to_string());
+        let session = register_session_for_test(
+            "profile-1".to_string(),
+            "Prod".to_string(),
+            "xterm-truecolor".to_string(),
+        );
+
+        assert_eq!(session.term_type, "xterm-truecolor");
 
         write_to_session(session.session_id.clone(), b"pwd\n".to_vec()).unwrap();
         resize_session(session.session_id.clone(), 30, 100).unwrap();
