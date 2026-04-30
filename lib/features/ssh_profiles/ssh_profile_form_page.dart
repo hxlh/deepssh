@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -29,6 +26,7 @@ class SshProfileDraft {
     required this.port,
     required this.username,
     required this.password,
+    required this.termType,
   });
 
   final String name;
@@ -36,6 +34,7 @@ class SshProfileDraft {
   final int port;
   final String username;
   final String password;
+  final String termType;
 }
 
 class _SshProfileFormPageState extends State<SshProfileFormPage> {
@@ -50,6 +49,8 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
   final portFocusNode = FocusNode(debugLabel: 'Port');
   final usernameFocusNode = FocusNode(debugLabel: 'Username');
   final passwordFocusNode = FocusNode(debugLabel: 'Password');
+  final termTypeFocusNode = FocusNode(debugLabel: 'Terminal Type');
+  late String selectedTermType;
 
   @override
   void initState() {
@@ -62,29 +63,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
     );
     usernameController = TextEditingController(text: profile?.username ?? '');
     passwordController = TextEditingController(text: profile?.password ?? '');
-    for (final node in [
-      nameFocusNode,
-      hostFocusNode,
-      portFocusNode,
-      usernameFocusNode,
-      passwordFocusNode,
-    ]) {
-      node.addListener(() {
-        logDebug(
-          '[ssh-form:focus] ${node.debugLabel}=${node.hasFocus} '
-          'primary=${FocusManager.instance.primaryFocus?.debugLabel}',
-        );
-      });
-    }
-    nameController.addListener(() => logFieldEditing('Name', nameController));
-    hostController.addListener(() => logFieldEditing('Host', hostController));
-    portController.addListener(() => logFieldEditing('Port', portController));
-    usernameController.addListener(
-      () => logFieldEditing('Username', usernameController),
-    );
-    passwordController.addListener(
-      () => logFieldEditing('Password', passwordController),
-    );
+    selectedTermType = profile?.termType ?? SshProfileItem.defaultTermType;
   }
 
   @override
@@ -99,23 +78,8 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
     portFocusNode.dispose();
     usernameFocusNode.dispose();
     passwordFocusNode.dispose();
+    termTypeFocusNode.dispose();
     super.dispose();
-  }
-
-  void logDebug(String message) {
-    if (kDebugMode) {
-      debugPrint(message);
-    }
-  }
-
-  void logFieldEditing(String label, TextEditingController controller) {
-    final value = controller.value;
-    logDebug(
-      '[ssh-form:edit] $label text=${jsonEncode(value.text)} '
-      'selection=${value.selection.start}-${value.selection.end} '
-      'composing=${value.composing.start}-${value.composing.end} '
-      'valid=${value.composing.isValid} collapsed=${value.composing.isCollapsed}',
-    );
   }
 
   KeyEventResult handleFieldKey(
@@ -123,21 +87,11 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
     FocusNode? previousFocusNode,
     FocusNode? nextFocusNode,
   ) {
-    logDebug(
-      '[ssh-form:key] focus=${FocusManager.instance.primaryFocus?.debugLabel} '
-      'type=${event.runtimeType} logical=${event.logicalKey.keyLabel} '
-      'character=${jsonEncode(event.character)} '
-      'ctrl=${HardwareKeyboard.instance.isControlPressed} '
-      'alt=${HardwareKeyboard.instance.isAltPressed} '
-      'shift=${HardwareKeyboard.instance.isShiftPressed} '
-      'meta=${HardwareKeyboard.instance.isMetaPressed}',
-    );
     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.tab) {
       final targetFocusNode = HardwareKeyboard.instance.isShiftPressed
           ? previousFocusNode
           : nextFocusNode;
       if (targetFocusNode != null) {
-        logDebug('[ssh-form:tab] target=${targetFocusNode.debugLabel}');
         targetFocusNode.requestFocus();
         return KeyEventResult.handled;
       }
@@ -171,6 +125,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
         port: int.parse(portController.text.trim()),
         username: usernameController.text.trim(),
         password: passwordController.text,
+        termType: selectedTermType,
       ),
     );
   }
@@ -182,8 +137,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
       padding: const EdgeInsets.all(20),
       child: Form(
         key: formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: ListView(
           children: [
             Text(
               isEdit ? 'Edit SSH Profile' : 'New SSH Profile',
@@ -251,15 +205,35 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
             const SizedBox(height: 12),
             Focus(
               onKeyEvent: (_, event) =>
-                  handleFieldKey(event, usernameFocusNode, null),
+                  handleFieldKey(event, usernameFocusNode, termTypeFocusNode),
               child: TextFormField(
                 focusNode: passwordFocusNode,
                 controller: passwordController,
                 decoration: const InputDecoration(labelText: 'Password'),
                 obscureText: true,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => save(),
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => termTypeFocusNode.requestFocus(),
                 validator: requiredText,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Focus(
+              onKeyEvent: (_, event) =>
+                  handleFieldKey(event, passwordFocusNode, null),
+              child: DropdownButtonFormField<String>(
+                focusNode: termTypeFocusNode,
+                value: selectedTermType,
+                decoration: const InputDecoration(labelText: 'Terminal Type'),
+                items: [
+                  for (final option in SshProfileItem.termTypeOptions)
+                    DropdownMenuItem(value: option, child: Text(option)),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    selectedTermType = value;
+                  });
+                },
               ),
             ),
             const SizedBox(height: 24),

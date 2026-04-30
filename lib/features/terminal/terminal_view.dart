@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -96,14 +94,7 @@ class _TerminalViewState extends State<TerminalView> {
     _syncFindSession();
   }
 
-  void logDebug(String message) {
-    if (kDebugMode) {
-      debugPrint(message);
-    }
-  }
-
   void _bindSshSession(String sessionId) {
-    logDebug('[terminal:bind] session=$sessionId tab=${widget.tab.id}');
     terminal.onResize = (width, height, _, _) {
       _syncSshSize(sessionId, width, height);
     };
@@ -113,9 +104,6 @@ class _TerminalViewState extends State<TerminalView> {
       }
     });
     terminal.onOutput = (data) {
-      logDebug(
-        '[terminal:onOutput] session=$sessionId data=${jsonEncode(data)}',
-      );
       widget.onSshInput?.call(data);
       widget.sshBridge.writeToSession(sessionId, utf8.encode(data));
     };
@@ -216,38 +204,23 @@ class _TerminalViewState extends State<TerminalView> {
 
   void _handleTextEditingChanged() {
     final value = textController.value;
-    logDebug(
-      '[terminal:edit] text=${jsonEncode(value.text)} '
-      'selection=${value.selection.start}-${value.selection.end} '
-      'composing=${value.composing.start}-${value.composing.end} '
-      'valid=${value.composing.isValid} collapsed=${value.composing.isCollapsed}',
-    );
     if (value.text.isEmpty) return;
     if (value.composing.isValid && !value.composing.isCollapsed) {
-      logDebug('[terminal:edit] skip composing text=${jsonEncode(value.text)}');
       return;
     }
-    logDebug('[terminal:edit] commit text=${jsonEncode(value.text)}');
     _resetCursorBlinkIdle();
     terminal.textInput(value.text);
     textController.clear();
   }
 
   KeyEventResult _handleTerminalKeyEvent(FocusNode focusNode, KeyEvent event) {
-    logDebug(
-      '[terminal:find:key] type=${event.runtimeType} '
-      'logical=${event.logicalKey.keyLabel} '
-      'ctrl=${HardwareKeyboard.instance.isControlPressed}',
-    );
     if (event is KeyDownEvent &&
         HardwareKeyboard.instance.isControlPressed &&
         !HardwareKeyboard.instance.isAltPressed &&
         event.logicalKey == LogicalKeyboardKey.keyF) {
       if (_effectiveFindVisible) {
-        logDebug('[terminal:find] closing find bar via Ctrl+F');
         _closeFind();
       } else {
-        logDebug('[terminal:find] opening find bar via Ctrl+F');
         _openFind();
       }
       return KeyEventResult.handled;
@@ -256,16 +229,6 @@ class _TerminalViewState extends State<TerminalView> {
   }
 
   KeyEventResult _handleProxyKeyEvent(FocusNode focusNode, KeyEvent event) {
-    logDebug(
-      '[terminal:key] focus=${focusNode.hasFocus} '
-      'primary=${FocusManager.instance.primaryFocus?.debugLabel} '
-      'type=${event.runtimeType} logical=${event.logicalKey.keyLabel} '
-      'character=${jsonEncode(event.character)} '
-      'ctrl=${HardwareKeyboard.instance.isControlPressed} '
-      'alt=${HardwareKeyboard.instance.isAltPressed} '
-      'shift=${HardwareKeyboard.instance.isShiftPressed} '
-      'meta=${HardwareKeyboard.instance.isMetaPressed}',
-    );
     if (event is KeyUpEvent) return KeyEventResult.ignored;
 
     if (HardwareKeyboard.instance.isControlPressed) {
@@ -274,9 +237,6 @@ class _TerminalViewState extends State<TerminalView> {
         final codeUnit = character.toLowerCase().codeUnitAt(0);
         if (codeUnit >= 97 && codeUnit <= 122) {
           final controlText = String.fromCharCode(codeUnit - 96);
-          logDebug(
-            '[terminal:key] ctrl-letter commit=${jsonEncode(controlText)}',
-          );
           _resetCursorBlinkIdle();
           terminal.textInput(controlText);
           return KeyEventResult.handled;
@@ -287,9 +247,6 @@ class _TerminalViewState extends State<TerminalView> {
         final codeUnit = keyLabel.toLowerCase().codeUnitAt(0);
         if (codeUnit >= 97 && codeUnit <= 122) {
           final controlText = String.fromCharCode(codeUnit - 96);
-          logDebug(
-            '[terminal:key] ctrl-letter commit=${jsonEncode(controlText)}',
-          );
           _resetCursorBlinkIdle();
           terminal.textInput(controlText);
           return KeyEventResult.handled;
@@ -314,7 +271,6 @@ class _TerminalViewState extends State<TerminalView> {
       _ => null,
     };
     if (key == null) {
-      logDebug('[terminal:key] ignored unmapped');
       return KeyEventResult.ignored;
     }
 
@@ -324,7 +280,6 @@ class _TerminalViewState extends State<TerminalView> {
       alt: HardwareKeyboard.instance.isAltPressed,
       shift: HardwareKeyboard.instance.isShiftPressed,
     );
-    logDebug('[terminal:key] keyInput key=$key handled=$handled');
     if (handled) {
       _resetCursorBlinkIdle();
     }
@@ -415,7 +370,6 @@ class _TerminalViewState extends State<TerminalView> {
   }
 
   void _openFind() {
-    logDebug('[terminal:find] _openFind called');
     final selection = terminalController.selection;
     final selectedText = selection == null
         ? ''

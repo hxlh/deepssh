@@ -98,12 +98,14 @@ class _DefaultSshBridgeClientHolder implements SshBridgeClient {
     required int port,
     required String username,
     required String password,
+    required String termType,
   }) => _delegate.createProfile(
     name: name,
     host: host,
     port: port,
     username: username,
     password: password,
+    termType: termType,
   );
 
   @override
@@ -114,6 +116,7 @@ class _DefaultSshBridgeClientHolder implements SshBridgeClient {
     required int port,
     required String username,
     required String password,
+    required String termType,
   }) => _delegate.updateProfile(
     id: id,
     name: name,
@@ -121,14 +124,18 @@ class _DefaultSshBridgeClientHolder implements SshBridgeClient {
     port: port,
     username: username,
     password: password,
+    termType: termType,
   );
 
   @override
   Future<void> deleteProfile(String id) => _delegate.deleteProfile(id);
 
   @override
-  Future<SshConnectionResult> connectProfile(String id) =>
-      _delegate.connectProfile(id);
+  Future<SshConnectionResult> connectProfile(
+    String id, {
+    int? rows,
+    int? cols,
+  }) => _delegate.connectProfile(id, rows: rows, cols: cols);
 
   @override
   Stream<List<int>> outputStream(String sessionId) =>
@@ -304,20 +311,17 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     setState(() {
       final next = [...sshProfiles];
       final item = next.removeAt(oldIndex);
-      final insertAt =
-          newIndex > oldIndex ? newIndex - 1 : newIndex;
+      final insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
       next.insert(insertAt, item);
       sshProfiles = next;
     });
   }
 
-  void _handleReorderSessions(
-      String profileId, int oldIndex, int newIndex) {
+  void _handleReorderSessions(String profileId, int oldIndex, int newIndex) {
     setState(() {
       final sessions = [...?sshSessionsByProfileId[profileId]];
       final item = sessions.removeAt(oldIndex);
-      final sInsertAt =
-          newIndex > oldIndex ? newIndex - 1 : newIndex;
+      final sInsertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
       sessions.insert(sInsertAt, item);
       sshSessionsByProfileId = {...sshSessionsByProfileId, profileId: sessions};
     });
@@ -327,8 +331,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     setState(() {
       final next = [...localTerminals];
       final item = next.removeAt(oldIndex);
-      final ltInsertAt =
-          newIndex > oldIndex ? newIndex - 1 : newIndex;
+      final ltInsertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
       next.insert(ltInsertAt, item);
       localTerminals = next;
     });
@@ -390,6 +393,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         port: draft.port,
         username: draft.username,
         password: draft.password,
+        termType: draft.termType,
       );
     } else {
       await widget.sshBridge.updateProfile(
@@ -399,6 +403,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         port: draft.port,
         username: draft.username,
         password: draft.password,
+        termType: draft.termType,
       );
     }
     await loadSshProfiles();
@@ -705,8 +710,15 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       sshErrorMessage = null;
     });
 
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
     try {
-      final result = await widget.sshBridge.connectProfile(profile.id);
+      final result = await widget.sshBridge.connectProfile(
+        profile.id,
+        rows: session.terminal?.viewHeight,
+        cols: session.terminal?.viewWidth,
+      );
       if (!mounted) return;
       if (removedPendingSshSessionIds.remove(session.id)) {
         try {

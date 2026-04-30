@@ -22,6 +22,9 @@ Future<SshSession> connectProfile({
   required int port,
   required String username,
   required String password,
+  required String termType,
+  required int rows,
+  required int cols,
 }) => RustLib.instance.api.crateSshSessionConnectProfile(
   profileId: profileId,
   title: title,
@@ -29,6 +32,9 @@ Future<SshSession> connectProfile({
   port: port,
   username: username,
   password: password,
+  termType: termType,
+  rows: rows,
+  cols: cols,
 );
 
 Future<SshSession> duplicateSession({required String sessionId}) =>
@@ -62,6 +68,7 @@ class SshSession {
   final String title;
   final int rows;
   final int cols;
+  final String termType;
 
   const SshSession({
     required this.sessionId,
@@ -70,6 +77,7 @@ class SshSession {
     required this.title,
     required this.rows,
     required this.cols,
+    required this.termType,
   });
 
   @override
@@ -79,7 +87,8 @@ class SshSession {
       connectionId.hashCode ^
       title.hashCode ^
       rows.hashCode ^
-      cols.hashCode;
+      cols.hashCode ^
+      termType.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -91,5 +100,6 @@ class SshSession {
           connectionId == other.connectionId &&
           title == other.title &&
           rows == other.rows &&
-          cols == other.cols;
+          cols == other.cols &&
+          termType == other.termType;
 }

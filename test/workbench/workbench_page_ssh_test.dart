@@ -14,6 +14,7 @@ class FakeSshBridgeClient implements SshBridgeClient {
   final profiles = <SshProfileItem>[];
   final connectCompleters = <Completer<SshConnectionResult>>[];
   var connectCount = 0;
+  final connectSizes = <({int rows, int cols})>[];
   var outputStreamListenCount = 0;
   var writeToSessionCount = 0;
   var closeSessionCount = 0;
@@ -33,6 +34,7 @@ class FakeSshBridgeClient implements SshBridgeClient {
     required int port,
     required String username,
     required String password,
+    required String termType,
   }) async {
     final profile = SshProfileItem(
       id: 'profile-${profiles.length + 1}',
@@ -41,6 +43,7 @@ class FakeSshBridgeClient implements SshBridgeClient {
       port: port,
       username: username,
       password: password,
+      termType: termType,
     );
     profiles.add(profile);
     return profile;
@@ -54,6 +57,7 @@ class FakeSshBridgeClient implements SshBridgeClient {
     required int port,
     required String username,
     required String password,
+    required String termType,
   }) async {
     final index = profiles.indexWhere((profile) => profile.id == id);
     final updated = SshProfileItem(
@@ -63,6 +67,7 @@ class FakeSshBridgeClient implements SshBridgeClient {
       port: port,
       username: username,
       password: password,
+      termType: termType,
     );
     profiles[index] = updated;
     return updated;
@@ -74,8 +79,15 @@ class FakeSshBridgeClient implements SshBridgeClient {
   }
 
   @override
-  Future<SshConnectionResult> connectProfile(String id) async {
+  Future<SshConnectionResult> connectProfile(
+    String id, {
+    int? rows,
+    int? cols,
+  }) async {
     connectCount += 1;
+    if (rows != null && cols != null) {
+      connectSizes.add((rows: rows, cols: cols));
+    }
     if (connectCompleters.isNotEmpty) {
       return connectCompleters.removeAt(0).future;
     }
@@ -286,6 +298,37 @@ void main() {
       expect(bridge.outputStreamListenCount, 2);
     },
   );
+
+  testWidgets('connect passes the rendered terminal size to SSH', (tester) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
+
+    await tester.pumpWidget(MaterialApp(home: WorkbenchPage(sshBridge: bridge)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
+
+    final terminalWidget = tester.widget<xterm.TerminalView>(
+      find.byType(xterm.TerminalView),
+    );
+    expect(bridge.connectSizes, hasLength(1));
+    expect(bridge.connectSizes.single.cols, terminalWidget.terminal.viewWidth);
+    expect(bridge.connectSizes.single.rows, terminalWidget.terminal.viewHeight);
+  });
 
   testWidgets('closing an SSH tab keeps the session available in explorer', (
     tester,
@@ -727,8 +770,14 @@ void main() {
       await tester.enterText(find.bySemanticsLabel('Port'), '2222');
       await tester.enterText(find.bySemanticsLabel('Username'), 'root');
       await tester.enterText(find.bySemanticsLabel('Password'), 'secret');
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('xterm-truecolor').last);
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Create'));
       await tester.pumpAndSettle();
+
+      expect(bridge.profiles.single.termType, 'xterm-truecolor');
 
       expect(find.text('Prod'), findsWidgets);
       expect(find.text('root@example.com:2222'), findsOneWidget);
