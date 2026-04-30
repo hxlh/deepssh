@@ -1,4 +1,5 @@
 import '../../core/models/tunnel_config_item.dart';
+import '../../src/rust/frb_generated.dart';
 import '../../src/rust/tunnel.dart' as rust;
 
 abstract class TunnelBridgeClient {
@@ -164,10 +165,17 @@ TunnelConfigItem _toTunnelConfigItem(rust.TunnelConfig config) {
 }
 
 class RustTunnelBridgeClient implements TunnelBridgeClient {
-  const RustTunnelBridgeClient();
+  RustTunnelBridgeClient();
+
+  Future<void>? _initFuture;
+
+  Future<void> _ensureInitialized() {
+    return _initFuture ??= RustLib.init();
+  }
 
   @override
   Future<List<TunnelConfigItem>> listTunnels() async {
+    await _ensureInitialized();
     final configs = await rust.listTunnels();
     return configs.map(_toTunnelConfigItem).toList();
   }
@@ -182,6 +190,7 @@ class RustTunnelBridgeClient implements TunnelBridgeClient {
     required String targetHost,
     required int targetPort,
   }) async {
+    await _ensureInitialized();
     final config = await rust.createTunnel(
       name: name,
       forwardType: _toRustForwardType(type),
@@ -205,6 +214,7 @@ class RustTunnelBridgeClient implements TunnelBridgeClient {
     required String targetHost,
     required int targetPort,
   }) async {
+    await _ensureInitialized();
     final config = await rust.updateTunnel(
       id: id,
       name: name,
@@ -220,17 +230,20 @@ class RustTunnelBridgeClient implements TunnelBridgeClient {
 
   @override
   Future<void> deleteTunnel(String id) async {
+    await _ensureInitialized();
     await rust.deleteTunnel(id: id);
   }
 
   @override
   Future<TunnelConfigItem> startTunnel(String id) async {
+    await _ensureInitialized();
     final config = await rust.startTunnel(id: id);
     return _toTunnelConfigItem(config);
   }
 
   @override
   Future<TunnelConfigItem> stopTunnel(String id) async {
+    await _ensureInitialized();
     final config = await rust.stopTunnel(id: id);
     return _toTunnelConfigItem(config);
   }
