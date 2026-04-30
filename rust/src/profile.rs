@@ -39,6 +39,8 @@ struct SshProfilesFile {
 #[flutter_rust_bridge::frb(ignore)]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct SshProfileConfig {
+    #[serde(default)]
+    id: String,
     name: String,
     host: String,
     port: u16,
@@ -53,22 +55,32 @@ fn default_term_type() -> String {
 }
 
 impl SshProfileConfig {
-    fn into_profile(self) -> SshProfile {
-        SshProfile {
-            id: Uuid::new_v4().to_string(),
-            name: self.name,
-            host: self.host,
-            port: self.port,
-            username: self.username,
-            password: self.password,
-            term_type: self.term_type,
-        }
+    fn into_profile_with_migration(self) -> (SshProfile, bool) {
+        let missing_id = self.id.is_empty();
+        let id = if missing_id {
+            Uuid::new_v4().to_string()
+        } else {
+            self.id
+        };
+        (
+            SshProfile {
+                id,
+                name: self.name,
+                host: self.host,
+                port: self.port,
+                username: self.username,
+                password: self.password,
+                term_type: self.term_type,
+            },
+            missing_id,
+        )
     }
 }
 
 impl From<&SshProfile> for SshProfileConfig {
     fn from(profile: &SshProfile) -> Self {
         Self {
+            id: profile.id.clone(),
             name: profile.name.clone(),
             host: profile.host.clone(),
             port: profile.port,
@@ -90,11 +102,20 @@ fn load_profiles_from_disk() -> Result<Vec<SshProfile>> {
     };
     let file: SshProfilesFile = serde_yaml::from_str(&content)
         .with_context(|| format!("Failed to parse {}", path.display()))?;
-    Ok(file
+    let mut migrated = false;
+    let profiles = file
         .profiles
         .into_iter()
-        .map(SshProfileConfig::into_profile)
-        .collect())
+        .map(|config| {
+            let (profile, changed) = config.into_profile_with_migration();
+            migrated |= changed;
+            profile
+        })
+        .collect::<Vec<_>>();
+    if migrated {
+        write_profiles_to_disk(&profiles)?;
+    }
+    Ok(profiles)
 }
 
 fn write_profiles_to_disk(profiles: &[SshProfile]) -> Result<()> {
@@ -285,7 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn creates_profile_yaml_without_runtime_id() {
+    fn creates_profile_yaml_with_stable_runtime_id() {
         let _guard = clear_profiles_for_test();
         let workspace = TestWorkspace::new();
         reset_store();
@@ -309,8 +330,8 @@ mod tests {
         assert!(yaml.contains("port: 22"));
         assert!(yaml.contains("username: root"));
         assert!(yaml.contains("password: secret"));
+        assert!(yaml.contains(&format!("id: {}", created.id)));
         assert!(yaml.contains("term_type: xterm-truecolor"));
-        assert!(!yaml.contains("id:"));
     }
 
     #[test]
@@ -348,9 +369,9 @@ mod tests {
         assert!(yaml.contains("username: admin"));
         assert!(yaml.contains("password: new-secret"));
         assert!(yaml.contains("term_type: xterm-256color"));
+        assert!(yaml.contains(&format!("id: {}", created.id)));
         assert!(!yaml.contains("example.com"));
         assert!(!yaml.contains("term_type: xterm\n"));
-        assert!(!yaml.contains("id:"));
     }
 
     #[test]
@@ -383,7 +404,6 @@ mod tests {
         assert!(!yaml.contains("name: Prod"));
         assert!(yaml.contains("name: Stage"));
         assert!(yaml.contains("term_type: xterm-color"));
-        assert!(!yaml.contains("id:"));
     }
 
     #[test]
@@ -426,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn reloads_yaml_in_order_with_new_runtime_ids() {
+    fn reloads_yaml_in_order_with_persisted_runtime_ids() {
         let _guard = clear_profiles_for_test();
         let workspace = TestWorkspace::new();
         reset_store();
@@ -434,12 +454,14 @@ mod tests {
         fs::write(
             workspace.config_path(),
             r#"profiles:
-- name: Prod
+- id: prod-id
+  name: Prod
   host: example.com
   port: 22
   username: root
   password: secret
-- name: Stage
+- id: stage-id
+  name: Stage
   host: stage.example.com
   port: 2222
   username: deploy
@@ -454,16 +476,39 @@ mod tests {
 
         assert_eq!(first_load.len(), 2);
         assert_eq!(second_load.len(), 2);
-        assert_eq!(first_load[0].name, "Prod");
-        assert_eq!(first_load[1].name, "Stage");
-        assert_eq!(second_load[0].name, "Prod");
-        assert_eq!(second_load[1].name, "Stage");
+        assert_eq!(first_load[0].id, "prod-id");
+        assert_eq!(first_load[1].id, "stage-id");
+        assert_eq!(second_load[0].id, "prod-id");
+        assert_eq!(second_load[1].id, "stage-id");
         assert_eq!(first_load[0].term_type, "xterm-256color");
         assert_eq!(first_load[1].term_type, "xterm-256color");
-        assert_eq!(second_load[0].term_type, "xterm-256color");
-        assert_eq!(second_load[1].term_type, "xterm-256color");
-        assert_ne!(first_load[0].id, second_load[0].id);
-        assert_ne!(first_load[1].id, second_load[1].id);
+    }
+
+    #[test]
+    fn legacy_yaml_without_ids_gets_ids_written_back_on_load() {
+        let _guard = clear_profiles_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+        fs::create_dir_all(workspace.path().join("config")).unwrap();
+        fs::write(
+            workspace.config_path(),
+            r#"profiles:
+- name: Legacy
+  host: legacy.example.com
+  port: 22
+  username: root
+  password: secret
+"#,
+        )
+        .unwrap();
+
+        let profiles = list_profiles().unwrap();
+
+        assert_eq!(profiles.len(), 1);
+        assert!(!profiles[0].id.is_empty());
+        assert_eq!(profiles[0].term_type, "xterm-256color");
+        let yaml = fs::read_to_string(workspace.config_path()).unwrap();
+        assert!(yaml.contains(&format!("id: {}", profiles[0].id)));
     }
 
     #[test]

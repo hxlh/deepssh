@@ -22,7 +22,7 @@ static OUTPUT_SINK_STORE: Lazy<Mutex<HashMap<String, StreamSink<Vec<u8>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 static SSH_CLIENT_STORE: Lazy<Mutex<HashMap<String, SshConnectionInfo>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
-static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+pub(crate) static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     Builder::new_multi_thread()
         .enable_all()
         .thread_name("deepssh-russh")

@@ -90,4 +90,18 @@ void main() {
       expect(find.text('local · terminal1'), findsOneWidget);
     },
   );
+
+  testWidgets('opens tunnel connections page from add connection menu', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: WorkbenchPage()));
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('隧道连接'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tunnel Connections'), findsOneWidget);
+    expect(find.text('新增'), findsOneWidget);
+  });
 }
