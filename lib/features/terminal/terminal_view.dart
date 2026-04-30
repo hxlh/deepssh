@@ -219,7 +219,6 @@ class _TerminalViewState extends State<TerminalView> {
         !HardwareKeyboard.instance.isAltPressed &&
         event.logicalKey == LogicalKeyboardKey.keyC &&
         _copySelectionIfNotEmpty()) {
-      logDebug('[terminal:find:key] copied selection via Ctrl+C');
       return KeyEventResult.handled;
     }
     if (event is KeyDownEvent &&

@@ -243,6 +243,11 @@ class _TerminalFindBarState extends State<TerminalFindBar> {
     _inputController.addListener(() {
       widget.onQueryChanged(_searchQuery(_inputController.text));
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _inputFocusNode.requestFocus();
+      }
+    });
   }
 
   String _displayQuery(String query) {

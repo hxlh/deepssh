@@ -131,6 +131,45 @@ void main() {
     final textField = tester.widget<TextField>(findInput);
     expect(textField.controller!.text, r'alpha\nbeta');
   });
+  testWidgets('focuses find input when terminal find opens', (tester) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.write('needle match\r\n');
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: _defaultTerminalTheme,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF, character: 'f');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    final textField = tester.widget<TextField>(
+      find.descendant(
+        of: find.byType(TerminalFindBar),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(textField.focusNode!.hasFocus, isTrue);
+  });
+
   testWidgets('seeds find query from current terminal selection on Ctrl+F', (
     tester,
   ) async {
