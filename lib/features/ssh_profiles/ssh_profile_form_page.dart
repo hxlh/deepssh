@@ -222,7 +222,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
                   handleFieldKey(event, passwordFocusNode, null),
               child: DropdownButtonFormField<String>(
                 focusNode: termTypeFocusNode,
-                value: selectedTermType,
+                initialValue: selectedTermType,
                 decoration: const InputDecoration(labelText: 'Terminal Type'),
                 items: [
                   for (final option in SshProfileItem.termTypeOptions)

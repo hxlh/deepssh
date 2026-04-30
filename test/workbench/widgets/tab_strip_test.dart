@@ -3,8 +3,7 @@ import 'package:deepssh/workbench/widgets/tab_strip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-OpenTerminalTab _tab(String id) =>
-    OpenTerminalTab.local(id: id, title: id);
+OpenTerminalTab _tab(String id) => OpenTerminalTab.local(id: id, title: id);
 
 void main() {
   testWidgets('TabStrip renders tabs', (tester) async {

@@ -9,9 +9,7 @@ void main() {
     expect(
       source,
       contains(
-        RegExp(
-          r'<key>com\.apple\.security\.network\.client</key>\s*<true/>',
-        ),
+        RegExp(r'<key>com\.apple\.security\.network\.client</key>\s*<true/>'),
       ),
     );
   });

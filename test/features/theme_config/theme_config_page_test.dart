@@ -231,7 +231,8 @@ void main() {
             uiSettings: UiThemeSettings.commandDeck(),
             terminalSettings: terminalSettings,
             onUiSettingsChanged: (_) {},
-            onTerminalSettingsChanged: (settings) => terminalSettings = settings,
+            onTerminalSettingsChanged: (settings) =>
+                terminalSettings = settings,
             onBack: () {},
           ),
         ),
