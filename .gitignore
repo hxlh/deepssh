@@ -13,6 +13,7 @@
 migrate_working_dir/
 .worktree
 .worktree/
+.worktrees/
 
 # IntelliJ related
 *.iml
