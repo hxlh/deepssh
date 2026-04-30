@@ -1,10 +1,23 @@
+import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
+import 'package:deepssh/features/theme/theme_bridge.dart';
+import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+Widget _workbenchApp() {
+  return MaterialApp(
+    home: WorkbenchPage(
+      localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+      tunnelBridge: InMemoryTunnelBridgeClient(),
+      themeBridge: InMemoryThemeBridgeClient(),
+    ),
+  );
+}
+
 void main() {
   testWidgets('starts without prototype hosts in the explorer', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: WorkbenchPage()));
+    await tester.pumpWidget(_workbenchApp());
     await tester.pumpAndSettle();
 
     expect(find.text('machine1'), findsNothing);
@@ -16,7 +29,7 @@ void main() {
   testWidgets('closes the active local tab and returns to empty state', (
     tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: WorkbenchPage()));
+    await tester.pumpWidget(_workbenchApp());
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();

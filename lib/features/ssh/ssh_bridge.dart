@@ -1,5 +1,5 @@
 import '../../core/models/ssh_profile_item.dart';
-import '../../src/rust/frb_generated.dart';
+import '../../src/rust/rust_init.dart';
 import '../../src/rust/profile.dart' as rust_profile;
 import '../../src/rust/ssh_session.dart' as rust_session;
 
@@ -54,10 +54,8 @@ abstract class SshBridgeClient {
 class RustSshBridgeClient implements SshBridgeClient {
   RustSshBridgeClient();
 
-  Future<void>? _initFuture;
-
   Future<void> _ensureInitialized() {
-    return _initFuture ??= RustLib.init();
+    return ensureRustInitialized();
   }
 
   @override

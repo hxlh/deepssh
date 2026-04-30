@@ -4,6 +4,7 @@ import '../../core/models/theme_settings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../workbench/widgets/empty_state.dart';
 import '../../workbench/widgets/tab_strip.dart';
+import '../local_terminal/local_terminal_bridge.dart';
 import '../ssh/ssh_bridge.dart';
 import 'terminal_state.dart';
 import 'terminal_view.dart';
@@ -16,6 +17,7 @@ class TerminalTabShell extends StatefulWidget {
     required this.onCloseTab,
     required this.onReorderTab,
     required this.sshBridge,
+    required this.localTerminalBridge,
     required this.terminalThemeSettings,
     this.onSshInput,
   });
@@ -25,6 +27,7 @@ class TerminalTabShell extends StatefulWidget {
   final ValueChanged<String> onCloseTab;
   final void Function(int oldIndex, int newIndex) onReorderTab;
   final SshBridgeClient sshBridge;
+  final LocalTerminalBridgeClient localTerminalBridge;
   final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String>? onSshInput;
 
@@ -78,6 +81,7 @@ class _TerminalTabShellState extends State<TerminalTabShell> {
               key: ValueKey(activeTab.id),
               tab: activeTab,
               sshBridge: widget.sshBridge,
+              localTerminalBridge: widget.localTerminalBridge,
               terminalThemeSettings: widget.terminalThemeSettings,
               onSshInput: widget.onSshInput,
               findVisible: _findVisible,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models/ssh_profile_item.dart';
 import '../../core/models/theme_settings.dart';
 import '../../core/models/tunnel_config_item.dart';
+import '../../features/local_terminal/local_terminal_bridge.dart';
 import '../../features/ssh/ssh_bridge.dart';
 import '../../features/ssh_profiles/ssh_profile_form_page.dart';
 import '../../features/ssh_profiles/ssh_profiles_page.dart';
@@ -54,6 +55,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
     required this.onTerminalThemeChanged,
     required this.onBackFromConfig,
     required this.sshBridge,
+    required this.localTerminalBridge,
     this.onSshInput,
   });
 
@@ -71,6 +73,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
   final ValueChanged<String> onCloseTab;
   final void Function(int oldIndex, int newIndex) onReorderTab;
   final SshBridgeClient sshBridge;
+  final LocalTerminalBridgeClient localTerminalBridge;
   final VoidCallback onAddSshProfile;
   final ValueChanged<SshProfileItem> onConnectSshProfile;
   final ValueChanged<SshProfileItem> onEditSshProfile;
@@ -132,6 +135,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
           onCloseTab: onCloseTab,
           onReorderTab: onReorderTab,
           sshBridge: sshBridge,
+          localTerminalBridge: localTerminalBridge,
           terminalThemeSettings: terminalThemeSettings,
           onSshInput: onSshInput,
         );

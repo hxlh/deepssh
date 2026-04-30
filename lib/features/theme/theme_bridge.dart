@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/theme_settings.dart';
 import '../../core/widgets/css_colors.dart' as css;
-import '../../src/rust/frb_generated.dart';
+import '../../src/rust/rust_init.dart';
 import '../../src/rust/theme.dart' as rust_theme;
 
 abstract class ThemeBridgeClient {
@@ -17,10 +17,8 @@ abstract class ThemeBridgeClient {
 class RustThemeBridgeClient implements ThemeBridgeClient {
   RustThemeBridgeClient();
 
-  Future<void>? _initFuture;
-
   Future<void> _ensureInitialized() {
-    return _initFuture ??= RustLib.init();
+    return ensureRustInitialized();
   }
 
   @override

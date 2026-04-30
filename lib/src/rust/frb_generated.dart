@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'frb_generated.dart';
 import 'frb_generated.io.dart'
     if (dart.library.js_interop) 'frb_generated.web.dart';
+import 'local_terminal.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'profile.dart';
 import 'ssh_session.dart';
@@ -67,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -513955967;
+  int get rustContentHash => 1567238282;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -79,6 +80,10 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
+  Future<void> crateLocalTerminalCloseLocalTerminal({
+    required String sessionId,
+  });
+
   Future<bool> crateSshSessionCloseSession({required String sessionId});
 
   Future<SshSession> crateSshSessionConnectProfile({
@@ -91,6 +96,10 @@ abstract class RustLibApi extends BaseApi {
     required String termType,
     required int rows,
     required int cols,
+  });
+
+  Stream<Uint8List> crateLocalTerminalCreateLocalTerminalOutputStream({
+    required String sessionId,
   });
 
   Stream<Uint8List> crateSshSessionCreateOutputStream({
@@ -130,6 +139,12 @@ abstract class RustLibApi extends BaseApi {
 
   Future<ThemeSettings> crateThemeLoadTheme();
 
+  Future<void> crateLocalTerminalResizeLocalTerminal({
+    required String sessionId,
+    required int rows,
+    required int cols,
+  });
+
   Future<void> crateSshSessionResizeSession({
     required String sessionId,
     required int rows,
@@ -137,6 +152,11 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Future<void> crateThemeSaveTheme({required ThemeSettings settings});
+
+  Future<LocalTerminalSession> crateLocalTerminalSpawnLocalTerminal({
+    int? rows,
+    int? cols,
+  });
 
   Future<TunnelConfig> crateTunnelStartTunnel({required String id});
 
@@ -163,6 +183,11 @@ abstract class RustLibApi extends BaseApi {
     required int targetPort,
   });
 
+  Future<void> crateLocalTerminalWriteToLocalTerminal({
+    required String sessionId,
+    required List<int> data,
+  });
+
   Future<void> crateSshSessionWriteToSession({
     required String sessionId,
     required List<int> data,
@@ -178,7 +203,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   });
 
   @override
-  Future<bool> crateSshSessionCloseSession({required String sessionId}) {
+  Future<void> crateLocalTerminalCloseLocalTerminal({
+    required String sessionId,
+  }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -188,6 +215,37 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             generalizedFrbRustBinding,
             serializer,
             funcId: 1,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateLocalTerminalCloseLocalTerminalConstMeta,
+        argValues: [sessionId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateLocalTerminalCloseLocalTerminalConstMeta =>
+      const TaskConstMeta(
+        debugName: "close_local_terminal",
+        argNames: ["sessionId"],
+      );
+
+  @override
+  Future<bool> crateSshSessionCloseSession({required String sessionId}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(sessionId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 2,
             port: port_,
           );
         },
@@ -233,7 +291,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 2,
+            funcId: 3,
             port: port_,
           );
         },
@@ -275,6 +333,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Stream<Uint8List> crateLocalTerminalCreateLocalTerminalOutputStream({
+    required String sessionId,
+  }) {
+    final sink = RustStreamSink<Uint8List>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_String(sessionId, serializer);
+            sse_encode_StreamSink_list_prim_u_8_strict_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 4,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: null,
+          ),
+          constMeta:
+              kCrateLocalTerminalCreateLocalTerminalOutputStreamConstMeta,
+          argValues: [sessionId, sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta
+  get kCrateLocalTerminalCreateLocalTerminalOutputStreamConstMeta =>
+      const TaskConstMeta(
+        debugName: "create_local_terminal_output_stream",
+        argNames: ["sessionId", "sink"],
+      );
+
+  @override
   Stream<Uint8List> crateSshSessionCreateOutputStream({
     required String sessionId,
   }) {
@@ -289,7 +387,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 3,
+              funcId: 5,
               port: port_,
             );
           },
@@ -334,7 +432,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 6,
             port: port_,
           );
         },
@@ -378,7 +476,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 7,
             port: port_,
           );
         },
@@ -424,7 +522,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 8,
             port: port_,
           );
         },
@@ -452,7 +550,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 9,
             port: port_,
           );
         },
@@ -482,7 +580,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 10,
             port: port_,
           );
         },
@@ -512,7 +610,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 11,
             port: port_,
           );
         },
@@ -539,7 +637,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 12,
             port: port_,
           );
         },
@@ -566,7 +664,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 13,
             port: port_,
           );
         },
@@ -585,6 +683,43 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "load_theme", argNames: []);
 
   @override
+  Future<void> crateLocalTerminalResizeLocalTerminal({
+    required String sessionId,
+    required int rows,
+    required int cols,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(sessionId, serializer);
+          sse_encode_u_16(rows, serializer);
+          sse_encode_u_16(cols, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 14,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateLocalTerminalResizeLocalTerminalConstMeta,
+        argValues: [sessionId, rows, cols],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateLocalTerminalResizeLocalTerminalConstMeta =>
+      const TaskConstMeta(
+        debugName: "resize_local_terminal",
+        argNames: ["sessionId", "rows", "cols"],
+      );
+
+  @override
   Future<void> crateSshSessionResizeSession({
     required String sessionId,
     required int rows,
@@ -600,7 +735,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 15,
             port: port_,
           );
         },
@@ -631,7 +766,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 16,
             port: port_,
           );
         },
@@ -650,6 +785,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "save_theme", argNames: ["settings"]);
 
   @override
+  Future<LocalTerminalSession> crateLocalTerminalSpawnLocalTerminal({
+    int? rows,
+    int? cols,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_box_autoadd_u_16(rows, serializer);
+          sse_encode_opt_box_autoadd_u_16(cols, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 17,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_local_terminal_session,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateLocalTerminalSpawnLocalTerminalConstMeta,
+        argValues: [rows, cols],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateLocalTerminalSpawnLocalTerminalConstMeta =>
+      const TaskConstMeta(
+        debugName: "spawn_local_terminal",
+        argNames: ["rows", "cols"],
+      );
+
+  @override
   Future<TunnelConfig> crateTunnelStartTunnel({required String id}) {
     return handler.executeNormal(
       NormalTask(
@@ -659,7 +829,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 18,
             port: port_,
           );
         },
@@ -687,7 +857,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 19,
             port: port_,
           );
         },
@@ -729,7 +899,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 20,
             port: port_,
           );
         },
@@ -783,7 +953,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 21,
             port: port_,
           );
         },
@@ -822,6 +992,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<void> crateLocalTerminalWriteToLocalTerminal({
+    required String sessionId,
+    required List<int> data,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(sessionId, serializer);
+          sse_encode_list_prim_u_8_loose(data, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 22,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateLocalTerminalWriteToLocalTerminalConstMeta,
+        argValues: [sessionId, data],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateLocalTerminalWriteToLocalTerminalConstMeta =>
+      const TaskConstMeta(
+        debugName: "write_to_local_terminal",
+        argNames: ["sessionId", "data"],
+      );
+
+  @override
   Future<void> crateSshSessionWriteToSession({
     required String sessionId,
     required List<int> data,
@@ -835,7 +1040,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 23,
             port: port_,
           );
         },
@@ -889,6 +1094,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int dco_decode_box_autoadd_u_16(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
   int dco_decode_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -922,6 +1133,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<TunnelConfig> dco_decode_list_tunnel_config(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_tunnel_config).toList();
+  }
+
+  @protected
+  LocalTerminalSession dco_decode_local_terminal_session(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return LocalTerminalSession(
+      sessionId: dco_decode_String(arr[0]),
+      title: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_16(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_u_16(raw);
   }
 
   @protected
@@ -1115,6 +1344,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int sse_decode_box_autoadd_u_16(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_u_16(deserializer));
+  }
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getInt32();
@@ -1172,6 +1407,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       ans_.add(sse_decode_tunnel_config(deserializer));
     }
     return ans_;
+  }
+
+  @protected
+  LocalTerminalSession sse_decode_local_terminal_session(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_sessionId = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    return LocalTerminalSession(sessionId: var_sessionId, title: var_title);
+  }
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_u_16(deserializer));
+    } else {
+      return null;
+    }
   }
 
   @protected
@@ -1405,6 +1661,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_16(self, serializer);
+  }
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
@@ -1465,6 +1727,26 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_tunnel_config(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_local_terminal_session(
+    LocalTerminalSession self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.sessionId, serializer);
+    sse_encode_String(self.title, serializer);
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_u_16(self, serializer);
     }
   }
 

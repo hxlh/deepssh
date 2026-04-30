@@ -1,5 +1,5 @@
 import '../../core/models/tunnel_config_item.dart';
-import '../../src/rust/frb_generated.dart';
+import '../../src/rust/rust_init.dart';
 import '../../src/rust/tunnel.dart' as rust;
 
 abstract class TunnelBridgeClient {
@@ -167,10 +167,8 @@ TunnelConfigItem _toTunnelConfigItem(rust.TunnelConfig config) {
 class RustTunnelBridgeClient implements TunnelBridgeClient {
   RustTunnelBridgeClient();
 
-  Future<void>? _initFuture;
-
   Future<void> _ensureInitialized() {
-    return _initFuture ??= RustLib.init();
+    return ensureRustInitialized();
   }
 
   @override
