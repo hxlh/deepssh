@@ -6,7 +6,7 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `default_term_type`, `ensure_profiles_loaded`, `into_profile`, `load_profiles_from_disk`, `write_profiles_to_disk`
+// These functions are ignored because they are not marked as `pub`: `default_term_type`, `ensure_profiles_loaded`, `into_profile_with_migration`, `load_profiles_from_disk`, `write_profiles_to_disk`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ProfileStore`, `SshProfileConfig`, `SshProfilesFile`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `from`
 // These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`, `default`

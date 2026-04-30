@@ -13,6 +13,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 import 'profile.dart';
 import 'ssh_session.dart';
 import 'theme.dart';
+import 'tunnel.dart';
 
 abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RustLibApiImplPlatform({
@@ -40,6 +41,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ThemeSettings dco_decode_box_autoadd_theme_settings(dynamic raw);
 
   @protected
+  int dco_decode_i_32(dynamic raw);
+
+  @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
   @protected
@@ -50,6 +54,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<SshProfile> dco_decode_list_ssh_profile(dynamic raw);
+
+  @protected
+  List<TunnelConfig> dco_decode_list_tunnel_config(dynamic raw);
 
   @protected
   RegexHighlight dco_decode_regex_highlight(dynamic raw);
@@ -65,6 +72,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ThemeSettings dco_decode_theme_settings(dynamic raw);
+
+  @protected
+  TunnelConfig dco_decode_tunnel_config(dynamic raw);
+
+  @protected
+  TunnelForwardType dco_decode_tunnel_forward_type(dynamic raw);
+
+  @protected
+  TunnelRuntimeStatus dco_decode_tunnel_runtime_status(dynamic raw);
 
   @protected
   int dco_decode_u_16(dynamic raw);
@@ -101,6 +117,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  int sse_decode_i_32(SseDeserializer deserializer);
+
+  @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
   @protected
@@ -113,6 +132,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<SshProfile> sse_decode_list_ssh_profile(SseDeserializer deserializer);
+
+  @protected
+  List<TunnelConfig> sse_decode_list_tunnel_config(
+    SseDeserializer deserializer,
+  );
 
   @protected
   RegexHighlight sse_decode_regex_highlight(SseDeserializer deserializer);
@@ -130,6 +154,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ThemeSettings sse_decode_theme_settings(SseDeserializer deserializer);
 
   @protected
+  TunnelConfig sse_decode_tunnel_config(SseDeserializer deserializer);
+
+  @protected
+  TunnelForwardType sse_decode_tunnel_forward_type(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  TunnelRuntimeStatus sse_decode_tunnel_runtime_status(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int sse_decode_u_16(SseDeserializer deserializer);
 
   @protected
@@ -143,9 +180,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
-
-  @protected
-  int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
   void sse_encode_AnyhowException(
@@ -172,6 +206,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_i_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
@@ -189,6 +226,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_ssh_profile(
     List<SshProfile> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_tunnel_config(
+    List<TunnelConfig> self,
     SseSerializer serializer,
   );
 
@@ -211,6 +254,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_theme_settings(ThemeSettings self, SseSerializer serializer);
 
   @protected
+  void sse_encode_tunnel_config(TunnelConfig self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_tunnel_forward_type(
+    TunnelForwardType self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_tunnel_runtime_status(
+    TunnelRuntimeStatus self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_u_16(int self, SseSerializer serializer);
 
   @protected
@@ -224,9 +282,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_i_32(int self, SseSerializer serializer);
 }
 
 // Section: wire_class

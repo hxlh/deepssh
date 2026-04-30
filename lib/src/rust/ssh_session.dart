@@ -6,7 +6,7 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `cleanup_session_after_loop`, `push_output`, `run_session_loop`
+// These functions are ignored because they are not marked as `pub`: `cleanup_session_after_loop`, `pty_term_type`, `push_output`, `run_session_loop`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `SshChannel`, `SshClientHandler`, `SshCommand`, `SshConnectionInfo`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `check_server_key`, `clone`, `clone`, `eq`, `fmt`
 

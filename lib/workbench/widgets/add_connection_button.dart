@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 
-enum AddConnectionAction { localTerminal, ssh }
+enum AddConnectionAction { localTerminal, ssh, tunnel }
 
 class AddConnectionButton extends StatefulWidget {
   const AddConnectionButton({super.key, required this.onSelected});
@@ -36,6 +36,7 @@ class _AddConnectionButtonState extends State<AddConnectionButton> {
             child: Text('本地终端'),
           ),
           PopupMenuItem(value: AddConnectionAction.ssh, child: Text('SSH')),
+          PopupMenuItem(value: AddConnectionAction.tunnel, child: Text('隧道连接')),
         ],
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),

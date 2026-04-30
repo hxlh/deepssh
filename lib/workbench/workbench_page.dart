@@ -10,6 +10,7 @@ import '../core/models/ssh_profile_item.dart';
 import '../core/models/ssh_session_item.dart';
 import '../core/models/terminal_item.dart';
 import '../core/models/theme_settings.dart';
+import '../core/models/tunnel_config_item.dart';
 import '../core/theme/app_colors.dart';
 import '../features/hosts/host_tree.dart';
 import '../features/hosts/host_tree_state.dart';
@@ -17,6 +18,8 @@ import '../features/ssh/ssh_bridge.dart';
 import '../features/ssh_profiles/ssh_profile_form_page.dart';
 import '../features/terminal/terminal_state.dart';
 import '../features/theme/theme_bridge.dart';
+import '../features/tunnels/tunnel_bridge.dart';
+import '../features/tunnels/tunnel_config_form_page.dart';
 import 'widgets/add_connection_button.dart';
 import 'widgets/sidebar.dart';
 import 'widgets/workbench_content_switcher.dart';
@@ -25,13 +28,16 @@ class WorkbenchPage extends StatefulWidget {
   const WorkbenchPage({
     super.key,
     SshBridgeClient? sshBridge,
+    TunnelBridgeClient? tunnelBridge,
     ThemeBridgeClient? themeBridge,
     this.onThemeChanged,
     this.errorLogger,
   }) : sshBridge = sshBridge ?? const _DefaultSshBridgeClientHolder(),
+       tunnelBridge = tunnelBridge ?? const RustTunnelBridgeClient(),
        themeBridge = themeBridge ?? const _DefaultThemeBridgeClientHolder();
 
   final SshBridgeClient sshBridge;
+  final TunnelBridgeClient tunnelBridge;
   final ThemeBridgeClient themeBridge;
   final VoidCallback? onThemeChanged;
   final ErrorLogger? errorLogger;
@@ -201,6 +207,10 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   final _sshCommandBuffers = <String, String>{};
   SshProfileItem? editingSshProfile;
   String? sshErrorMessage;
+  List<TunnelConfigItem> tunnelConfigs = const [];
+  TunnelConfigItem? editingTunnelConfig;
+  String? tunnelErrorMessage;
+  Timer? tunnelStatusRefreshTimer;
   UiThemeSettings uiThemeSettings = UiThemeSettings.commandDeck();
   TerminalThemeSettings terminalThemeSettings =
       TerminalThemeSettings.commandDeck();
@@ -214,11 +224,13 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   void initState() {
     super.initState();
     loadSshProfiles();
+    loadTunnelConfigs();
     loadInitialTheme();
   }
 
   @override
   void dispose() {
+    tunnelStatusRefreshTimer?.cancel();
     for (final timer in sshOutputFlushTimers.values) {
       timer.cancel();
     }
@@ -233,6 +245,39 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     if (!mounted) return;
     setState(() {
       sshProfiles = profiles;
+    });
+  }
+
+  Future<void> loadTunnelConfigs() async {
+    try {
+      final tunnels = await widget.tunnelBridge.listTunnels();
+      if (!mounted) return;
+      setState(() {
+        tunnelConfigs = tunnels;
+      });
+      _syncTunnelStatusRefresh(tunnels);
+    } catch (error, stackTrace) {
+      unawaited(_errorLogger.error('tunnel.list', error, stackTrace));
+      if (!mounted) return;
+      setState(() {
+        tunnelErrorMessage = 'Load tunnels failed: $error';
+      });
+    }
+  }
+
+  void _syncTunnelStatusRefresh(List<TunnelConfigItem> tunnels) {
+    final needsRefresh = tunnels.any((tunnel) => tunnel.isRunning);
+    if (!needsRefresh) {
+      tunnelStatusRefreshTimer?.cancel();
+      tunnelStatusRefreshTimer = null;
+      return;
+    }
+    tunnelStatusRefreshTimer ??= Timer.periodic(const Duration(seconds: 2), (
+      _,
+    ) {
+      if (mounted) {
+        unawaited(loadTunnelConfigs());
+      }
     });
   }
 
@@ -374,7 +419,133 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         });
         loadSshProfiles();
         break;
+      case AddConnectionAction.tunnel:
+        setState(() {
+          contentMode = WorkbenchContentMode.tunnelConfigs;
+          editingTunnelConfig = null;
+          tunnelErrorMessage = null;
+        });
+        loadSshProfiles();
+        loadTunnelConfigs();
+        break;
     }
+  }
+
+  void _handleAddTunnelConfig() {
+    setState(() {
+      editingTunnelConfig = null;
+      contentMode = WorkbenchContentMode.tunnelConfigForm;
+    });
+  }
+
+  void _handleEditTunnelConfig(TunnelConfigItem tunnel) {
+    setState(() {
+      editingTunnelConfig = tunnel;
+      contentMode = WorkbenchContentMode.tunnelConfigForm;
+    });
+  }
+
+  void _handleCancelTunnelForm() {
+    setState(() {
+      editingTunnelConfig = null;
+      contentMode = WorkbenchContentMode.tunnelConfigs;
+    });
+  }
+
+  Future<void> _handleSaveTunnelConfig(TunnelConfigDraft draft) async {
+    try {
+      final editing = editingTunnelConfig;
+      if (editing == null) {
+        await widget.tunnelBridge.createTunnel(
+          name: draft.name,
+          type: draft.type,
+          sshProfileId: draft.sshProfileId,
+          listenHost: draft.listenHost,
+          listenPort: draft.listenPort,
+          targetHost: draft.targetHost,
+          targetPort: draft.targetPort,
+        );
+      } else {
+        await widget.tunnelBridge.updateTunnel(
+          id: editing.id,
+          name: draft.name,
+          type: draft.type,
+          sshProfileId: draft.sshProfileId,
+          listenHost: draft.listenHost,
+          listenPort: draft.listenPort,
+          targetHost: draft.targetHost,
+          targetPort: draft.targetPort,
+        );
+      }
+      await loadTunnelConfigs();
+      if (!mounted) return;
+      setState(() {
+        editingTunnelConfig = null;
+        contentMode = WorkbenchContentMode.tunnelConfigs;
+        tunnelErrorMessage = null;
+      });
+    } catch (error, stackTrace) {
+      unawaited(_errorLogger.error('tunnel.save', error, stackTrace));
+      if (!mounted) return;
+      setState(() {
+        tunnelErrorMessage = 'Save tunnel failed: $error';
+        contentMode = WorkbenchContentMode.tunnelConfigs;
+      });
+    }
+  }
+
+  Future<void> _handleDeleteTunnelConfig(TunnelConfigItem tunnel) async {
+    try {
+      await widget.tunnelBridge.deleteTunnel(tunnel.id);
+      await loadTunnelConfigs();
+    } catch (error, stackTrace) {
+      unawaited(_errorLogger.error('tunnel.delete', error, stackTrace));
+      if (!mounted) return;
+      setState(() {
+        tunnelErrorMessage = 'Delete tunnel failed: $error';
+      });
+    }
+  }
+
+  Future<void> _handleStartTunnelConfig(TunnelConfigItem tunnel) async {
+    try {
+      final started = await widget.tunnelBridge.startTunnel(tunnel.id);
+      _replaceTunnelConfig(started);
+      _syncTunnelStatusRefresh([
+        for (final item in tunnelConfigs)
+          item.id == started.id ? started : item,
+      ]);
+    } catch (error, stackTrace) {
+      unawaited(_errorLogger.error('tunnel.start', error, stackTrace));
+      if (!mounted) return;
+      setState(() {
+        tunnelErrorMessage = 'Start tunnel failed: $error';
+      });
+    }
+  }
+
+  Future<void> _handleStopTunnelConfig(TunnelConfigItem tunnel) async {
+    try {
+      final stopped = await widget.tunnelBridge.stopTunnel(tunnel.id);
+      _replaceTunnelConfig(stopped);
+      await loadTunnelConfigs();
+    } catch (error, stackTrace) {
+      unawaited(_errorLogger.error('tunnel.stop', error, stackTrace));
+      if (!mounted) return;
+      setState(() {
+        tunnelErrorMessage = 'Stop tunnel failed: $error';
+      });
+    }
+  }
+
+  void _replaceTunnelConfig(TunnelConfigItem tunnel) {
+    if (!mounted) return;
+    setState(() {
+      tunnelConfigs = [
+        for (final item in tunnelConfigs) item.id == tunnel.id ? tunnel : item,
+      ];
+      tunnelErrorMessage = null;
+    });
   }
 
   void _handleAddSshProfile() {
@@ -863,6 +1034,9 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               sshProfiles: sshProfiles,
               sshErrorMessage: sshErrorMessage,
               editingSshProfile: editingSshProfile,
+              tunnelConfigs: tunnelConfigs,
+              tunnelErrorMessage: tunnelErrorMessage,
+              editingTunnelConfig: editingTunnelConfig,
               uiThemeSettings: uiThemeSettings,
               terminalThemeSettings: terminalThemeSettings,
               onSelectTab: _handleTabSelect,
@@ -874,6 +1048,13 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               onDeleteSshProfile: _handleDeleteSshProfile,
               onCancelSshForm: _handleCancelSshForm,
               onSaveSshProfile: _handleSaveSshProfile,
+              onAddTunnelConfig: _handleAddTunnelConfig,
+              onStartTunnelConfig: _handleStartTunnelConfig,
+              onStopTunnelConfig: _handleStopTunnelConfig,
+              onEditTunnelConfig: _handleEditTunnelConfig,
+              onDeleteTunnelConfig: _handleDeleteTunnelConfig,
+              onCancelTunnelForm: _handleCancelTunnelForm,
+              onSaveTunnelConfig: _handleSaveTunnelConfig,
               onUiThemeChanged: _handleUiThemeChanged,
               onTerminalThemeChanged: _handleTerminalThemeChanged,
               onBackFromConfig: _handleBackFromConfig,
