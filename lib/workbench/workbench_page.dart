@@ -33,7 +33,7 @@ class WorkbenchPage extends StatefulWidget {
     this.onThemeChanged,
     this.errorLogger,
   }) : sshBridge = sshBridge ?? const _DefaultSshBridgeClientHolder(),
-       tunnelBridge = tunnelBridge ?? const RustTunnelBridgeClient(),
+       tunnelBridge = tunnelBridge ?? const _DefaultTunnelBridgeClientHolder(),
        themeBridge = themeBridge ?? const _DefaultThemeBridgeClientHolder();
 
   final SshBridgeClient sshBridge;
@@ -90,6 +90,66 @@ class _SshSessionNoteDialogState extends State<_SshSessionNoteDialog> {
       ],
     );
   }
+}
+
+class _DefaultTunnelBridgeClientHolder implements TunnelBridgeClient {
+  const _DefaultTunnelBridgeClientHolder();
+
+  static final RustTunnelBridgeClient _delegate = RustTunnelBridgeClient();
+
+  @override
+  Future<List<TunnelConfigItem>> listTunnels() => _delegate.listTunnels();
+
+  @override
+  Future<TunnelConfigItem> createTunnel({
+    required String name,
+    required TunnelForwardType type,
+    required String sshProfileId,
+    required String listenHost,
+    required int listenPort,
+    required String targetHost,
+    required int targetPort,
+  }) => _delegate.createTunnel(
+    name: name,
+    type: type,
+    sshProfileId: sshProfileId,
+    listenHost: listenHost,
+    listenPort: listenPort,
+    targetHost: targetHost,
+    targetPort: targetPort,
+  );
+
+  @override
+  Future<TunnelConfigItem> updateTunnel({
+    required String id,
+    required String name,
+    required TunnelForwardType type,
+    required String sshProfileId,
+    required String listenHost,
+    required int listenPort,
+    required String targetHost,
+    required int targetPort,
+  }) => _delegate.updateTunnel(
+    id: id,
+    name: name,
+    type: type,
+    sshProfileId: sshProfileId,
+    listenHost: listenHost,
+    listenPort: listenPort,
+    targetHost: targetHost,
+    targetPort: targetPort,
+  );
+
+  @override
+  Future<void> deleteTunnel(String id) => _delegate.deleteTunnel(id);
+
+  @override
+  Future<TunnelConfigItem> startTunnel(String id) =>
+      _delegate.startTunnel(id);
+
+  @override
+  Future<TunnelConfigItem> stopTunnel(String id) =>
+      _delegate.stopTunnel(id);
 }
 
 class _DefaultSshBridgeClientHolder implements SshBridgeClient {
