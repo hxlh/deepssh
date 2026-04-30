@@ -199,7 +199,7 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
                     handleFieldKey(event, nameFocusNode, profileFocusNode),
                 child: DropdownButtonFormField<TunnelForwardType>(
                   focusNode: typeFocusNode,
-                  value: selectedType,
+                  initialValue: selectedType,
                   decoration: const InputDecoration(labelText: 'Type'),
                   items: const [
                     DropdownMenuItem(
@@ -225,7 +225,7 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
                     handleFieldKey(event, typeFocusNode, listenHostFocusNode),
                 child: DropdownButtonFormField<String>(
                   focusNode: profileFocusNode,
-                  value: selectedProfileId,
+                  initialValue: selectedProfileId,
                   decoration: const InputDecoration(labelText: 'SSH Profile'),
                   items: [
                     for (final profile in widget.profiles)

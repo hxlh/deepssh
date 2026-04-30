@@ -286,28 +286,36 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
                     termSettings.regexHighlights,
                   );
                   highlights[index] = highlight.copyWith(pattern: v);
-                  _updateTerm(termSettings.copyWith(regexHighlights: highlights));
+                  _updateTerm(
+                    termSettings.copyWith(regexHighlights: highlights),
+                  );
                 },
                 onNoteChanged: (v) {
                   final highlights = List<RegexHighlight>.from(
                     termSettings.regexHighlights,
                   );
                   highlights[index] = highlight.copyWith(note: v);
-                  _updateTerm(termSettings.copyWith(regexHighlights: highlights));
+                  _updateTerm(
+                    termSettings.copyWith(regexHighlights: highlights),
+                  );
                 },
                 onColorChanged: (c) {
                   final highlights = List<RegexHighlight>.from(
                     termSettings.regexHighlights,
                   );
                   highlights[index] = highlight.copyWith(color: c);
-                  _updateTerm(termSettings.copyWith(regexHighlights: highlights));
+                  _updateTerm(
+                    termSettings.copyWith(regexHighlights: highlights),
+                  );
                 },
                 onRemove: () {
                   final highlights = List<RegexHighlight>.from(
                     termSettings.regexHighlights,
                   )..removeAt(index);
                   _regexRuleKeys.removeAt(index);
-                  _updateTerm(termSettings.copyWith(regexHighlights: highlights));
+                  _updateTerm(
+                    termSettings.copyWith(regexHighlights: highlights),
+                  );
                 },
               );
             },

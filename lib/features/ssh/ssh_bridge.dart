@@ -34,11 +34,7 @@ abstract class SshBridgeClient {
 
   Future<void> deleteProfile(String id);
 
-  Future<SshConnectionResult> connectProfile(
-    String id, {
-    int? rows,
-    int? cols,
-  });
+  Future<SshConnectionResult> connectProfile(String id, {int? rows, int? cols});
 
   Stream<List<int>> outputStream(String sessionId);
 

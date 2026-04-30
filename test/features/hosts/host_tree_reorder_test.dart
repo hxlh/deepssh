@@ -6,20 +6,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 SshProfileItem _profile(String id, String name) => SshProfileItem(
-      id: id,
-      name: name,
-      host: 'host-$id',
-      port: 22,
-      username: 'user',
-      password: '',
-    );
+  id: id,
+  name: name,
+  host: 'host-$id',
+  port: 22,
+  username: 'user',
+  password: '',
+);
 
 SshSessionItem _session(String id, String profileId) => SshSessionItem(
-      id: id,
-      profileId: profileId,
-      hostName: 'host-$profileId',
-      title: 'session-$id',
-    );
+  id: id,
+  profileId: profileId,
+  hostName: 'host-$profileId',
+  title: 'session-$id',
+);
 
 void main() {
   testWidgets('HostTree accepts reorder callbacks', (tester) async {
@@ -40,7 +40,9 @@ void main() {
             onToggleLocal: () {},
             onLocalTerminalTap: (_) {},
             sshProfiles: [profile],
-            sshSessionsByProfileId: {'p1': [sessionA, sessionB]},
+            sshSessionsByProfileId: {
+              'p1': [sessionA, sessionB],
+            },
             onSshProfileTap: (_) {},
             onSshSessionTap: (_) {},
             onEditSshSessionNote: (_) async {},

@@ -651,64 +651,65 @@ void main() {
     expect(bridge.writes.join(), '中文');
   });
 
-  testWidgets('copies selected terminal text on Ctrl+C without interrupting SSH', (
-    tester,
-  ) async {
-    final bridge = RecordingSshBridgeClient();
-    final terminal = xterm.Terminal(maxLines: 3000);
-    String? copiedText;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-          if (call.method == 'Clipboard.setData') {
-            final data = Map<String, dynamic>.from(call.arguments as Map);
-            copiedText = data['text'] as String?;
-          }
-          return null;
-        });
-    addTearDown(() {
+  testWidgets(
+    'copies selected terminal text on Ctrl+C without interrupting SSH',
+    (tester) async {
+      final bridge = RecordingSshBridgeClient();
+      final terminal = xterm.Terminal(maxLines: 3000);
+      String? copiedText;
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(SystemChannels.platform, null);
-    });
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              final data = Map<String, dynamic>.from(call.arguments as Map);
+              copiedText = data['text'] as String?;
+            }
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
 
-    terminal.write('alpha beta gamma\r\n');
-    final tab = OpenTerminalTab.ssh(
-      id: 'ssh-tab-1',
-      hostName: 'host1',
-      title: 'terminal1',
-      sessionId: 'session-1',
-      terminal: terminal,
-    );
+      terminal.write('alpha beta gamma\r\n');
+      final tab = OpenTerminalTab.ssh(
+        id: 'ssh-tab-1',
+        hostName: 'host1',
+        title: 'terminal1',
+        sessionId: 'session-1',
+        terminal: terminal,
+      );
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: TerminalView(
-            tab: tab,
-            sshBridge: bridge,
-            terminalThemeSettings: _defaultTerminalTheme,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TerminalView(
+              tab: tab,
+              sshBridge: bridge,
+              terminalThemeSettings: _defaultTerminalTheme,
+            ),
           ),
         ),
-      ),
-    );
-    await tester.tap(find.byKey(const Key('terminal-input-proxy')));
-    await tester.pump(const Duration(milliseconds: 300));
+      );
+      await tester.tap(find.byKey(const Key('terminal-input-proxy')));
+      await tester.pump(const Duration(milliseconds: 300));
 
-    final controller = terminalView(tester).controller!;
-    controller.setSelection(
-      terminal.buffer.createAnchor(6, 0),
-      terminal.buffer.createAnchor(10, 0),
-    );
-    await tester.pump();
+      final controller = terminalView(tester).controller!;
+      controller.setSelection(
+        terminal.buffer.createAnchor(6, 0),
+        terminal.buffer.createAnchor(10, 0),
+      );
+      await tester.pump();
 
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyC, character: '');
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyC);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-    await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyC, character: '');
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
 
-    expect(copiedText, 'beta');
-    expect(bridge.writes, isEmpty);
-  });
+      expect(copiedText, 'beta');
+      expect(bridge.writes, isEmpty);
+    },
+  );
 
   testWidgets('sends Ctrl+C through SSH terminal input proxy', (tester) async {
     final bridge = RecordingSshBridgeClient();
@@ -1159,7 +1160,10 @@ void main() {
     expect(controller.highlights, hasLength(2));
     expect(controller.highlights.first.range!.begin.x, 0);
     expect(controller.highlights.first.range!.end.x, 13);
-    expect(controller.highlights.first.foregroundColor, const Color(0xFFF5F543));
+    expect(
+      controller.highlights.first.foregroundColor,
+      const Color(0xFFF5F543),
+    );
     expect(controller.highlights.last.range!.begin.x, 0);
     expect(controller.highlights.last.range!.end.x, 5);
     expect(controller.highlights.last.foregroundColor, const Color(0xFFF14C4C));

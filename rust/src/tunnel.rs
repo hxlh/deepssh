@@ -95,7 +95,6 @@ enum TunnelForwardTypeFile {
     Remote,
 }
 
-
 #[derive(Clone)]
 #[flutter_rust_bridge::frb(ignore)]
 struct RemoteRoute {
@@ -132,7 +131,9 @@ impl client::Handler for TunnelClientHandler {
         let route = self.remote_routes.lock().unwrap().get(&key).cloned();
         if let Some(route) = route {
             TOKIO_RUNTIME.spawn(async move {
-                match TcpStream::connect(format!("{}:{}", route.target_host, route.target_port)).await {
+                match TcpStream::connect(format!("{}:{}", route.target_host, route.target_port))
+                    .await
+                {
                     Ok(stream) => {
                         if let Err(error) = relay_tcp_stream_and_channel(stream, channel).await {
                             crate::app_log::log_error("tunnel.remote.connection", &error);
@@ -208,7 +209,6 @@ impl From<&TunnelConfig> for TunnelConfigFile {
         }
     }
 }
-
 
 fn remote_route_key(address: &str, port: u16) -> String {
     format!("{}:{}", address, port)
@@ -304,8 +304,10 @@ fn set_runtime_status(id: &str, status: TunnelRuntimeStatus) {
         });
 }
 
-
-async fn connect_ssh_profile(profile_id: &str, remote_routes: Arc<Mutex<HashMap<String, RemoteRoute>>>) -> Result<client::Handle<TunnelClientHandler>> {
+async fn connect_ssh_profile(
+    profile_id: &str,
+    remote_routes: Arc<Mutex<HashMap<String, RemoteRoute>>>,
+) -> Result<client::Handle<TunnelClientHandler>> {
     let ssh_profile = profile::list_profiles()?
         .into_iter()
         .find(|profile| profile.id == profile_id)
@@ -495,7 +497,6 @@ pub fn delete_tunnel(id: String) -> Result<()> {
     result
 }
 
-
 pub fn start_tunnel(id: String) -> Result<TunnelConfig> {
     let result = (|| {
         let tunnel = {
@@ -567,12 +568,10 @@ async fn run_tunnel(tunnel: TunnelConfig, stop_rx: oneshot::Receiver<()>) {
     RUNTIME_STORE.lock().unwrap().remove(&tunnel.id);
 }
 
-async fn run_local_tunnel(
-    tunnel: TunnelConfig,
-    mut stop_rx: oneshot::Receiver<()>,
-) -> Result<()> {
+async fn run_local_tunnel(tunnel: TunnelConfig, mut stop_rx: oneshot::Receiver<()>) -> Result<()> {
     let remote_routes = Arc::new(Mutex::new(HashMap::new()));
-    let handle = Arc::new(connect_ssh_profile(&tunnel.ssh_profile_id, Arc::clone(&remote_routes)).await?);
+    let handle =
+        Arc::new(connect_ssh_profile(&tunnel.ssh_profile_id, Arc::clone(&remote_routes)).await?);
     let mut backoff = Duration::from_secs(1);
 
     loop {
@@ -621,7 +620,9 @@ async fn run_local_tunnel(
             }
         }
     }
-    let _ = handle.disconnect(Disconnect::ByApplication, "", "English").await;
+    let _ = handle
+        .disconnect(Disconnect::ByApplication, "", "English")
+        .await;
     Ok(())
 }
 
@@ -643,10 +644,7 @@ async fn handle_local_tunnel_connection(
     relay_tcp_stream_and_channel(stream, channel).await
 }
 
-async fn run_remote_tunnel(
-    tunnel: TunnelConfig,
-    mut stop_rx: oneshot::Receiver<()>,
-) -> Result<()> {
+async fn run_remote_tunnel(tunnel: TunnelConfig, mut stop_rx: oneshot::Receiver<()>) -> Result<()> {
     let remote_routes = Arc::new(Mutex::new(HashMap::new()));
     let handle = connect_ssh_profile(&tunnel.ssh_profile_id, Arc::clone(&remote_routes)).await?;
     let mut backoff = Duration::from_secs(1);
@@ -685,7 +683,9 @@ async fn run_remote_tunnel(
     let _ = handle
         .cancel_tcpip_forward(tunnel.listen_host.clone(), tunnel.listen_port.into())
         .await;
-    let _ = handle.disconnect(Disconnect::ByApplication, "", "English").await;
+    let _ = handle
+        .disconnect(Disconnect::ByApplication, "", "English")
+        .await;
     Ok(())
 }
 
@@ -770,9 +770,7 @@ mod tests {
         let _workspace = TestWorkspace::new();
 
         TOKIO_RUNTIME.block_on(async {
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-                .await
-                .unwrap();
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let port = listener.local_addr().unwrap().port();
             let accept_task = TOKIO_RUNTIME.spawn(async move {
                 let _ = listener.accept().await;

@@ -8,23 +8,23 @@ import 'package:flutter_test/flutter_test.dart';
 class _FakeSshBridge extends InMemorySshBridgeClient {
   @override
   Future<List<SshProfileItem>> listProfiles() async => [
-        SshProfileItem(
-          id: 'p1',
-          name: 'Server A',
-          host: 'a.example.com',
-          port: 22,
-          username: 'user',
-          password: '',
-        ),
-        SshProfileItem(
-          id: 'p2',
-          name: 'Server B',
-          host: 'b.example.com',
-          port: 22,
-          username: 'user',
-          password: '',
-        ),
-      ];
+    SshProfileItem(
+      id: 'p1',
+      name: 'Server A',
+      host: 'a.example.com',
+      port: 22,
+      username: 'user',
+      password: '',
+    ),
+    SshProfileItem(
+      id: 'p2',
+      name: 'Server B',
+      host: 'b.example.com',
+      port: 22,
+      username: 'user',
+      password: '',
+    ),
+  ];
 }
 
 class _FakeThemeBridge extends InMemoryThemeBridgeClient {}

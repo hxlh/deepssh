@@ -55,7 +55,7 @@ class HostTree extends StatelessWidget {
   final bool themeConfigActive;
   final void Function(int oldIndex, int newIndex)? onReorderProfiles;
   final void Function(String profileId, int oldIndex, int newIndex)?
-      onReorderSessions;
+  onReorderSessions;
   final void Function(int oldIndex, int newIndex)? onReorderLocalTerminals;
 
   static const Color _menuAccent = Color(0xFFFFB280);
@@ -198,8 +198,7 @@ class HostTree extends StatelessWidget {
     );
   }
 
-  Widget _localTerminalItem(
-      BuildContext context, LocalTerminalItem terminal) {
+  Widget _localTerminalItem(BuildContext context, LocalTerminalItem terminal) {
     return InkWell(
       onTap: () => onLocalTerminalTap(terminal),
       onSecondaryTapDown: (details) {
@@ -284,7 +283,7 @@ class HostTree extends StatelessWidget {
                       final profile = sshProfiles[profileIndex];
                       final sessions =
                           sshSessionsByProfileId[profile.id] ??
-                              const <SshSessionItem>[];
+                          const <SshSessionItem>[];
                       return Column(
                         key: ValueKey('profile-${profile.id}'),
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -296,8 +295,7 @@ class HostTree extends StatelessWidget {
                           if (sessions.isNotEmpty)
                             ReorderableListView.builder(
                               shrinkWrap: true,
-                              physics:
-                                  const NeverScrollableScrollPhysics(),
+                              physics: const NeverScrollableScrollPhysics(),
                               buildDefaultDragHandles: false,
                               itemCount: sessions.length,
                               onReorder: (oldIndex, newIndex) {
@@ -375,10 +373,7 @@ class HostTree extends StatelessWidget {
             ),
           ),
         ),
-        _ThemeConfigButton(
-          active: themeConfigActive,
-          onTap: onOpenThemeConfig,
-        ),
+        _ThemeConfigButton(active: themeConfigActive, onTap: onOpenThemeConfig),
       ],
     );
   }

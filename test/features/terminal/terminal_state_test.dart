@@ -1,8 +1,7 @@
 import 'package:deepssh/features/terminal/terminal_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-OpenTerminalTab _tab(String id) =>
-    OpenTerminalTab.local(id: id, title: id);
+OpenTerminalTab _tab(String id) => OpenTerminalTab.local(id: id, title: id);
 
 void main() {
   group('TerminalState.reorder', () {

@@ -299,7 +299,9 @@ void main() {
     },
   );
 
-  testWidgets('connect passes the rendered terminal size to SSH', (tester) async {
+  testWidgets('connect passes the rendered terminal size to SSH', (
+    tester,
+  ) async {
     final bridge = FakeSshBridgeClient();
     bridge.profiles.add(
       const SshProfileItem(
@@ -312,7 +314,9 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(MaterialApp(home: WorkbenchPage(sshBridge: bridge)));
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('新增连接'));
