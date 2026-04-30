@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:xterm/xterm.dart' as xterm;
 
+import '../core/logging/app_logger.dart';
 import '../core/models/local_terminal_item.dart';
 import '../core/models/ssh_profile_item.dart';
 import '../core/models/ssh_session_item.dart';
@@ -26,12 +27,14 @@ class WorkbenchPage extends StatefulWidget {
     SshBridgeClient? sshBridge,
     ThemeBridgeClient? themeBridge,
     this.onThemeChanged,
+    this.errorLogger,
   }) : sshBridge = sshBridge ?? const _DefaultSshBridgeClientHolder(),
        themeBridge = themeBridge ?? const _DefaultThemeBridgeClientHolder();
 
   final SshBridgeClient sshBridge;
   final ThemeBridgeClient themeBridge;
   final VoidCallback? onThemeChanged;
+  final ErrorLogger? errorLogger;
 
   @override
   State<WorkbenchPage> createState() => _WorkbenchPageState();
@@ -204,6 +207,9 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   bool _themeSaveInFlight = false;
   bool _themeSaveQueued = false;
 
+  ErrorLogger get _errorLogger =>
+      widget.errorLogger ?? FileErrorLogger.frontend();
+
   @override
   void initState() {
     super.initState();
@@ -241,7 +247,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         terminalThemeSettings = loaded.terminal;
       });
       widget.onThemeChanged?.call();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      unawaited(_errorLogger.error('theme.load', error, stackTrace));
       // Keep built-in defaults if persistence is unavailable.
     }
   }
@@ -625,7 +632,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
 
     try {
       await widget.sshBridge.closeSession(sessionId);
-    } catch (error) {
+    } catch (error, stackTrace) {
+      unawaited(_errorLogger.error('ssh.close', error, stackTrace));
       closingSshSessionIds.remove(session.id);
       if (!mounted) return;
       setState(() {
@@ -674,11 +682,14 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       if (removedPendingSshSessionIds.remove(newSession.id)) {
         try {
           await widget.sshBridge.closeSession(result.sessionId);
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          unawaited(_errorLogger.error('ssh.close', error, stackTrace));
+        }
         return;
       }
       _updateSshSession(newSession.copyWith(sessionId: result.sessionId));
-    } catch (error) {
+    } catch (error, stackTrace) {
+      unawaited(_errorLogger.error('ssh.duplicate', error, stackTrace));
       if (!mounted) return;
       _removeSshSession(newSession);
       setState(() {
@@ -723,7 +734,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       if (removedPendingSshSessionIds.remove(session.id)) {
         try {
           await widget.sshBridge.closeSession(result.sessionId);
-        } catch (error) {
+        } catch (error, stackTrace) {
+          unawaited(_errorLogger.error('ssh.close', error, stackTrace));
           if (!mounted) return;
           setState(() {
             sshErrorMessage = 'Close pending session failed: $error';
@@ -742,7 +754,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       }
       if (currentSession == null) return;
       _updateSshSession(currentSession.copyWith(sessionId: result.sessionId));
-    } catch (error) {
+    } catch (error, stackTrace) {
+      unawaited(_errorLogger.error('ssh.connect', error, stackTrace));
       if (!mounted) return;
       _removeSshSession(session);
       setState(() {
@@ -802,7 +815,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       final terminal = terminalThemeSettings;
       try {
         await widget.themeBridge.saveTheme(ui: ui, terminal: terminal);
-      } catch (_) {
+      } catch (error, stackTrace) {
+        unawaited(_errorLogger.error('theme.save', error, stackTrace));
         // Ignore persistence errors so the UI keeps responding.
       }
     } while (_themeSaveQueued);

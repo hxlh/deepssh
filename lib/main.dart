@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'core/logging/frontend_error_hooks.dart';
 import 'core/models/ssh_profile_item.dart';
 import 'core/models/theme_settings.dart';
 import 'core/theme/app_theme.dart';
@@ -8,7 +9,7 @@ import 'features/theme/theme_bridge.dart';
 import 'workbench/workbench_page.dart';
 
 void main() {
-  runApp(const DeepSshApp());
+  runLoggedApp(const DeepSshApp());
 }
 
 class DeepSshApp extends StatefulWidget {

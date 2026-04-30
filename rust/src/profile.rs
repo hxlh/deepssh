@@ -84,7 +84,9 @@ fn load_profiles_from_disk() -> Result<Vec<SshProfile>> {
     let content = match fs::read_to_string(&path) {
         Ok(content) => content,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(error) => return Err(error).with_context(|| format!("Failed to read {}", path.display())),
+        Err(error) => {
+            return Err(error).with_context(|| format!("Failed to read {}", path.display()))
+        }
     };
     let file: SshProfilesFile = serde_yaml::from_str(&content)
         .with_context(|| format!("Failed to parse {}", path.display()))?;
@@ -118,9 +120,15 @@ fn ensure_profiles_loaded(store: &mut ProfileStore) -> Result<()> {
 }
 
 pub fn list_profiles() -> Result<Vec<SshProfile>> {
-    let mut store = PROFILE_STORE.lock().unwrap();
-    ensure_profiles_loaded(&mut store)?;
-    Ok(store.profiles.clone())
+    let result = (|| {
+        let mut store = PROFILE_STORE.lock().unwrap();
+        ensure_profiles_loaded(&mut store)?;
+        Ok(store.profiles.clone())
+    })();
+    if let Err(error) = &result {
+        crate::app_log::log_error("profile.list", error);
+    }
+    result
 }
 
 pub fn create_profile(
@@ -131,20 +139,26 @@ pub fn create_profile(
     password: String,
     term_type: String,
 ) -> Result<SshProfile> {
-    let mut store = PROFILE_STORE.lock().unwrap();
-    ensure_profiles_loaded(&mut store)?;
-    let profile = SshProfile {
-        id: Uuid::new_v4().to_string(),
-        name,
-        host,
-        port,
-        username,
-        password,
-        term_type,
-    };
-    store.profiles.push(profile.clone());
-    write_profiles_to_disk(&store.profiles)?;
-    Ok(profile)
+    let result = (|| {
+        let mut store = PROFILE_STORE.lock().unwrap();
+        ensure_profiles_loaded(&mut store)?;
+        let profile = SshProfile {
+            id: Uuid::new_v4().to_string(),
+            name,
+            host,
+            port,
+            username,
+            password,
+            term_type,
+        };
+        store.profiles.push(profile.clone());
+        write_profiles_to_disk(&store.profiles)?;
+        Ok(profile)
+    })();
+    if let Err(error) = &result {
+        crate::app_log::log_error("profile.create", error);
+    }
+    result
 }
 
 pub fn update_profile(
@@ -156,38 +170,50 @@ pub fn update_profile(
     password: String,
     term_type: String,
 ) -> Result<SshProfile> {
-    let mut store = PROFILE_STORE.lock().unwrap();
-    ensure_profiles_loaded(&mut store)?;
-    let index = store
-        .profiles
-        .iter()
-        .position(|profile| profile.id == id)
-        .ok_or_else(|| anyhow!("Profile not found"))?;
-    let profile = SshProfile {
-        id,
-        name,
-        host,
-        port,
-        username,
-        password,
-        term_type,
-    };
-    store.profiles[index] = profile.clone();
-    write_profiles_to_disk(&store.profiles)?;
-    Ok(profile)
+    let result = (|| {
+        let mut store = PROFILE_STORE.lock().unwrap();
+        ensure_profiles_loaded(&mut store)?;
+        let index = store
+            .profiles
+            .iter()
+            .position(|profile| profile.id == id)
+            .ok_or_else(|| anyhow!("Profile not found"))?;
+        let profile = SshProfile {
+            id,
+            name,
+            host,
+            port,
+            username,
+            password,
+            term_type,
+        };
+        store.profiles[index] = profile.clone();
+        write_profiles_to_disk(&store.profiles)?;
+        Ok(profile)
+    })();
+    if let Err(error) = &result {
+        crate::app_log::log_error("profile.update", error);
+    }
+    result
 }
 
 pub fn delete_profile(id: String) -> Result<()> {
-    let mut store = PROFILE_STORE.lock().unwrap();
-    ensure_profiles_loaded(&mut store)?;
-    let index = store
-        .profiles
-        .iter()
-        .position(|profile| profile.id == id)
-        .ok_or_else(|| anyhow!("Profile not found"))?;
-    store.profiles.remove(index);
-    write_profiles_to_disk(&store.profiles)?;
-    Ok(())
+    let result = (|| {
+        let mut store = PROFILE_STORE.lock().unwrap();
+        ensure_profiles_loaded(&mut store)?;
+        let index = store
+            .profiles
+            .iter()
+            .position(|profile| profile.id == id)
+            .ok_or_else(|| anyhow!("Profile not found"))?;
+        store.profiles.remove(index);
+        write_profiles_to_disk(&store.profiles)?;
+        Ok(())
+    })();
+    if let Err(error) = &result {
+        crate::app_log::log_error("profile.delete", error);
+    }
+    result
 }
 
 #[cfg(test)]
@@ -227,6 +253,10 @@ mod tests {
 
         fn config_path(&self) -> std::path::PathBuf {
             self.path().join("config").join("ssh_profiles.yaml")
+        }
+
+        fn log_dir(&self) -> std::path::PathBuf {
+            self.path().join("config").join("log")
         }
     }
 
@@ -354,6 +384,28 @@ mod tests {
         assert!(yaml.contains("name: Stage"));
         assert!(yaml.contains("term_type: xterm-color"));
         assert!(!yaml.contains("id:"));
+    }
+
+    #[test]
+    fn logs_profile_load_errors() {
+        let _guard = clear_profiles_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+        fs::create_dir_all(workspace.path().join("config")).unwrap();
+        fs::write(workspace.config_path(), "profiles: [").unwrap();
+
+        let result = list_profiles();
+
+        assert!(result.is_err());
+        let log_file = fs::read_dir(workspace.log_dir())
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let log = fs::read_to_string(log_file).unwrap();
+        assert!(log.contains("ERROR backend profile.list"));
+        assert!(log.contains("Failed to parse"));
     }
 
     #[test]

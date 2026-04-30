@@ -89,7 +89,7 @@ pub fn connect_profile(
     rows: u16,
     cols: u16,
 ) -> Result<SshSession> {
-    TOKIO_RUNTIME.block_on(async move {
+    let result = TOKIO_RUNTIME.block_on(async move {
         let addr = format!("{}:{}", host, port);
         let mut config = client::Config::default();
         config.nodelay = true;
@@ -159,11 +159,15 @@ pub fn connect_profile(
         ));
 
         Ok(session)
-    })
+    });
+    if let Err(error) = &result {
+        crate::app_log::log_error("ssh.connect", error);
+    }
+    result
 }
 
 pub fn duplicate_session(session_id: String) -> Result<SshSession> {
-    TOKIO_RUNTIME.block_on(async move {
+    let result = TOKIO_RUNTIME.block_on(async move {
         let (connection_id, profile_id, title, rows, cols, term_type) = {
             let sessions = SESSION_STORE.lock().unwrap();
             let session = sessions
@@ -239,39 +243,55 @@ pub fn duplicate_session(session_id: String) -> Result<SshSession> {
         ));
 
         Ok(session)
-    })
+    });
+    if let Err(error) = &result {
+        crate::app_log::log_error("ssh.duplicate", error);
+    }
+    result
 }
 
 pub fn write_to_session(session_id: String, data: Vec<u8>) -> Result<()> {
-    let channels = CONNECTION_STORE.lock().unwrap();
-    let channel = channels
-        .get(&session_id)
-        .ok_or_else(|| anyhow!("Session not found"))?;
-    channel
-        .cmd_tx
-        .send(SshCommand::Write(data))
-        .map_err(|_| anyhow!("Session closed"))?;
-    Ok(())
+    let result = (|| {
+        let channels = CONNECTION_STORE.lock().unwrap();
+        let channel = channels
+            .get(&session_id)
+            .ok_or_else(|| anyhow!("Session not found"))?;
+        channel
+            .cmd_tx
+            .send(SshCommand::Write(data))
+            .map_err(|_| anyhow!("Session closed"))?;
+        Ok(())
+    })();
+    if let Err(error) = &result {
+        crate::app_log::log_error("ssh.write", error);
+    }
+    result
 }
 
 pub fn resize_session(session_id: String, rows: u16, cols: u16) -> Result<()> {
-    let channels = CONNECTION_STORE.lock().unwrap();
-    let channel = channels
-        .get(&session_id)
-        .ok_or_else(|| anyhow!("Session not found"))?;
-    channel
-        .cmd_tx
-        .send(SshCommand::Resize(rows, cols))
-        .map_err(|_| anyhow!("Session closed"))?;
+    let result = (|| {
+        let channels = CONNECTION_STORE.lock().unwrap();
+        let channel = channels
+            .get(&session_id)
+            .ok_or_else(|| anyhow!("Session not found"))?;
+        channel
+            .cmd_tx
+            .send(SshCommand::Resize(rows, cols))
+            .map_err(|_| anyhow!("Session closed"))?;
 
-    if let Ok(mut sessions) = SESSION_STORE.lock() {
-        if let Some(session) = sessions.get_mut(&session_id) {
-            session.rows = rows;
-            session.cols = cols;
+        if let Ok(mut sessions) = SESSION_STORE.lock() {
+            if let Some(session) = sessions.get_mut(&session_id) {
+                session.rows = rows;
+                session.cols = cols;
+            }
         }
-    }
 
-    Ok(())
+        Ok(())
+    })();
+    if let Err(error) = &result {
+        crate::app_log::log_error("ssh.resize", error);
+    }
+    result
 }
 
 pub fn close_session(session_id: String) -> Result<bool> {
@@ -319,11 +339,29 @@ async fn run_session_loop(
                 match command {
                     Some(SshCommand::Write(data)) => {
                         let mut writer = write_half.make_writer();
-                        let _ = writer.write_all(&data).await;
-                        let _ = writer.flush().await;
+                        if let Err(error) = writer.write_all(&data).await {
+                            crate::app_log::log_error_message(
+                                "ssh.channel.write",
+                                &format!("Failed to write to SSH channel: {error:?}"),
+                                None,
+                            );
+                        }
+                        if let Err(error) = writer.flush().await {
+                            crate::app_log::log_error_message(
+                                "ssh.channel.flush",
+                                &format!("Failed to flush SSH channel: {error:?}"),
+                                None,
+                            );
+                        }
                     }
                     Some(SshCommand::Resize(rows, cols)) => {
-                        let _ = write_half.window_change(cols as u32, rows as u32, 0, 0).await;
+                        if let Err(error) = write_half.window_change(cols as u32, rows as u32, 0, 0).await {
+                            crate::app_log::log_error_message(
+                                "ssh.channel.resize",
+                                &format!("Failed to resize SSH channel: {error:?}"),
+                                None,
+                            );
+                        }
                     }
                     Some(SshCommand::Close) | None => {
                         let _ = write_half.close().await;
@@ -412,7 +450,7 @@ fn register_session_for_test(profile_id: String, title: String, term_type: Strin
 
 #[cfg(test)]
 fn clear_sessions_for_test() -> std::sync::MutexGuard<'static, ()> {
-    let guard = TEST_LOCK.lock().unwrap();
+    let guard = crate::test_support::WORKSPACE_LOCK.lock().unwrap();
     SESSION_STORE.lock().unwrap().clear();
     CONNECTION_STORE.lock().unwrap().clear();
     OUTPUT_SINK_STORE.lock().unwrap().clear();
@@ -421,15 +459,56 @@ fn clear_sessions_for_test() -> std::sync::MutexGuard<'static, ()> {
 }
 
 #[cfg(test)]
-static TEST_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
-
-#[cfg(test)]
 mod tests {
+    use std::{env, fs, path::Path};
+
     use super::*;
+
+    struct TestWorkspace {
+        original_dir: std::path::PathBuf,
+        temp_dir: tempfile::TempDir,
+    }
+
+    impl TestWorkspace {
+        fn new() -> Self {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let original_dir = env::current_dir().unwrap();
+            env::set_current_dir(temp_dir.path()).unwrap();
+            Self {
+                original_dir,
+                temp_dir,
+            }
+        }
+
+        fn path(&self) -> &Path {
+            self.temp_dir.path()
+        }
+
+        fn log_dir(&self) -> std::path::PathBuf {
+            self.path().join("config").join("log")
+        }
+    }
+
+    impl Drop for TestWorkspace {
+        fn drop(&mut self) {
+            env::set_current_dir(&self.original_dir).unwrap();
+        }
+    }
+
+    fn read_single_log(workspace: &TestWorkspace) -> String {
+        let log_file = fs::read_dir(workspace.log_dir())
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        fs::read_to_string(log_file).unwrap()
+    }
 
     #[test]
     fn fails_to_connect_to_invalid_host() {
         let _guard = clear_sessions_for_test();
+        let _workspace = TestWorkspace::new();
 
         let result = connect_profile(
             "profile-1".to_string(),
@@ -457,6 +536,7 @@ mod tests {
     #[test]
     fn write_to_missing_session_fails() {
         let _guard = clear_sessions_for_test();
+        let _workspace = TestWorkspace::new();
 
         let result = write_to_session("missing".to_string(), b"ls\n".to_vec());
         assert!(result.is_err());
@@ -465,6 +545,7 @@ mod tests {
     #[test]
     fn resize_missing_session_fails() {
         let _guard = clear_sessions_for_test();
+        let _workspace = TestWorkspace::new();
 
         let result = resize_session("missing".to_string(), 40, 120);
         assert!(result.is_err());
@@ -494,8 +575,36 @@ mod tests {
     }
 
     #[test]
+    fn logs_write_to_missing_session_errors_without_terminal_data() {
+        let _guard = clear_sessions_for_test();
+        let workspace = TestWorkspace::new();
+
+        let result = write_to_session("missing".to_string(), b"password=secret\n".to_vec());
+
+        assert!(result.is_err());
+        let log = read_single_log(&workspace);
+        assert!(log.contains("ERROR backend ssh.write"));
+        assert!(log.contains("Session not found"));
+        assert!(!log.contains("password=secret"));
+    }
+
+    #[test]
+    fn logs_duplicate_missing_session_errors() {
+        let _guard = clear_sessions_for_test();
+        let workspace = TestWorkspace::new();
+
+        let result = duplicate_session("nonexistent".to_string());
+
+        assert!(result.is_err());
+        let log = read_single_log(&workspace);
+        assert!(log.contains("ERROR backend ssh.duplicate"));
+        assert!(log.contains("Session not found"));
+    }
+
+    #[test]
     fn duplicate_missing_session_fails() {
         let _guard = clear_sessions_for_test();
+        let _workspace = TestWorkspace::new();
 
         let result = duplicate_session("nonexistent".to_string());
         assert!(result.is_err());

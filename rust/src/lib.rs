@@ -1,5 +1,6 @@
 #![allow(unexpected_cfgs)]
 
+pub(crate) mod app_log;
 pub mod config_path;
 mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
 pub mod profile;
