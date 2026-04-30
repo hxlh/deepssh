@@ -8,6 +8,7 @@ import 'package:deepssh/features/terminal/terminal_find.dart';
 import 'package:deepssh/features/terminal/terminal_state.dart';
 import 'package:deepssh/features/terminal/terminal_tab_shell.dart';
 import 'package:deepssh/features/terminal/terminal_view.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -297,8 +298,13 @@ void main() {
     final terminalWidget = tester.widget<xterm.TerminalView>(
       find.byType(xterm.TerminalView),
     );
-    expect(terminalWidget.hardwareKeyboardOnly, isTrue);
-    expect(find.byKey(const Key('terminal-input-proxy')), findsOneWidget);
+    final isMacOS = defaultTargetPlatform == TargetPlatform.macOS;
+    expect(terminalWidget.hardwareKeyboardOnly, !isMacOS);
+    if (isMacOS) {
+      expect(find.byKey(const Key('terminal-input-proxy')), findsNothing);
+    } else {
+      expect(find.byKey(const Key('terminal-input-proxy')), findsOneWidget);
+    }
     expect(find.byType(xterm.TerminalView), findsOneWidget);
   });
 
@@ -597,7 +603,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byType(xterm.TerminalView));
+    await tester.tap(find.byKey(const Key('terminal-input-proxy')));
     await tester.pump(const Duration(milliseconds: 300));
 
     binding.testTextInput.enterText('中文');

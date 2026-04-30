@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -53,7 +54,7 @@ class TerminalView extends StatefulWidget {
 
 class _TerminalViewState extends State<TerminalView> {
   final inputFocusNode = FocusNode();
-  final textController = TextEditingController();
+  TextEditingController? _textController;
   final terminalController = xterm.TerminalController();
   final regexHighlights = <xterm.TerminalHighlight>[];
   late final xterm.Terminal terminal;
@@ -65,6 +66,9 @@ class _TerminalViewState extends State<TerminalView> {
   final _findScrollController = ScrollController();
   TerminalFindSession? _findSession;
   bool _localFindVisible = false;
+
+  bool get _isMacOS => defaultTargetPlatform == TargetPlatform.macOS;
+
   @override
   void initState() {
     super.initState();
@@ -73,7 +77,10 @@ class _TerminalViewState extends State<TerminalView> {
         xterm.Terminal(maxLines: widget.terminalThemeSettings.scrollbackLines);
     _applyCursorBlinkMode();
     terminal.addListener(_handleTerminalChanged);
-    textController.addListener(_handleTextEditingChanged);
+    if (!_isMacOS) {
+      _textController = TextEditingController();
+      _textController!.addListener(_handleTextEditingChanged);
+    }
     _refreshRegexHighlights();
 
     if (widget.tab.sourceType == TerminalSourceType.ssh) {
@@ -104,6 +111,7 @@ class _TerminalViewState extends State<TerminalView> {
       }
     });
     terminal.onOutput = (data) {
+      _resetCursorBlinkIdle();
       widget.onSshInput?.call(data);
       widget.sshBridge.writeToSession(sessionId, utf8.encode(data));
     };
@@ -202,24 +210,12 @@ class _TerminalViewState extends State<TerminalView> {
     return settings.selectionColor.withValues(alpha: 0.45);
   }
 
-  void _handleTextEditingChanged() {
-    final value = textController.value;
-    if (value.text.isEmpty) return;
-    if (value.composing.isValid && !value.composing.isCollapsed) {
-      return;
-    }
-    _resetCursorBlinkIdle();
-    terminal.textInput(value.text);
-    textController.clear();
-  }
-
   KeyEventResult _handleTerminalKeyEvent(FocusNode focusNode, KeyEvent event) {
     if (event is KeyDownEvent &&
         HardwareKeyboard.instance.isControlPressed &&
         !HardwareKeyboard.instance.isAltPressed &&
         event.logicalKey == LogicalKeyboardKey.keyC &&
         _copySelectionIfNotEmpty()) {
-      logDebug('[terminal:find:key] copied selection via Ctrl+C');
       return KeyEventResult.handled;
     }
     if (event is KeyDownEvent &&
@@ -234,6 +230,17 @@ class _TerminalViewState extends State<TerminalView> {
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
+  }
+
+  void _handleTextEditingChanged() {
+    final value = _textController!.value;
+    if (value.text.isEmpty) return;
+    if (value.composing.isValid && !value.composing.isCollapsed) {
+      return;
+    }
+    _resetCursorBlinkIdle();
+    terminal.textInput(value.text);
+    _textController!.clear();
   }
 
   KeyEventResult _handleProxyKeyEvent(FocusNode focusNode, KeyEvent event) {
@@ -342,11 +349,11 @@ class _TerminalViewState extends State<TerminalView> {
       if (!mounted) return;
       if (value == 'copy') {
         _copySelection();
-        _focusInputProxy();
+        _focusTerminalInput();
       } else if (value == 'paste') {
         _pasteFromClipboard();
       } else {
-        _focusInputProxy();
+        _focusTerminalInput();
       }
     });
   }
@@ -370,11 +377,11 @@ class _TerminalViewState extends State<TerminalView> {
       if (data != null && data.text != null && data.text!.isNotEmpty) {
         terminal.textInput(data.text!);
       }
-      _focusInputProxy();
+      _focusTerminalInput();
     });
   }
 
-  void _focusInputProxy() {
+  void _focusTerminalInput() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !inputFocusNode.hasFocus) {
         inputFocusNode.requestFocus();
@@ -405,7 +412,7 @@ class _TerminalViewState extends State<TerminalView> {
     if (widget.onFindClosed == null) {
       setState(() {});
     }
-    _focusInputProxy();
+    _focusTerminalInput();
   }
 
   bool get _effectiveFindVisible => widget.findVisible || _localFindVisible;
@@ -526,7 +533,7 @@ class _TerminalViewState extends State<TerminalView> {
     terminalController.dispose();
     terminal.removeListener(_handleTerminalChanged);
     inputFocusNode.dispose();
-    textController.dispose();
+    _textController?.dispose();
     super.dispose();
   }
 
@@ -556,7 +563,7 @@ class _TerminalViewState extends State<TerminalView> {
                 if (event.buttons == kSecondaryButton) {
                   _showContextMenu(context, event.position);
                 } else {
-                  _focusInputProxy();
+                  _focusTerminalInput();
                 }
               },
               child: xterm.TerminalView(
@@ -564,7 +571,8 @@ class _TerminalViewState extends State<TerminalView> {
                 controller: terminalController,
                 scrollController: _findScrollController,
                 focusNode: inputFocusNode,
-                hardwareKeyboardOnly: true,
+                autofocus: _isMacOS,
+                hardwareKeyboardOnly: !_isMacOS,
                 onKeyEvent: _handleTerminalKeyEvent,
                 cursorType: _xtermCursorType(settings.cursorStyle),
                 alwaysShowCursor: false,
@@ -601,32 +609,33 @@ class _TerminalViewState extends State<TerminalView> {
               ),
             ),
           ),
-          Positioned(
-            width: 1,
-            height: 1,
-            child: Opacity(
-              opacity: 0.01,
-              child: Focus(
-                onKeyEvent: _handleProxyKeyEvent,
-                child: TextField(
-                  key: const Key('terminal-input-proxy'),
-                  focusNode: inputFocusNode,
-                  controller: textController,
-                  autofocus: true,
-                  keyboardType: TextInputType.text,
-                  textInputAction: TextInputAction.none,
-                  enableSuggestions: false,
-                  autocorrect: false,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
+          if (!_isMacOS)
+            Positioned(
+              width: 1,
+              height: 1,
+              child: Opacity(
+                opacity: 0.01,
+                child: Focus(
+                  onKeyEvent: _handleProxyKeyEvent,
+                  child: TextField(
+                    key: const Key('terminal-input-proxy'),
+                    focusNode: inputFocusNode,
+                    controller: _textController,
+                    autofocus: true,
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.none,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    style: const TextStyle(color: Colors.transparent),
+                    cursorColor: Colors.transparent,
                   ),
-                  style: const TextStyle(color: Colors.transparent),
-                  cursorColor: Colors.transparent,
                 ),
               ),
             ),
-          ),
           if (_effectiveFindVisible && _findSession != null)
             Positioned(
               top: 0,
