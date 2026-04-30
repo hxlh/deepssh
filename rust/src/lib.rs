@@ -1,5 +1,6 @@
 #![allow(unexpected_cfgs)]
 
+pub mod config_path;
 mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
 pub mod profile;
 pub mod ssh_session;
