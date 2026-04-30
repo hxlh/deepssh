@@ -6,7 +6,7 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `ensure_profiles_loaded`, `into_profile`, `load_profiles_from_disk`, `write_profiles_to_disk`
+// These functions are ignored because they are not marked as `pub`: `default_term_type`, `ensure_profiles_loaded`, `into_profile`, `load_profiles_from_disk`, `write_profiles_to_disk`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ProfileStore`, `SshProfileConfig`, `SshProfilesFile`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `from`
 // These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`, `default`
@@ -20,12 +20,14 @@ Future<SshProfile> createProfile({
   required int port,
   required String username,
   required String password,
+  required String termType,
 }) => RustLib.instance.api.crateProfileCreateProfile(
   name: name,
   host: host,
   port: port,
   username: username,
   password: password,
+  termType: termType,
 );
 
 Future<SshProfile> updateProfile({
@@ -35,6 +37,7 @@ Future<SshProfile> updateProfile({
   required int port,
   required String username,
   required String password,
+  required String termType,
 }) => RustLib.instance.api.crateProfileUpdateProfile(
   id: id,
   name: name,
@@ -42,6 +45,7 @@ Future<SshProfile> updateProfile({
   port: port,
   username: username,
   password: password,
+  termType: termType,
 );
 
 Future<void> deleteProfile({required String id}) =>
@@ -54,6 +58,7 @@ class SshProfile {
   final int port;
   final String username;
   final String password;
+  final String termType;
 
   const SshProfile({
     required this.id,
@@ -62,6 +67,7 @@ class SshProfile {
     required this.port,
     required this.username,
     required this.password,
+    required this.termType,
   });
 
   @override
@@ -71,7 +77,8 @@ class SshProfile {
       host.hashCode ^
       port.hashCode ^
       username.hashCode ^
-      password.hashCode;
+      password.hashCode ^
+      termType.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -83,5 +90,6 @@ class SshProfile {
           host == other.host &&
           port == other.port &&
           username == other.username &&
-          password == other.password;
+          password == other.password &&
+          termType == other.termType;
 }

@@ -1,7 +1,29 @@
+import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('SSH profile item defaults to xterm-256color', () {
+    const profile = SshProfileItem(
+      id: 'profile-1',
+      name: 'Prod',
+      host: 'example.com',
+      port: 22,
+      username: 'root',
+      password: 'secret',
+    );
+
+    expect(SshProfileItem.defaultTermType, 'xterm-256color');
+    expect(SshProfileItem.termTypeOptions, [
+      'xterm',
+      'xterm-color',
+      'xterm-16color',
+      'xterm-256color',
+      'xterm-truecolor',
+    ]);
+    expect(profile.termType, 'xterm-256color');
+  });
+
   test(
     'in-memory bridge creates updates lists and deletes SSH profiles',
     () async {
@@ -13,6 +35,7 @@ void main() {
         port: 2222,
         username: 'root',
         password: 'secret',
+        termType: 'xterm-truecolor',
       );
 
       expect(created.id, 'profile-1');
@@ -21,6 +44,7 @@ void main() {
       expect(created.port, 2222);
       expect(created.username, 'root');
       expect(created.password, 'secret');
+      expect(created.termType, 'xterm-truecolor');
       expect(await bridge.listProfiles(), [created]);
 
       final updated = await bridge.updateProfile(
@@ -30,6 +54,7 @@ void main() {
         port: 22,
         username: 'ubuntu',
         password: 'changed',
+        termType: 'xterm-256color',
       );
 
       expect(updated.name, 'Prod Updated');
@@ -37,6 +62,7 @@ void main() {
       expect(updated.port, 22);
       expect(updated.username, 'ubuntu');
       expect(updated.password, 'changed');
+      expect(updated.termType, 'xterm-256color');
       expect(await bridge.listProfiles(), [updated]);
 
       await bridge.deleteProfile(created.id);
@@ -53,6 +79,7 @@ void main() {
       port: 22,
       username: 'dev',
       password: 'secret',
+      termType: 'xterm-color',
     );
 
     final result = await bridge.connectProfile(profile.id);

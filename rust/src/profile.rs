@@ -26,6 +26,7 @@ pub struct SshProfile {
     pub port: u16,
     pub username: String,
     pub password: String,
+    pub term_type: String,
 }
 
 #[flutter_rust_bridge::frb(ignore)]
@@ -43,6 +44,12 @@ struct SshProfileConfig {
     port: u16,
     username: String,
     password: String,
+    #[serde(default = "default_term_type")]
+    term_type: String,
+}
+
+fn default_term_type() -> String {
+    "xterm-256color".to_string()
 }
 
 impl SshProfileConfig {
@@ -54,6 +61,7 @@ impl SshProfileConfig {
             port: self.port,
             username: self.username,
             password: self.password,
+            term_type: self.term_type,
         }
     }
 }
@@ -66,6 +74,7 @@ impl From<&SshProfile> for SshProfileConfig {
             port: profile.port,
             username: profile.username.clone(),
             password: profile.password.clone(),
+            term_type: profile.term_type.clone(),
         }
     }
 }
@@ -120,6 +129,7 @@ pub fn create_profile(
     port: u16,
     username: String,
     password: String,
+    term_type: String,
 ) -> Result<SshProfile> {
     let mut store = PROFILE_STORE.lock().unwrap();
     ensure_profiles_loaded(&mut store)?;
@@ -130,6 +140,7 @@ pub fn create_profile(
         port,
         username,
         password,
+        term_type,
     };
     store.profiles.push(profile.clone());
     write_profiles_to_disk(&store.profiles)?;
@@ -143,6 +154,7 @@ pub fn update_profile(
     port: u16,
     username: String,
     password: String,
+    term_type: String,
 ) -> Result<SshProfile> {
     let mut store = PROFILE_STORE.lock().unwrap();
     ensure_profiles_loaded(&mut store)?;
@@ -158,6 +170,7 @@ pub fn update_profile(
         port,
         username,
         password,
+        term_type,
     };
     store.profiles[index] = profile.clone();
     write_profiles_to_disk(&store.profiles)?;
@@ -179,15 +192,12 @@ pub fn delete_profile(id: String) -> Result<()> {
 
 #[cfg(test)]
 fn clear_profiles_for_test() -> std::sync::MutexGuard<'static, ()> {
-    let guard = TEST_LOCK.lock().unwrap();
+    let guard = crate::test_support::WORKSPACE_LOCK.lock().unwrap();
     let mut store = PROFILE_STORE.lock().unwrap();
     store.profiles.clear();
     store.initialized = false;
     guard
 }
-
-#[cfg(test)]
-static TEST_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 #[cfg(test)]
 mod tests {
@@ -256,17 +266,20 @@ mod tests {
             22,
             "root".to_string(),
             "secret".to_string(),
+            "xterm-truecolor".to_string(),
         )
         .unwrap();
 
         let yaml = fs::read_to_string(workspace.config_path()).unwrap();
         assert!(!created.id.is_empty());
+        assert_eq!(created.term_type, "xterm-truecolor");
         assert!(yaml.contains("profiles:"));
         assert!(yaml.contains("name: Prod"));
         assert!(yaml.contains("host: example.com"));
         assert!(yaml.contains("port: 22"));
         assert!(yaml.contains("username: root"));
         assert!(yaml.contains("password: secret"));
+        assert!(yaml.contains("term_type: xterm-truecolor"));
         assert!(!yaml.contains("id:"));
     }
 
@@ -281,6 +294,7 @@ mod tests {
             22,
             "root".to_string(),
             "secret".to_string(),
+            "xterm".to_string(),
         )
         .unwrap();
 
@@ -291,17 +305,21 @@ mod tests {
             2222,
             "admin".to_string(),
             "new-secret".to_string(),
+            "xterm-256color".to_string(),
         )
         .unwrap();
 
         let yaml = fs::read_to_string(workspace.config_path()).unwrap();
         assert_eq!(updated.id, created.id);
+        assert_eq!(updated.term_type, "xterm-256color");
         assert!(yaml.contains("name: Prod 2"));
         assert!(yaml.contains("host: example.org"));
         assert!(yaml.contains("port: 2222"));
         assert!(yaml.contains("username: admin"));
         assert!(yaml.contains("password: new-secret"));
+        assert!(yaml.contains("term_type: xterm-256color"));
         assert!(!yaml.contains("example.com"));
+        assert!(!yaml.contains("term_type: xterm\n"));
         assert!(!yaml.contains("id:"));
     }
 
@@ -316,6 +334,7 @@ mod tests {
             22,
             "root".to_string(),
             "secret".to_string(),
+            "xterm-256color".to_string(),
         )
         .unwrap();
         create_profile(
@@ -324,6 +343,7 @@ mod tests {
             22,
             "deploy".to_string(),
             "stage-secret".to_string(),
+            "xterm-color".to_string(),
         )
         .unwrap();
 
@@ -332,6 +352,7 @@ mod tests {
         let yaml = fs::read_to_string(workspace.config_path()).unwrap();
         assert!(!yaml.contains("name: Prod"));
         assert!(yaml.contains("name: Stage"));
+        assert!(yaml.contains("term_type: xterm-color"));
         assert!(!yaml.contains("id:"));
     }
 
@@ -385,8 +406,36 @@ mod tests {
         assert_eq!(first_load[1].name, "Stage");
         assert_eq!(second_load[0].name, "Prod");
         assert_eq!(second_load[1].name, "Stage");
+        assert_eq!(first_load[0].term_type, "xterm-256color");
+        assert_eq!(first_load[1].term_type, "xterm-256color");
+        assert_eq!(second_load[0].term_type, "xterm-256color");
+        assert_eq!(second_load[1].term_type, "xterm-256color");
         assert_ne!(first_load[0].id, second_load[0].id);
         assert_ne!(first_load[1].id, second_load[1].id);
+    }
+
+    #[test]
+    fn missing_term_type_defaults_to_xterm_256color() {
+        let _guard = clear_profiles_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+        fs::create_dir_all(workspace.path().join("config")).unwrap();
+        fs::write(
+            workspace.config_path(),
+            r#"profiles:
+- name: Legacy
+  host: legacy.example.com
+  port: 22
+  username: root
+  password: secret
+"#,
+        )
+        .unwrap();
+
+        let profiles = list_profiles().unwrap();
+
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].term_type, "xterm-256color");
     }
 
     #[test]
@@ -402,6 +451,7 @@ mod tests {
             22,
             "root".to_string(),
             "secret".to_string(),
+            "xterm-256color".to_string(),
         );
         let delete_result = delete_profile("missing".to_string());
 

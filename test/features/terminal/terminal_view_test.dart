@@ -17,6 +17,26 @@ final TerminalThemeSettings _defaultTerminalTheme =
     TerminalThemeSettings.commandDeck();
 
 void main() {
+  test('terminal parses colon-separated truecolor foreground SGR', () {
+    final terminal = xterm.Terminal();
+    terminal.write('\x1b[38:2::255:128:64mA');
+
+    final foreground = terminal.buffer.lines[0].getForeground(0);
+
+    expect(foreground & xterm.CellColor.typeMask, xterm.CellColor.rgb);
+    expect(foreground & xterm.CellColor.valueMask, 0xff8040);
+  });
+
+  test('terminal ignores incomplete extended color SGR parameters', () {
+    final terminal = xterm.Terminal();
+
+    expect(() => terminal.write('\x1b[38mA'), returnsNormally);
+    expect(() => terminal.write('\x1b[48;2;16mB'), returnsNormally);
+
+    expect(terminal.buffer.lines[0].getCodePoint(0), 'A'.codeUnitAt(0));
+    expect(terminal.buffer.lines[0].getCodePoint(1), 'B'.codeUnitAt(0));
+  });
+
   test('find session keeps highlight columns after empty terminal cells', () {
     final terminal = xterm.Terminal(maxLines: 3000);
     terminal.write('prefix\x1b[20Gpingcap/tidb\r\n');
@@ -1222,7 +1242,11 @@ class RecordingSshBridgeClient implements SshBridgeClient {
   Future<void> closeSession(String sessionId) async {}
 
   @override
-  Future<SshConnectionResult> connectProfile(String id) async {
+  Future<SshConnectionResult> connectProfile(
+    String id, {
+    int? rows,
+    int? cols,
+  }) async {
     return const SshConnectionResult(
       sessionId: 'session-1',
       title: 'terminal1',
@@ -1236,6 +1260,7 @@ class RecordingSshBridgeClient implements SshBridgeClient {
     required int port,
     required String username,
     required String password,
+    required String termType,
   }) async {
     return SshProfileItem(
       id: 'profile-1',
@@ -1244,6 +1269,7 @@ class RecordingSshBridgeClient implements SshBridgeClient {
       port: port,
       username: username,
       password: password,
+      termType: termType,
     );
   }
 
@@ -1273,6 +1299,7 @@ class RecordingSshBridgeClient implements SshBridgeClient {
     required int port,
     required String username,
     required String password,
+    required String termType,
   }) async {
     return SshProfileItem(
       id: id,
@@ -1281,6 +1308,7 @@ class RecordingSshBridgeClient implements SshBridgeClient {
       port: port,
       username: username,
       password: password,
+      termType: termType,
     );
   }
 

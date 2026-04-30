@@ -109,6 +109,9 @@ fn wire__crate__ssh_session__connect_profile_impl(
             let api_port = <u16>::sse_decode(&mut deserializer);
             let api_username = <String>::sse_decode(&mut deserializer);
             let api_password = <String>::sse_decode(&mut deserializer);
+            let api_term_type = <String>::sse_decode(&mut deserializer);
+            let api_rows = <u16>::sse_decode(&mut deserializer);
+            let api_cols = <u16>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
@@ -120,6 +123,9 @@ fn wire__crate__ssh_session__connect_profile_impl(
                             api_port,
                             api_username,
                             api_password,
+                            api_term_type,
+                            api_rows,
+                            api_cols,
                         )?;
                         Ok(output_ok)
                     })(),
@@ -194,6 +200,7 @@ fn wire__crate__profile__create_profile_impl(
             let api_port = <u16>::sse_decode(&mut deserializer);
             let api_username = <String>::sse_decode(&mut deserializer);
             let api_password = <String>::sse_decode(&mut deserializer);
+            let api_term_type = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
@@ -204,6 +211,7 @@ fn wire__crate__profile__create_profile_impl(
                             api_port,
                             api_username,
                             api_password,
+                            api_term_type,
                         )?;
                         Ok(output_ok)
                     })(),
@@ -451,6 +459,7 @@ fn wire__crate__profile__update_profile_impl(
             let api_port = <u16>::sse_decode(&mut deserializer);
             let api_username = <String>::sse_decode(&mut deserializer);
             let api_password = <String>::sse_decode(&mut deserializer);
+            let api_term_type = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
@@ -462,6 +471,7 @@ fn wire__crate__profile__update_profile_impl(
                             api_port,
                             api_username,
                             api_password,
+                            api_term_type,
                         )?;
                         Ok(output_ok)
                     })(),
@@ -600,6 +610,7 @@ impl SseDecode for crate::profile::SshProfile {
         let mut var_port = <u16>::sse_decode(deserializer);
         let mut var_username = <String>::sse_decode(deserializer);
         let mut var_password = <String>::sse_decode(deserializer);
+        let mut var_termType = <String>::sse_decode(deserializer);
         return crate::profile::SshProfile {
             id: var_id,
             name: var_name,
@@ -607,6 +618,7 @@ impl SseDecode for crate::profile::SshProfile {
             port: var_port,
             username: var_username,
             password: var_password,
+            term_type: var_termType,
         };
     }
 }
@@ -620,6 +632,7 @@ impl SseDecode for crate::ssh_session::SshSession {
         let mut var_title = <String>::sse_decode(deserializer);
         let mut var_rows = <u16>::sse_decode(deserializer);
         let mut var_cols = <u16>::sse_decode(deserializer);
+        let mut var_termType = <String>::sse_decode(deserializer);
         return crate::ssh_session::SshSession {
             session_id: var_sessionId,
             profile_id: var_profileId,
@@ -627,6 +640,7 @@ impl SseDecode for crate::ssh_session::SshSession {
             title: var_title,
             rows: var_rows,
             cols: var_cols,
+            term_type: var_termType,
         };
     }
 }
@@ -800,6 +814,7 @@ impl flutter_rust_bridge::IntoDart for crate::profile::SshProfile {
             self.port.into_into_dart().into_dart(),
             self.username.into_into_dart().into_dart(),
             self.password.into_into_dart().into_dart(),
+            self.term_type.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -820,6 +835,7 @@ impl flutter_rust_bridge::IntoDart for crate::ssh_session::SshSession {
             self.title.into_into_dart().into_dart(),
             self.rows.into_into_dart().into_dart(),
             self.cols.into_into_dart().into_dart(),
+            self.term_type.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -980,6 +996,7 @@ impl SseEncode for crate::profile::SshProfile {
         <u16>::sse_encode(self.port, serializer);
         <String>::sse_encode(self.username, serializer);
         <String>::sse_encode(self.password, serializer);
+        <String>::sse_encode(self.term_type, serializer);
     }
 }
 
@@ -992,6 +1009,7 @@ impl SseEncode for crate::ssh_session::SshSession {
         <String>::sse_encode(self.title, serializer);
         <u16>::sse_encode(self.rows, serializer);
         <u16>::sse_encode(self.cols, serializer);
+        <String>::sse_encode(self.term_type, serializer);
     }
 }
 

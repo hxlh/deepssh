@@ -87,6 +87,9 @@ abstract class RustLibApi extends BaseApi {
     required int port,
     required String username,
     required String password,
+    required String termType,
+    required int rows,
+    required int cols,
   });
 
   Stream<Uint8List> crateSshSessionCreateOutputStream({
@@ -99,6 +102,7 @@ abstract class RustLibApi extends BaseApi {
     required int port,
     required String username,
     required String password,
+    required String termType,
   });
 
   Future<void> crateProfileDeleteProfile({required String id});
@@ -126,6 +130,7 @@ abstract class RustLibApi extends BaseApi {
     required int port,
     required String username,
     required String password,
+    required String termType,
   });
 
   Future<void> crateSshSessionWriteToSession({
@@ -178,6 +183,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required int port,
     required String username,
     required String password,
+    required String termType,
+    required int rows,
+    required int cols,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -189,6 +197,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_16(port, serializer);
           sse_encode_String(username, serializer);
           sse_encode_String(password, serializer);
+          sse_encode_String(termType, serializer);
+          sse_encode_u_16(rows, serializer);
+          sse_encode_u_16(cols, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -201,7 +212,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateSshSessionConnectProfileConstMeta,
-        argValues: [profileId, title, host, port, username, password],
+        argValues: [
+          profileId,
+          title,
+          host,
+          port,
+          username,
+          password,
+          termType,
+          rows,
+          cols,
+        ],
         apiImpl: this,
       ),
     );
@@ -217,6 +238,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "port",
           "username",
           "password",
+          "termType",
+          "rows",
+          "cols",
         ],
       );
 
@@ -265,6 +289,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required int port,
     required String username,
     required String password,
+    required String termType,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -275,6 +300,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_16(port, serializer);
           sse_encode_String(username, serializer);
           sse_encode_String(password, serializer);
+          sse_encode_String(termType, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -287,7 +313,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateProfileCreateProfileConstMeta,
-        argValues: [name, host, port, username, password],
+        argValues: [name, host, port, username, password, termType],
         apiImpl: this,
       ),
     );
@@ -295,7 +321,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateProfileCreateProfileConstMeta => const TaskConstMeta(
     debugName: "create_profile",
-    argNames: ["name", "host", "port", "username", "password"],
+    argNames: ["name", "host", "port", "username", "password", "termType"],
   );
 
   @override
@@ -486,6 +512,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required int port,
     required String username,
     required String password,
+    required String termType,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -497,6 +524,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_16(port, serializer);
           sse_encode_String(username, serializer);
           sse_encode_String(password, serializer);
+          sse_encode_String(termType, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -509,7 +537,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateProfileUpdateProfileConstMeta,
-        argValues: [id, name, host, port, username, password],
+        argValues: [id, name, host, port, username, password, termType],
         apiImpl: this,
       ),
     );
@@ -517,7 +545,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateProfileUpdateProfileConstMeta => const TaskConstMeta(
     debugName: "update_profile",
-    argNames: ["id", "name", "host", "port", "username", "password"],
+    argNames: [
+      "id",
+      "name",
+      "host",
+      "port",
+      "username",
+      "password",
+      "termType",
+    ],
   );
 
   @override
@@ -628,8 +664,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SshProfile dco_decode_ssh_profile(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return SshProfile(
       id: dco_decode_String(arr[0]),
       name: dco_decode_String(arr[1]),
@@ -637,6 +673,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       port: dco_decode_u_16(arr[3]),
       username: dco_decode_String(arr[4]),
       password: dco_decode_String(arr[5]),
+      termType: dco_decode_String(arr[6]),
     );
   }
 
@@ -644,8 +681,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SshSession dco_decode_ssh_session(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return SshSession(
       sessionId: dco_decode_String(arr[0]),
       profileId: dco_decode_String(arr[1]),
@@ -653,6 +690,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       title: dco_decode_String(arr[3]),
       rows: dco_decode_u_16(arr[4]),
       cols: dco_decode_u_16(arr[5]),
+      termType: dco_decode_String(arr[6]),
     );
   }
 
@@ -830,6 +868,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_port = sse_decode_u_16(deserializer);
     var var_username = sse_decode_String(deserializer);
     var var_password = sse_decode_String(deserializer);
+    var var_termType = sse_decode_String(deserializer);
     return SshProfile(
       id: var_id,
       name: var_name,
@@ -837,6 +876,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       port: var_port,
       username: var_username,
       password: var_password,
+      termType: var_termType,
     );
   }
 
@@ -849,6 +889,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_title = sse_decode_String(deserializer);
     var var_rows = sse_decode_u_16(deserializer);
     var var_cols = sse_decode_u_16(deserializer);
+    var var_termType = sse_decode_String(deserializer);
     return SshSession(
       sessionId: var_sessionId,
       profileId: var_profileId,
@@ -856,6 +897,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       title: var_title,
       rows: var_rows,
       cols: var_cols,
+      termType: var_termType,
     );
   }
 
@@ -1063,6 +1105,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_16(self.port, serializer);
     sse_encode_String(self.username, serializer);
     sse_encode_String(self.password, serializer);
+    sse_encode_String(self.termType, serializer);
   }
 
   @protected
@@ -1074,6 +1117,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.title, serializer);
     sse_encode_u_16(self.rows, serializer);
     sse_encode_u_16(self.cols, serializer);
+    sse_encode_String(self.termType, serializer);
   }
 
   @protected
