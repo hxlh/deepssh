@@ -1122,6 +1122,49 @@ void main() {
     expect(controller.highlights.single.backgroundColor, isNull);
   });
 
+  testWidgets('gives earlier regex highlight rules higher paint priority', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final theme = _defaultTerminalTheme.copyWith(
+      regexHighlights: const [
+        RegexHighlight(pattern: 'ERROR', color: Color(0xFFF14C4C)),
+        RegexHighlight(pattern: 'ERROR request', color: Color(0xFFF5F543)),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            terminalThemeSettings: theme,
+          ),
+        ),
+      ),
+    );
+
+    terminal.write('ERROR request failed\r\n');
+    await tester.pump(const Duration(milliseconds: 120));
+
+    final controller = terminalView(tester).controller!;
+    expect(controller.highlights, hasLength(2));
+    expect(controller.highlights.first.range!.begin.x, 0);
+    expect(controller.highlights.first.range!.end.x, 13);
+    expect(controller.highlights.first.foregroundColor, const Color(0xFFF5F543));
+    expect(controller.highlights.last.range!.begin.x, 0);
+    expect(controller.highlights.last.range!.end.x, 5);
+    expect(controller.highlights.last.foregroundColor, const Color(0xFFF14C4C));
+  });
+
   testWidgets('skips invalid regex highlight rules', (tester) async {
     final terminal = xterm.Terminal(maxLines: 3000);
     final tab = OpenTerminalTab.ssh(

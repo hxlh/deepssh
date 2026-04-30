@@ -148,7 +148,7 @@ class _TerminalViewState extends State<TerminalView> {
     }
     regexHighlights.clear();
 
-    for (final rule in widget.terminalThemeSettings.regexHighlights) {
+    for (final rule in widget.terminalThemeSettings.regexHighlights.reversed) {
       if (rule.pattern.isEmpty) continue;
       final regex = _compileRegex(rule.pattern);
       if (regex == null) continue;
