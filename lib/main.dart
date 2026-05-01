@@ -1,5 +1,9 @@
+import 'dart:developer' as developer;
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
+import 'core/logging/app_logger.dart';
 import 'core/logging/frontend_error_hooks.dart';
 import 'core/models/ssh_profile_item.dart';
 import 'core/models/theme_settings.dart';
@@ -8,8 +12,52 @@ import 'features/ssh/ssh_bridge.dart';
 import 'features/theme/theme_bridge.dart';
 import 'workbench/workbench_page.dart';
 
-void main() {
+Future<void> main(List<String> args) async {
+  if (shouldEnableVmService(args)) {
+    await _enableVmService();
+  }
+
   runLoggedApp(const DeepSshApp());
+}
+
+bool shouldEnableVmService(List<String> args) {
+  return args.contains('--vm');
+}
+
+Future<void> _enableVmService() async {
+  final info = await developer.Service.controlWebServer(
+    enable: true,
+    silenceOutput: false,
+  );
+  final uri = info.serverUri;
+  if (uri == null) {
+    throw StateError('Dart VM Service did not return a server URI.');
+  }
+  final message = 'Dart VM Service listening at $uri';
+  stderr.writeln(message);
+  await _writeStartupLog(message);
+}
+
+Future<void> _writeStartupLog(String message) async {
+  final timestamp = DateTime.now().toLocal();
+  final platform = AppLogPlatform.current();
+  final logDirectory = platform.logDirectory();
+  await logDirectory.create(recursive: true);
+  final logFile = File(
+    [
+      logDirectory.path,
+      'frontend-${_dateStamp(timestamp)}.log',
+    ].join(Platform.pathSeparator),
+  );
+  await logFile.writeAsString(
+    '${timestamp.toIso8601String()} INFO frontend vm_service\n$message\n',
+    mode: FileMode.append,
+    flush: true,
+  );
+}
+
+String _dateStamp(DateTime value) {
+  return '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 }
 
 class DeepSshApp extends StatefulWidget {

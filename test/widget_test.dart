@@ -6,6 +6,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('shouldEnableVmService', () {
+    test('returns true when --vm is present', () {
+      expect(shouldEnableVmService(['--vm']), isTrue);
+    });
+
+    test('returns false when --vm is absent', () {
+      expect(shouldEnableVmService(['--debug']), isFalse);
+    });
+
+    test('ignores unknown arguments while detecting --vm', () {
+      expect(shouldEnableVmService(['--profile', '--vm', '--other']), isTrue);
+    });
+  });
+
   testWidgets(
     'app boots into the DeepSSH workbench with add connection action',
     (tester) async {
