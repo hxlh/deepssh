@@ -35,6 +35,14 @@ class TerminalController with ChangeNotifier {
   List<TerminalHighlight> get highlights => _highlights;
   final _highlights = <TerminalHighlight>[];
 
+  CellOffset? get selectionBaseOffset {
+    final base = _selectionBase;
+    if (base == null || !base.attached) {
+      return null;
+    }
+    return base.offset;
+  }
+
   BufferRange? get selection {
     final base = _selectionBase;
     final extent = _selectionExtent;
@@ -161,7 +169,8 @@ class TerminalHighlight with Disposable {
 
   final Color? backgroundColor;
 
-  Color get color => backgroundColor ?? foregroundColor ?? const Color(0x00000000);
+  Color get color =>
+      backgroundColor ?? foregroundColor ?? const Color(0x00000000);
 
   TerminalHighlight(
     this.owner, {

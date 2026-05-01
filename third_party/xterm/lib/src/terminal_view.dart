@@ -304,6 +304,7 @@ class TerminalViewState extends State<TerminalView> {
     child = TerminalGestureHandler(
       terminalView: this,
       terminalController: _controller,
+      scrollController: _scrollController,
       onTapUp: _onTapUp,
       onTapDown: _onTapDown,
       onSecondaryTapDown:

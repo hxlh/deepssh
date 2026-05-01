@@ -10,6 +10,7 @@ import 'package:deepssh/features/terminal/terminal_state.dart';
 import 'package:deepssh/features/terminal/terminal_tab_shell.dart';
 import 'package:deepssh/features/terminal/terminal_view.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -260,6 +261,129 @@ void main() {
 
     expect(find.byType(TerminalFindBar), findsOneWidget);
     expect(find.widgetWithText(TextField, 'beta'), findsOneWidget);
+  });
+
+  testWidgets('extends drag selection from original cell after scrolling', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.resize(80, 8);
+    for (var i = 0; i < 40; i++) {
+      terminal.write('line ${i.toString().padLeft(2, '0')} target text\r\n');
+    }
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      _terminalApp(
+        width: 800,
+        height: 260,
+        tab: tab,
+        bridge: RecordingSshBridgeClient(),
+        theme: _defaultTerminalTheme.copyWith(fontSize: 20),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final view = terminalView(tester);
+    final scrollController = view.scrollController!;
+    final bottomOffset = scrollController.offset;
+    final renderTerminal =
+        tester.renderObject(
+              find.descendant(
+                of: find.byType(xterm.TerminalView),
+                matching: find.byWidgetPredicate(
+                  (widget) => widget.runtimeType.toString() == '_TerminalView',
+                ),
+              ),
+            )
+            as dynamic;
+    final cellSize = renderTerminal.cellSize as Size;
+    final start = Offset(8 * cellSize.width, cellSize.height * 4);
+    final originalStartCell = renderTerminal.getCellOffset(start);
+
+    renderTerminal.selectCharacters(start);
+    await tester.pump();
+
+    scrollController.jumpTo(bottomOffset - (cellSize.height * 4));
+    await tester.pump();
+
+    renderTerminal.selectCharacters(
+      start,
+      Offset(18 * cellSize.width, cellSize.height * 4),
+    );
+    await tester.pump();
+
+    final selection = view.controller!.selection!.normalized;
+    expect(selection.end.y, originalStartCell.y);
+  });
+
+  testWidgets('auto-scrolls while dragging selection near viewport edge', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.resize(80, 8);
+    for (var i = 0; i < 60; i++) {
+      terminal.write(
+        'line ${i.toString().padLeft(2, '0')} selectable text\r\n',
+      );
+    }
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      _terminalApp(
+        width: 800,
+        height: 260,
+        tab: tab,
+        bridge: RecordingSshBridgeClient(),
+        theme: _defaultTerminalTheme.copyWith(fontSize: 20),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final view = terminalView(tester);
+    final scrollController = view.scrollController!;
+    final initialOffset = scrollController.offset;
+    final renderTerminal =
+        tester.renderObject(
+              find.descendant(
+                of: find.byType(xterm.TerminalView),
+                matching: find.byWidgetPredicate(
+                  (widget) => widget.runtimeType.toString() == '_TerminalView',
+                ),
+              ),
+            )
+            as dynamic;
+    final cellSize = renderTerminal.cellSize as Size;
+    final start = renderTerminal.localToGlobal(
+      Offset(8 * cellSize.width, cellSize.height * 4),
+    );
+    final edge = renderTerminal.localToGlobal(
+      Offset(18 * cellSize.width, cellSize.height * 1),
+    );
+
+    final gesture = await tester.startGesture(
+      start,
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveTo(edge);
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(scrollController.offset, lessThan(initialOffset));
+    expect(view.controller!.selection!.normalized.begin.y, lessThan(52));
+
+    await gesture.up();
   });
 
   testWidgets(
