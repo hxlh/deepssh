@@ -179,4 +179,11 @@ class TerminalHighlight with Disposable {
     }
     return BufferRangeLine(p1.offset, p2.offset);
   }
+
+  @override
+  void dispose() {
+    super.dispose();
+    p1.dispose();
+    p2.dispose();
+  }
 }

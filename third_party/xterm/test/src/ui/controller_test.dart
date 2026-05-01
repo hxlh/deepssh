@@ -93,5 +93,26 @@ void main() {
       highlight.dispose();
       assert(controller.highlights.isEmpty);
     });
+
+    test('dispose releases anchors', () {
+      final terminal = Terminal();
+      final controller = TerminalController();
+      final p1 = terminal.buffer.createAnchor(5, 5);
+      final p2 = terminal.buffer.createAnchor(5, 10);
+
+      final highlight = controller.highlight(
+        p1: p1,
+        p2: p2,
+        color: Colors.yellow,
+      );
+
+      expect(p1.attached, isTrue);
+      expect(p2.attached, isTrue);
+
+      highlight.dispose();
+
+      expect(p1.attached, isFalse);
+      expect(p2.attached, isFalse);
+    });
   });
 }
