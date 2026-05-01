@@ -192,15 +192,36 @@ class _TerminalViewState extends State<TerminalView> {
   }
 
   Color? _regexForegroundForCell(int row, int column, String lineText) {
+    final line = terminal.buffer.lines[row];
+    final textIndex = _textIndexForCellColumn(line, column);
     for (final rule in _compiledRegexHighlights) {
       for (final match in rule.regex.allMatches(lineText)) {
         if (match.start == match.end) continue;
-        if (column >= match.start && column < match.end) {
+        if (textIndex >= match.start && textIndex < match.end) {
           return rule.foreground;
         }
       }
     }
     return null;
+  }
+
+  int _textIndexForCellColumn(xterm.BufferLine line, int column) {
+    var textIndex = 0;
+    for (var cell = 0; cell <= column && cell < line.length; cell++) {
+      final codePoint = line.getCodePoint(cell);
+      if (codePoint == 0) {
+        if (cell == column) return textIndex;
+        continue;
+      }
+
+      final start = textIndex;
+      final width = line.getWidth(cell);
+      textIndex += String.fromCharCode(codePoint).length;
+      if (cell == column || (width == 2 && cell + 1 == column)) {
+        return start;
+      }
+    }
+    return textIndex;
   }
 
   void _applyCursorBlinkMode() {

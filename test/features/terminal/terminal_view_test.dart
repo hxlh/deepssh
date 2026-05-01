@@ -1310,6 +1310,54 @@ void main() {
     },
   );
 
+  testWidgets('aligns regex highlight colors after wide terminal characters', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final theme = _defaultTerminalTheme.copyWith(
+      regexHighlights: const [
+        RegexHighlight(pattern: r'/[^\s]+', color: Color(0xFFF5F543)),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            terminalThemeSettings: theme,
+          ),
+        ),
+      ),
+    );
+
+    terminal.write('中文 /tmp/file\r\n');
+    await tester.pump();
+
+    final terminalWidget = tester.widget<xterm.TerminalView>(
+      find.byType(xterm.TerminalView),
+    );
+    final lineText = terminal.buffer.lines[0].getText();
+    expect(terminalWidget.foregroundColorResolver!(0, 4, lineText), isNull);
+    expect(
+      terminalWidget.foregroundColorResolver!(0, 5, lineText),
+      const Color(0xFFF5F543),
+    );
+    expect(
+      terminalWidget.foregroundColorResolver!(0, 13, lineText),
+      const Color(0xFFF5F543),
+    );
+  });
+
   testWidgets(
     'passes earlier regex highlight rules as higher priority foreground overlays',
     (tester) async {
@@ -1341,23 +1389,24 @@ void main() {
         ),
       );
 
+      terminal.write('ERROR request failed\r\n');
+      await tester.pump();
+
       final terminalWidget = tester.widget<xterm.TerminalView>(
         find.byType(xterm.TerminalView),
       );
+      final lineText = terminal.buffer.lines[0].getText();
       expect(terminalWidget.foregroundColorResolver, isNotNull);
 
       expect(
-        terminalWidget.foregroundColorResolver!(0, 0, 'ERROR request failed'),
+        terminalWidget.foregroundColorResolver!(0, 0, lineText),
         const Color(0xFFF14C4C),
       );
       expect(
-        terminalWidget.foregroundColorResolver!(0, 5, 'ERROR request failed'),
+        terminalWidget.foregroundColorResolver!(0, 5, lineText),
         const Color(0xFFF5F543),
       );
-      expect(
-        terminalWidget.foregroundColorResolver!(0, 13, 'ERROR request failed'),
-        isNull,
-      );
+      expect(terminalWidget.foregroundColorResolver!(0, 13, lineText), isNull);
       expect(
         terminal.buffer.lines[0].getForeground(0),
         isNot(terminalRgbColor(const Color(0xFFF14C4C))),
