@@ -130,8 +130,15 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
         _FontRow(
           family: uiSettings.fontFamily,
           size: uiSettings.fontSize,
+          normalWeight: uiSettings.normalFontWeight,
+          boldWeight: uiSettings.boldFontWeight,
+          weightHint: '界面文字默认/强调状态使用不同 weight',
           onFamilyChanged: (v) => _updateUi(uiSettings.copyWith(fontFamily: v)),
           onSizeChanged: (v) => _updateUi(uiSettings.copyWith(fontSize: v)),
+          onNormalWeightChanged: (v) =>
+              _updateUi(uiSettings.copyWith(normalFontWeight: v)),
+          onBoldWeightChanged: (v) =>
+              _updateUi(uiSettings.copyWith(boldFontWeight: v)),
         ),
         const SizedBox(height: 16),
         const _SectionLabel('配色'),
@@ -200,10 +207,17 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
               child: _FontRow(
                 family: termSettings.fontFamily,
                 size: termSettings.fontSize,
+                normalWeight: termSettings.normalFontWeight,
+                boldWeight: termSettings.boldFontWeight,
+                weightHint: '普通文本与 ANSI bold 分开控制',
                 onFamilyChanged: (v) =>
                     _updateTerm(termSettings.copyWith(fontFamily: v)),
                 onSizeChanged: (v) =>
                     _updateTerm(termSettings.copyWith(fontSize: v)),
+                onNormalWeightChanged: (v) =>
+                    _updateTerm(termSettings.copyWith(normalFontWeight: v)),
+                onBoldWeightChanged: (v) =>
+                    _updateTerm(termSettings.copyWith(boldFontWeight: v)),
               ),
             ),
             const SizedBox(width: 16),
@@ -512,14 +526,24 @@ class _FontRow extends StatelessWidget {
   const _FontRow({
     required this.family,
     required this.size,
+    required this.normalWeight,
+    required this.boldWeight,
+    required this.weightHint,
     required this.onFamilyChanged,
     required this.onSizeChanged,
+    required this.onNormalWeightChanged,
+    required this.onBoldWeightChanged,
   });
 
   final String family;
   final int size;
+  final int normalWeight;
+  final int boldWeight;
+  final String weightHint;
   final ValueChanged<String> onFamilyChanged;
   final ValueChanged<int> onSizeChanged;
+  final ValueChanged<int> onNormalWeightChanged;
+  final ValueChanged<int> onBoldWeightChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -540,6 +564,41 @@ class _FontRow extends StatelessWidget {
                 label: '',
                 value: size,
                 onChanged: onSizeChanged,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.end,
+          children: [
+            SizedBox(
+              width: 104,
+              child: _NumberInput(
+                label: '常规字重',
+                value: normalWeight,
+                onChanged: onNormalWeightChanged,
+              ),
+            ),
+            SizedBox(
+              width: 104,
+              child: _NumberInput(
+                label: '粗体字重',
+                value: boldWeight,
+                onChanged: onBoldWeightChanged,
+              ),
+            ),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 240),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: Text(
+                  weightHint,
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
           ],

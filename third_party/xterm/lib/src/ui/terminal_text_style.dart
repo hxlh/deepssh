@@ -23,12 +23,18 @@ const _kDefaultFontFamilyFallback = [
   'sans-serif',
 ];
 
+const _kDefaultNormalFontWeight = FontWeight.normal;
+
+const _kDefaultBoldFontWeight = FontWeight.bold;
+
 class TerminalStyle {
   const TerminalStyle({
     this.fontSize = _kDefaultFontSize,
     this.height = _kDefaultHeight,
     this.fontFamily = _kDefaultFontFamily,
     this.fontFamilyFallback = _kDefaultFontFamilyFallback,
+    this.normalFontWeight = _kDefaultNormalFontWeight,
+    this.boldFontWeight = _kDefaultBoldFontWeight,
   });
 
   factory TerminalStyle.fromTextStyle(TextStyle textStyle) {
@@ -40,6 +46,8 @@ class TerminalStyle {
           _kDefaultFontFamily,
       fontFamilyFallback:
           textStyle.fontFamilyFallback ?? _kDefaultFontFamilyFallback,
+      normalFontWeight: textStyle.fontWeight ?? _kDefaultNormalFontWeight,
+      boldFontWeight: _kDefaultBoldFontWeight,
     );
   }
 
@@ -50,6 +58,10 @@ class TerminalStyle {
   final String fontFamily;
 
   final List<String> fontFamilyFallback;
+
+  final FontWeight normalFontWeight;
+
+  final FontWeight boldFontWeight;
 
   TextStyle toTextStyle({
     Color? color,
@@ -65,7 +77,7 @@ class TerminalStyle {
       fontFamilyFallback: fontFamilyFallback,
       color: color,
       backgroundColor: backgroundColor,
-      fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+      fontWeight: bold ? boldFontWeight : normalFontWeight,
       fontStyle: italic ? FontStyle.italic : FontStyle.normal,
       decoration: underline ? TextDecoration.underline : TextDecoration.none,
     );
@@ -76,12 +88,16 @@ class TerminalStyle {
     double? height,
     String? fontFamily,
     List<String>? fontFamilyFallback,
+    FontWeight? normalFontWeight,
+    FontWeight? boldFontWeight,
   }) {
     return TerminalStyle(
       fontSize: fontSize ?? this.fontSize,
       height: height ?? this.height,
       fontFamily: fontFamily ?? this.fontFamily,
       fontFamilyFallback: fontFamilyFallback ?? this.fontFamilyFallback,
+      normalFontWeight: normalFontWeight ?? this.normalFontWeight,
+      boldFontWeight: boldFontWeight ?? this.boldFontWeight,
     );
   }
 }

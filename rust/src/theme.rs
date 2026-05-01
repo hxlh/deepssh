@@ -28,6 +28,8 @@ pub struct UiTheme {
     pub preset_name: String,
     pub font_family: String,
     pub font_size: u32,
+    pub normal_font_weight: u32,
+    pub bold_font_weight: u32,
     pub background: String,
     pub panel: String,
     pub sidebar: String,
@@ -41,6 +43,8 @@ pub struct TerminalTheme {
     pub preset_name: String,
     pub font_family: String,
     pub font_size: u32,
+    pub normal_font_weight: u32,
+    pub bold_font_weight: u32,
     pub cursor_style: String,
     pub cursor_blink: bool,
     pub foreground: String,
@@ -65,12 +69,32 @@ struct ThemeFile {
     terminal: TerminalThemeConfig,
 }
 
+fn default_ui_normal_font_weight() -> u32 {
+    500
+}
+
+fn default_ui_bold_font_weight() -> u32 {
+    700
+}
+
+fn default_terminal_normal_font_weight() -> u32 {
+    400
+}
+
+fn default_terminal_bold_font_weight() -> u32 {
+    700
+}
+
 #[flutter_rust_bridge::frb(ignore)]
 #[derive(Debug, Deserialize, Serialize)]
 struct UiThemeConfig {
     preset_name: String,
     font_family: String,
     font_size: u32,
+    #[serde(default = "default_ui_normal_font_weight")]
+    normal_font_weight: u32,
+    #[serde(default = "default_ui_bold_font_weight")]
+    bold_font_weight: u32,
     background: String,
     panel: String,
     sidebar: String,
@@ -85,6 +109,10 @@ struct TerminalThemeConfig {
     preset_name: String,
     font_family: String,
     font_size: u32,
+    #[serde(default = "default_terminal_normal_font_weight")]
+    normal_font_weight: u32,
+    #[serde(default = "default_terminal_bold_font_weight")]
+    bold_font_weight: u32,
     cursor_style: String,
     cursor_blink: bool,
     foreground: String,
@@ -129,6 +157,8 @@ impl From<&UiTheme> for UiThemeConfig {
             preset_name: theme.preset_name.clone(),
             font_family: theme.font_family.clone(),
             font_size: theme.font_size,
+            normal_font_weight: theme.normal_font_weight,
+            bold_font_weight: theme.bold_font_weight,
             background: theme.background.clone(),
             panel: theme.panel.clone(),
             sidebar: theme.sidebar.clone(),
@@ -145,6 +175,8 @@ impl From<UiThemeConfig> for UiTheme {
             preset_name: config.preset_name,
             font_family: config.font_family,
             font_size: config.font_size,
+            normal_font_weight: config.normal_font_weight,
+            bold_font_weight: config.bold_font_weight,
             background: config.background,
             panel: config.panel,
             sidebar: config.sidebar,
@@ -161,6 +193,8 @@ impl From<&TerminalTheme> for TerminalThemeConfig {
             preset_name: theme.preset_name.clone(),
             font_family: theme.font_family.clone(),
             font_size: theme.font_size,
+            normal_font_weight: theme.normal_font_weight,
+            bold_font_weight: theme.bold_font_weight,
             cursor_style: theme.cursor_style.clone(),
             cursor_blink: theme.cursor_blink,
             foreground: theme.foreground.clone(),
@@ -183,6 +217,8 @@ impl From<TerminalThemeConfig> for TerminalTheme {
             preset_name: config.preset_name,
             font_family: config.font_family,
             font_size: config.font_size,
+            normal_font_weight: config.normal_font_weight,
+            bold_font_weight: config.bold_font_weight,
             cursor_style: config.cursor_style,
             cursor_blink: config.cursor_blink,
             foreground: config.foreground,
@@ -225,6 +261,8 @@ fn default_theme() -> ThemeSettings {
             preset_name: "Command Deck".to_string(),
             font_family: "Inter".to_string(),
             font_size: 14,
+            normal_font_weight: default_ui_normal_font_weight(),
+            bold_font_weight: default_ui_bold_font_weight(),
             background: "#1E1E1E".to_string(),
             panel: "#252526".to_string(),
             sidebar: "#181818".to_string(),
@@ -236,6 +274,8 @@ fn default_theme() -> ThemeSettings {
             preset_name: "Command Deck".to_string(),
             font_family: "JetBrains Mono".to_string(),
             font_size: 14,
+            normal_font_weight: default_terminal_normal_font_weight(),
+            bold_font_weight: default_terminal_bold_font_weight(),
             cursor_style: "bar".to_string(),
             cursor_blink: true,
             foreground: "#E6E6E6".to_string(),
@@ -410,6 +450,8 @@ mod tests {
                 preset_name: "Custom".to_string(),
                 font_family: "Roboto".to_string(),
                 font_size: 16,
+                normal_font_weight: 300,
+                bold_font_weight: 800,
                 background: "#000000".to_string(),
                 panel: "#111111".to_string(),
                 sidebar: "#222222".to_string(),
@@ -421,6 +463,8 @@ mod tests {
                 preset_name: "Custom Term".to_string(),
                 font_family: "Fira Code".to_string(),
                 font_size: 18,
+                normal_font_weight: 400,
+                bold_font_weight: 900,
                 cursor_style: "block".to_string(),
                 cursor_blink: false,
                 foreground: "#CCCCCC".to_string(),
@@ -462,11 +506,56 @@ mod tests {
         assert!(yaml.contains("preset_name: Custom"));
         assert!(yaml.contains("font_family: Roboto"));
         assert!(yaml.contains("font_size: 16"));
+        assert!(yaml.contains("normal_font_weight: 300"));
+        assert!(yaml.contains("bold_font_weight: 800"));
+        assert!(yaml.contains("normal_font_weight: 400"));
+        assert!(yaml.contains("bold_font_weight: 900"));
         assert!(yaml.contains("background: '#000000'"));
         assert!(yaml.contains("cursor_style: block"));
         assert!(yaml.contains("cursor_blink: false"));
         assert!(yaml.contains("scrollback_lines: 5000"));
         assert!(yaml.contains("pattern: FAIL"));
+    }
+
+    #[test]
+    fn missing_font_weights_default_by_theme_section() {
+        let _guard = clear_theme_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+        fs::create_dir_all(workspace.path().join("config")).unwrap();
+        fs::write(
+            workspace.config_path(),
+            r##"ui:
+  preset_name: Legacy UI
+  font_family: Inter
+  font_size: 14
+  background: '#1E1E1E'
+  panel: '#252526'
+  sidebar: '#181818'
+  accent: '#3794FF'
+  text_primary: '#E6E6E6'
+  text_muted: '#9D9D9D'
+terminal:
+  preset_name: Legacy Terminal
+  font_family: Maple Mono NF CN
+  font_size: 14
+  cursor_style: block
+  cursor_blink: true
+  foreground: '#E6E6E6'
+  terminal_background: '#252526'
+  selection_color: '#094771'
+  cursor_color: '#3794FF'
+  scrollback_lines: 10000
+"##,
+        )
+        .unwrap();
+
+        let theme = load_theme().unwrap();
+
+        assert_eq!(theme.ui.normal_font_weight, 500);
+        assert_eq!(theme.ui.bold_font_weight, 700);
+        assert_eq!(theme.terminal.normal_font_weight, 400);
+        assert_eq!(theme.terminal.bold_font_weight, 700);
     }
 
     #[test]

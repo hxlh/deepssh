@@ -585,6 +585,13 @@ class _TerminalViewState extends State<TerminalView> {
     }
   }
 
+  FontWeight _fontWeightFromConfig(int value) {
+    return FontWeight.values.firstWhere(
+      (weight) => weight.value == value,
+      orElse: () => FontWeight.normal,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = widget.terminalThemeSettings;
@@ -617,6 +624,12 @@ class _TerminalViewState extends State<TerminalView> {
                 textStyle: xterm.TerminalStyle(
                   fontSize: settings.fontSize.toDouble(),
                   fontFamily: settings.fontFamily,
+                  normalFontWeight: _fontWeightFromConfig(
+                    settings.normalFontWeight,
+                  ),
+                  boldFontWeight: _fontWeightFromConfig(
+                    settings.boldFontWeight,
+                  ),
                 ),
                 theme: xterm.TerminalTheme(
                   cursor: settings.cursorColor,

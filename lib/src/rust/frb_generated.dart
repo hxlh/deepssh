@@ -1204,20 +1204,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TerminalTheme dco_decode_terminal_theme(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 11)
-      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    if (arr.length != 13)
+      throw Exception('unexpected arr length: expect 13 but see ${arr.length}');
     return TerminalTheme(
       presetName: dco_decode_String(arr[0]),
       fontFamily: dco_decode_String(arr[1]),
       fontSize: dco_decode_u_32(arr[2]),
-      cursorStyle: dco_decode_String(arr[3]),
-      cursorBlink: dco_decode_bool(arr[4]),
-      foreground: dco_decode_String(arr[5]),
-      terminalBackground: dco_decode_String(arr[6]),
-      selectionColor: dco_decode_String(arr[7]),
-      cursorColor: dco_decode_String(arr[8]),
-      scrollbackLines: dco_decode_u_32(arr[9]),
-      regexHighlights: dco_decode_list_regex_highlight(arr[10]),
+      normalFontWeight: dco_decode_u_32(arr[3]),
+      boldFontWeight: dco_decode_u_32(arr[4]),
+      cursorStyle: dco_decode_String(arr[5]),
+      cursorBlink: dco_decode_bool(arr[6]),
+      foreground: dco_decode_String(arr[7]),
+      terminalBackground: dco_decode_String(arr[8]),
+      selectionColor: dco_decode_String(arr[9]),
+      cursorColor: dco_decode_String(arr[10]),
+      scrollbackLines: dco_decode_u_32(arr[11]),
+      regexHighlights: dco_decode_list_regex_highlight(arr[12]),
     );
   }
 
@@ -1286,18 +1288,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   UiTheme dco_decode_ui_theme(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9)
-      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
     return UiTheme(
       presetName: dco_decode_String(arr[0]),
       fontFamily: dco_decode_String(arr[1]),
       fontSize: dco_decode_u_32(arr[2]),
-      background: dco_decode_String(arr[3]),
-      panel: dco_decode_String(arr[4]),
-      sidebar: dco_decode_String(arr[5]),
-      accent: dco_decode_String(arr[6]),
-      textPrimary: dco_decode_String(arr[7]),
-      textMuted: dco_decode_String(arr[8]),
+      normalFontWeight: dco_decode_u_32(arr[3]),
+      boldFontWeight: dco_decode_u_32(arr[4]),
+      background: dco_decode_String(arr[5]),
+      panel: dco_decode_String(arr[6]),
+      sidebar: dco_decode_String(arr[7]),
+      accent: dco_decode_String(arr[8]),
+      textPrimary: dco_decode_String(arr[9]),
+      textMuted: dco_decode_String(arr[10]),
     );
   }
 
@@ -1491,6 +1495,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_presetName = sse_decode_String(deserializer);
     var var_fontFamily = sse_decode_String(deserializer);
     var var_fontSize = sse_decode_u_32(deserializer);
+    var var_normalFontWeight = sse_decode_u_32(deserializer);
+    var var_boldFontWeight = sse_decode_u_32(deserializer);
     var var_cursorStyle = sse_decode_String(deserializer);
     var var_cursorBlink = sse_decode_bool(deserializer);
     var var_foreground = sse_decode_String(deserializer);
@@ -1503,6 +1509,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       presetName: var_presetName,
       fontFamily: var_fontFamily,
       fontSize: var_fontSize,
+      normalFontWeight: var_normalFontWeight,
+      boldFontWeight: var_boldFontWeight,
       cursorStyle: var_cursorStyle,
       cursorBlink: var_cursorBlink,
       foreground: var_foreground,
@@ -1589,6 +1597,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_presetName = sse_decode_String(deserializer);
     var var_fontFamily = sse_decode_String(deserializer);
     var var_fontSize = sse_decode_u_32(deserializer);
+    var var_normalFontWeight = sse_decode_u_32(deserializer);
+    var var_boldFontWeight = sse_decode_u_32(deserializer);
     var var_background = sse_decode_String(deserializer);
     var var_panel = sse_decode_String(deserializer);
     var var_sidebar = sse_decode_String(deserializer);
@@ -1599,6 +1609,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       presetName: var_presetName,
       fontFamily: var_fontFamily,
       fontSize: var_fontSize,
+      normalFontWeight: var_normalFontWeight,
+      boldFontWeight: var_boldFontWeight,
       background: var_background,
       panel: var_panel,
       sidebar: var_sidebar,
@@ -1791,6 +1803,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.presetName, serializer);
     sse_encode_String(self.fontFamily, serializer);
     sse_encode_u_32(self.fontSize, serializer);
+    sse_encode_u_32(self.normalFontWeight, serializer);
+    sse_encode_u_32(self.boldFontWeight, serializer);
     sse_encode_String(self.cursorStyle, serializer);
     sse_encode_bool(self.cursorBlink, serializer);
     sse_encode_String(self.foreground, serializer);
@@ -1864,6 +1878,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.presetName, serializer);
     sse_encode_String(self.fontFamily, serializer);
     sse_encode_u_32(self.fontSize, serializer);
+    sse_encode_u_32(self.normalFontWeight, serializer);
+    sse_encode_u_32(self.boldFontWeight, serializer);
     sse_encode_String(self.background, serializer);
     sse_encode_String(self.panel, serializer);
     sse_encode_String(self.sidebar, serializer);

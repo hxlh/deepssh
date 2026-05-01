@@ -6,7 +6,7 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `default_theme`, `ensure_theme_loaded`, `load_theme_from_disk`, `write_theme_to_disk`
+// These functions are ignored because they are not marked as `pub`: `default_terminal_bold_font_weight`, `default_terminal_normal_font_weight`, `default_theme`, `default_ui_bold_font_weight`, `default_ui_normal_font_weight`, `ensure_theme_loaded`, `load_theme_from_disk`, `write_theme_to_disk`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `RegexHighlightConfig`, `TerminalThemeConfig`, `ThemeFile`, `ThemeStore`, `UiThemeConfig`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
 // These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`
@@ -44,6 +44,8 @@ class TerminalTheme {
   final String presetName;
   final String fontFamily;
   final int fontSize;
+  final int normalFontWeight;
+  final int boldFontWeight;
   final String cursorStyle;
   final bool cursorBlink;
   final String foreground;
@@ -57,6 +59,8 @@ class TerminalTheme {
     required this.presetName,
     required this.fontFamily,
     required this.fontSize,
+    required this.normalFontWeight,
+    required this.boldFontWeight,
     required this.cursorStyle,
     required this.cursorBlink,
     required this.foreground,
@@ -72,6 +76,8 @@ class TerminalTheme {
       presetName.hashCode ^
       fontFamily.hashCode ^
       fontSize.hashCode ^
+      normalFontWeight.hashCode ^
+      boldFontWeight.hashCode ^
       cursorStyle.hashCode ^
       cursorBlink.hashCode ^
       foreground.hashCode ^
@@ -89,6 +95,8 @@ class TerminalTheme {
           presetName == other.presetName &&
           fontFamily == other.fontFamily &&
           fontSize == other.fontSize &&
+          normalFontWeight == other.normalFontWeight &&
+          boldFontWeight == other.boldFontWeight &&
           cursorStyle == other.cursorStyle &&
           cursorBlink == other.cursorBlink &&
           foreground == other.foreground &&
@@ -121,6 +129,8 @@ class UiTheme {
   final String presetName;
   final String fontFamily;
   final int fontSize;
+  final int normalFontWeight;
+  final int boldFontWeight;
   final String background;
   final String panel;
   final String sidebar;
@@ -132,6 +142,8 @@ class UiTheme {
     required this.presetName,
     required this.fontFamily,
     required this.fontSize,
+    required this.normalFontWeight,
+    required this.boldFontWeight,
     required this.background,
     required this.panel,
     required this.sidebar,
@@ -145,6 +157,8 @@ class UiTheme {
       presetName.hashCode ^
       fontFamily.hashCode ^
       fontSize.hashCode ^
+      normalFontWeight.hashCode ^
+      boldFontWeight.hashCode ^
       background.hashCode ^
       panel.hashCode ^
       sidebar.hashCode ^
@@ -160,6 +174,8 @@ class UiTheme {
           presetName == other.presetName &&
           fontFamily == other.fontFamily &&
           fontSize == other.fontSize &&
+          normalFontWeight == other.normalFontWeight &&
+          boldFontWeight == other.boldFontWeight &&
           background == other.background &&
           panel == other.panel &&
           sidebar == other.sidebar &&

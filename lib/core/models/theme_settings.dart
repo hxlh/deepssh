@@ -26,6 +26,8 @@ class UiThemeSettings {
     required this.presetName,
     required this.fontFamily,
     required this.fontSize,
+    required this.normalFontWeight,
+    required this.boldFontWeight,
     required this.background,
     required this.panel,
     required this.sidebar,
@@ -37,6 +39,8 @@ class UiThemeSettings {
   final String presetName;
   final String fontFamily;
   final int fontSize;
+  final int normalFontWeight;
+  final int boldFontWeight;
   final Color background;
   final Color panel;
   final Color sidebar;
@@ -48,6 +52,8 @@ class UiThemeSettings {
     String? presetName,
     String? fontFamily,
     int? fontSize,
+    int? normalFontWeight,
+    int? boldFontWeight,
     Color? background,
     Color? panel,
     Color? sidebar,
@@ -58,6 +64,8 @@ class UiThemeSettings {
     presetName: presetName ?? this.presetName,
     fontFamily: fontFamily ?? this.fontFamily,
     fontSize: fontSize ?? this.fontSize,
+    normalFontWeight: normalFontWeight ?? this.normalFontWeight,
+    boldFontWeight: boldFontWeight ?? this.boldFontWeight,
     background: background ?? this.background,
     panel: panel ?? this.panel,
     sidebar: sidebar ?? this.sidebar,
@@ -70,6 +78,8 @@ class UiThemeSettings {
     presetName: 'Command Deck',
     fontFamily: 'Inter',
     fontSize: 14,
+    normalFontWeight: 500,
+    boldFontWeight: 700,
     background: Color(0xFF1E1E1E),
     panel: Color(0xFF252526),
     sidebar: Color(0xFF181818),
@@ -82,6 +92,8 @@ class UiThemeSettings {
     presetName: 'VS Code Dark',
     fontFamily: 'Segoe UI',
     fontSize: 14,
+    normalFontWeight: 500,
+    boldFontWeight: 700,
     background: Color(0xFF1E1E1E),
     panel: Color(0xFF252526),
     sidebar: Color(0xFF181818),
@@ -96,6 +108,8 @@ class TerminalThemeSettings {
     required this.presetName,
     required this.fontFamily,
     required this.fontSize,
+    required this.normalFontWeight,
+    required this.boldFontWeight,
     required this.cursorStyle,
     required this.cursorBlink,
     required this.foreground,
@@ -109,6 +123,8 @@ class TerminalThemeSettings {
   final String presetName;
   final String fontFamily;
   final int fontSize;
+  final int normalFontWeight;
+  final int boldFontWeight;
   final CursorStyle cursorStyle;
   final bool cursorBlink;
   final Color foreground;
@@ -122,6 +138,8 @@ class TerminalThemeSettings {
     String? presetName,
     String? fontFamily,
     int? fontSize,
+    int? normalFontWeight,
+    int? boldFontWeight,
     CursorStyle? cursorStyle,
     bool? cursorBlink,
     Color? foreground,
@@ -134,6 +152,8 @@ class TerminalThemeSettings {
     presetName: presetName ?? this.presetName,
     fontFamily: fontFamily ?? this.fontFamily,
     fontSize: fontSize ?? this.fontSize,
+    normalFontWeight: normalFontWeight ?? this.normalFontWeight,
+    boldFontWeight: boldFontWeight ?? this.boldFontWeight,
     cursorStyle: cursorStyle ?? this.cursorStyle,
     cursorBlink: cursorBlink ?? this.cursorBlink,
     foreground: foreground ?? this.foreground,
@@ -148,6 +168,8 @@ class TerminalThemeSettings {
     presetName: 'Command Deck',
     fontFamily: 'JetBrains Mono',
     fontSize: 14,
+    normalFontWeight: 400,
+    boldFontWeight: 700,
     cursorStyle: CursorStyle.bar,
     cursorBlink: true,
     foreground: Color(0xFFE6E6E6),
@@ -198,6 +220,8 @@ class TerminalThemeSettings {
     presetName: 'One Dark',
     fontFamily: 'JetBrains Mono',
     fontSize: 14,
+    normalFontWeight: 400,
+    boldFontWeight: 700,
     cursorStyle: CursorStyle.block,
     cursorBlink: true,
     foreground: Color(0xFFABB2BF),
@@ -212,6 +236,8 @@ class TerminalThemeSettings {
     presetName: 'Solarized',
     fontFamily: 'JetBrains Mono',
     fontSize: 14,
+    normalFontWeight: 400,
+    boldFontWeight: 700,
     cursorStyle: CursorStyle.block,
     cursorBlink: false,
     foreground: Color(0xFF839496),

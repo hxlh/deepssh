@@ -20,6 +20,16 @@ final TerminalThemeSettings _defaultTerminalTheme =
     TerminalThemeSettings.commandDeck();
 
 void main() {
+  test('terminal style uses configured normal and bold font weights', () {
+    const style = xterm.TerminalStyle(
+      normalFontWeight: FontWeight.w300,
+      boldFontWeight: FontWeight.w800,
+    );
+
+    expect(style.toTextStyle().fontWeight, FontWeight.w300);
+    expect(style.toTextStyle(bold: true).fontWeight, FontWeight.w800);
+  });
+
   test('terminal parses colon-separated truecolor foreground SGR', () {
     final terminal = xterm.Terminal();
     terminal.write('\x1b[38:2::255:128:64mA');
@@ -86,6 +96,39 @@ void main() {
 
     session.dispose();
     controller.dispose();
+  });
+
+  testWidgets('passes terminal theme font weights to xterm view', (
+    tester,
+  ) async {
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: xterm.Terminal(maxLines: 3000),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            terminalThemeSettings: _defaultTerminalTheme.copyWith(
+              normalFontWeight: 300,
+              boldFontWeight: 800,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final view = terminalView(tester);
+
+    expect(view.textStyle.normalFontWeight, FontWeight.w300);
+    expect(view.textStyle.boldFontWeight, FontWeight.w800);
   });
 
   testWidgets('seeds full multi-line find query from terminal selection', (

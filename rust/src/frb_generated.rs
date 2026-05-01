@@ -1129,6 +1129,8 @@ impl SseDecode for crate::theme::TerminalTheme {
         let mut var_presetName = <String>::sse_decode(deserializer);
         let mut var_fontFamily = <String>::sse_decode(deserializer);
         let mut var_fontSize = <u32>::sse_decode(deserializer);
+        let mut var_normalFontWeight = <u32>::sse_decode(deserializer);
+        let mut var_boldFontWeight = <u32>::sse_decode(deserializer);
         let mut var_cursorStyle = <String>::sse_decode(deserializer);
         let mut var_cursorBlink = <bool>::sse_decode(deserializer);
         let mut var_foreground = <String>::sse_decode(deserializer);
@@ -1141,6 +1143,8 @@ impl SseDecode for crate::theme::TerminalTheme {
             preset_name: var_presetName,
             font_family: var_fontFamily,
             font_size: var_fontSize,
+            normal_font_weight: var_normalFontWeight,
+            bold_font_weight: var_boldFontWeight,
             cursor_style: var_cursorStyle,
             cursor_blink: var_cursorBlink,
             foreground: var_foreground,
@@ -1243,6 +1247,8 @@ impl SseDecode for crate::theme::UiTheme {
         let mut var_presetName = <String>::sse_decode(deserializer);
         let mut var_fontFamily = <String>::sse_decode(deserializer);
         let mut var_fontSize = <u32>::sse_decode(deserializer);
+        let mut var_normalFontWeight = <u32>::sse_decode(deserializer);
+        let mut var_boldFontWeight = <u32>::sse_decode(deserializer);
         let mut var_background = <String>::sse_decode(deserializer);
         let mut var_panel = <String>::sse_decode(deserializer);
         let mut var_sidebar = <String>::sse_decode(deserializer);
@@ -1253,6 +1259,8 @@ impl SseDecode for crate::theme::UiTheme {
             preset_name: var_presetName,
             font_family: var_fontFamily,
             font_size: var_fontSize,
+            normal_font_weight: var_normalFontWeight,
+            bold_font_weight: var_boldFontWeight,
             background: var_background,
             panel: var_panel,
             sidebar: var_sidebar,
@@ -1437,6 +1445,8 @@ impl flutter_rust_bridge::IntoDart for crate::theme::TerminalTheme {
             self.preset_name.into_into_dart().into_dart(),
             self.font_family.into_into_dart().into_dart(),
             self.font_size.into_into_dart().into_dart(),
+            self.normal_font_weight.into_into_dart().into_dart(),
+            self.bold_font_weight.into_into_dart().into_dart(),
             self.cursor_style.into_into_dart().into_dart(),
             self.cursor_blink.into_into_dart().into_dart(),
             self.foreground.into_into_dart().into_dart(),
@@ -1550,6 +1560,8 @@ impl flutter_rust_bridge::IntoDart for crate::theme::UiTheme {
             self.preset_name.into_into_dart().into_dart(),
             self.font_family.into_into_dart().into_dart(),
             self.font_size.into_into_dart().into_dart(),
+            self.normal_font_weight.into_into_dart().into_dart(),
+            self.bold_font_weight.into_into_dart().into_dart(),
             self.background.into_into_dart().into_dart(),
             self.panel.into_into_dart().into_dart(),
             self.sidebar.into_into_dart().into_dart(),
@@ -1701,6 +1713,8 @@ impl SseEncode for crate::theme::TerminalTheme {
         <String>::sse_encode(self.preset_name, serializer);
         <String>::sse_encode(self.font_family, serializer);
         <u32>::sse_encode(self.font_size, serializer);
+        <u32>::sse_encode(self.normal_font_weight, serializer);
+        <u32>::sse_encode(self.bold_font_weight, serializer);
         <String>::sse_encode(self.cursor_style, serializer);
         <bool>::sse_encode(self.cursor_blink, serializer);
         <String>::sse_encode(self.foreground, serializer);
@@ -1795,6 +1809,8 @@ impl SseEncode for crate::theme::UiTheme {
         <String>::sse_encode(self.preset_name, serializer);
         <String>::sse_encode(self.font_family, serializer);
         <u32>::sse_encode(self.font_size, serializer);
+        <u32>::sse_encode(self.normal_font_weight, serializer);
+        <u32>::sse_encode(self.bold_font_weight, serializer);
         <String>::sse_encode(self.background, serializer);
         <String>::sse_encode(self.panel, serializer);
         <String>::sse_encode(self.sidebar, serializer);

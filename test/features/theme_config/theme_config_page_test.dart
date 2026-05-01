@@ -1,4 +1,6 @@
 import 'package:deepssh/core/models/theme_settings.dart';
+import 'package:deepssh/core/theme/app_colors.dart';
+import 'package:deepssh/core/theme/app_theme.dart';
 import 'package:deepssh/features/theme_config/theme_config_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,6 +37,102 @@ void main() {
 
     expect(highlight.copyWith(pattern: 'WARN').note, '错误日志');
     expect(highlight.copyWith(note: '警告日志').note, '警告日志');
+  });
+
+  test('theme presets include normal and bold font weights', () {
+    final ui = UiThemeSettings.commandDeck();
+    final terminal = TerminalThemeSettings.commandDeck();
+
+    expect(ui.normalFontWeight, 500);
+    expect(ui.boldFontWeight, 700);
+    expect(terminal.normalFontWeight, 400);
+    expect(terminal.boldFontWeight, 700);
+  });
+
+  test('theme copyWith preserves and updates font weights', () {
+    final ui = UiThemeSettings.commandDeck().copyWith(normalFontWeight: 300);
+    final terminal = TerminalThemeSettings.commandDeck().copyWith(
+      boldFontWeight: 800,
+    );
+
+    expect(ui.normalFontWeight, 300);
+    expect(ui.boldFontWeight, 700);
+    expect(terminal.normalFontWeight, 400);
+    expect(terminal.boldFontWeight, 800);
+  });
+
+  test('app theme applies configured normal and bold UI font weights', () {
+    AppColors.applyUi(
+      UiThemeSettings.commandDeck().copyWith(
+        normalFontWeight: 300,
+        boldFontWeight: 800,
+      ),
+    );
+
+    final theme = AppTheme.dark();
+
+    expect(theme.textTheme.bodyMedium?.fontWeight, FontWeight.w300);
+    expect(theme.textTheme.titleLarge?.fontWeight, FontWeight.w800);
+  });
+
+  testWidgets('updates UI normal and bold font weights', (tester) async {
+    UiThemeSettings? savedUi;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ThemeConfigPage(
+            uiSettings: UiThemeSettings.commandDeck(),
+            terminalSettings: TerminalThemeSettings.commandDeck(),
+            onUiSettingsChanged: (settings) => savedUi = settings,
+            onTerminalSettingsChanged: (_) {},
+            onBack: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.widgetWithText(TextFormField, '500'), '300');
+    await tester.pump();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '700').first,
+      '800',
+    );
+    await tester.pump();
+
+    expect(savedUi?.normalFontWeight, 300);
+    expect(savedUi?.boldFontWeight, 800);
+  });
+
+  testWidgets('updates terminal normal and bold font weights', (tester) async {
+    TerminalThemeSettings? savedTerminal;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ThemeConfigPage(
+            uiSettings: UiThemeSettings.commandDeck(),
+            terminalSettings: TerminalThemeSettings.commandDeck(),
+            onUiSettingsChanged: (_) {},
+            onTerminalSettingsChanged: (settings) => savedTerminal = settings,
+            onBack: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('普通文本与 ANSI bold 分开控制'));
+    await tester.pump();
+    await tester.enterText(find.widgetWithText(TextFormField, '400'), '300');
+    await tester.pump();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '700').last,
+      '800',
+    );
+    await tester.pump();
+
+    expect(savedTerminal?.normalFontWeight, 300);
+    expect(savedTerminal?.boldFontWeight, 800);
   });
 
   testWidgets('text input changes are emitted as the user types', (
