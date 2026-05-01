@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:xterm/src/core/buffer/cell_offset.dart';
+import 'package:xterm/src/core/buffer/line.dart';
 import 'package:xterm/src/core/buffer/range.dart';
 import 'package:xterm/src/core/buffer/segment.dart';
 import 'package:xterm/src/core/cell.dart';
@@ -17,8 +18,15 @@ import 'package:xterm/src/ui/selection_mode.dart';
 import 'package:xterm/src/ui/terminal_size.dart';
 import 'package:xterm/src/ui/terminal_text_style.dart';
 import 'package:xterm/src/ui/terminal_theme.dart';
+import 'package:xterm/src/utils/circular_buffer.dart';
 
 typedef EditableRectCallback = void Function(Rect rect, Rect caretRect);
+
+typedef ForegroundColorResolver = Color? Function(
+  int row,
+  int column,
+  String lineText,
+);
 
 List<Color?> createForegroundHighlightMap(
   List<TerminalHighlight> highlights, {
@@ -63,6 +71,29 @@ List<Color?> createForegroundHighlightMap(
   return foregroundColors;
 }
 
+void applyForegroundColorResolver(
+  List<Color?> foregroundColors, {
+  required ForegroundColorResolver resolver,
+  required IndexAwareCircularBuffer<BufferLine> lines,
+  required int firstLine,
+  required int lastLine,
+  required int viewWidth,
+}) {
+  for (var row = firstLine; row <= lastLine; row++) {
+    final line = lines[row];
+    final lineText = line.getText();
+    if (lineText.isEmpty) continue;
+    final rowOffset = (row - firstLine) * viewWidth;
+    final end = min(line.length, viewWidth);
+    for (var column = 0; column < end; column++) {
+      final color = resolver(row, column, lineText);
+      if (color != null) {
+        foregroundColors[rowOffset + column] = color;
+      }
+    }
+  }
+}
+
 class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   RenderTerminal({
     required Terminal terminal,
@@ -79,6 +110,7 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     required bool cursorBlinkVisible,
     EditableRectCallback? onEditableRect,
     String? composingText,
+    ForegroundColorResolver? foregroundColorResolver,
   })  : _terminal = terminal,
         _controller = controller,
         _offset = offset,
@@ -90,6 +122,7 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         _cursorBlinkVisible = cursorBlinkVisible,
         _onEditableRect = onEditableRect,
         _composingText = composingText,
+        _foregroundColorResolver = foregroundColorResolver,
         _painter = TerminalPainter(
           theme: theme,
           textStyle: textStyle,
@@ -197,6 +230,13 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   set composingText(String? value) {
     if (value == _composingText) return;
     _composingText = value;
+    markNeedsPaint();
+  }
+
+  ForegroundColorResolver? _foregroundColorResolver;
+  set foregroundColorResolver(ForegroundColorResolver? value) {
+    if (value == _foregroundColorResolver) return;
+    _foregroundColorResolver = value;
     markNeedsPaint();
   }
 
@@ -489,6 +529,17 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       lastLine: effectLastLine,
       viewWidth: _terminal.viewWidth,
     );
+    final foregroundColorResolver = _foregroundColorResolver;
+    if (foregroundColorResolver != null) {
+      applyForegroundColorResolver(
+        foregroundColors,
+        resolver: foregroundColorResolver,
+        lines: lines,
+        firstLine: effectFirstLine,
+        lastLine: effectLastLine,
+        viewWidth: _terminal.viewWidth,
+      );
+    }
 
     for (var i = effectFirstLine; i <= effectLastLine; i++) {
       _painter.paintLine(

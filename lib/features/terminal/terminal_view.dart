@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -64,8 +63,6 @@ class _TerminalViewState extends State<TerminalView> {
   final terminalController = xterm.TerminalController();
   late final xterm.Terminal terminal;
   late List<_CompiledRegexHighlight> _compiledRegexHighlights;
-  late int _lastRegexColorLineCount;
-  late int _lastRegexColorCursorRow;
   Timer? _resizeDebounce;
   Timer? _cursorIdleTimer;
   Timer? _cursorBlinkTimer;
@@ -83,8 +80,6 @@ class _TerminalViewState extends State<TerminalView> {
         widget.tab.terminal ??
         xterm.Terminal(maxLines: widget.terminalThemeSettings.scrollbackLines);
     _compiledRegexHighlights = _compileRegexHighlightRules();
-    _lastRegexColorLineCount = terminal.buffer.lines.length;
-    _lastRegexColorCursorRow = terminal.buffer.absoluteCursorY;
     _applyCursorBlinkMode();
     terminal.addListener(_handleTerminalChanged);
     if (!_isMacOS) {
@@ -167,7 +162,6 @@ class _TerminalViewState extends State<TerminalView> {
 
   void _handleTerminalChanged() {
     _resetCursorBlinkIdle();
-    _applyRegexColorsToChangedRows();
   }
 
   List<_CompiledRegexHighlight> _compileRegexHighlightRules() {
@@ -178,7 +172,7 @@ class _TerminalViewState extends State<TerminalView> {
         rules.add(
           _CompiledRegexHighlight(
             regex: RegExp(rule.pattern),
-            foreground: _terminalRgbColor(rule.color),
+            foreground: rule.color,
           ),
         );
       } on FormatException {
@@ -188,54 +182,16 @@ class _TerminalViewState extends State<TerminalView> {
     return rules;
   }
 
-  int _terminalRgbColor(Color color) {
-    return xterm.CellColor.rgb | (color.toARGB32() & xterm.CellColor.valueMask);
-  }
-
-  void _applyRegexColorsToChangedRows() {
-    final lines = terminal.buffer.lines;
-    if (lines.length == 0) return;
-
-    final lastRow = lines.length - 1;
-    final currentRow = terminal.buffer.absoluteCursorY.clamp(0, lastRow);
-    final previousRow = _lastRegexColorCursorRow.clamp(0, lastRow);
-    final previousLineCount = _lastRegexColorLineCount.clamp(0, lines.length);
-
-    var startRow = math.min(previousRow, currentRow);
-    var endRow = math.max(previousRow, currentRow);
-
-    if (lines.length > previousLineCount) {
-      startRow = math.min(startRow, math.max(0, previousLineCount - 1));
-      endRow = lastRow;
-    } else if (lines.length == lines.maxLength && currentRow == previousRow) {
-      startRow = 0;
-      endRow = lastRow;
-    }
-
-    if (_compiledRegexHighlights.isNotEmpty) {
-      for (var row = startRow; row <= endRow; row++) {
-        _applyRegexColorsToRow(row);
-      }
-    }
-
-    _lastRegexColorLineCount = lines.length;
-    _lastRegexColorCursorRow = currentRow;
-  }
-
-  void _applyRegexColorsToRow(int row) {
-    final line = terminal.buffer.lines[row];
-    final lineText = line.getText();
-    if (lineText.isEmpty) return;
-
-    for (final rule in _compiledRegexHighlights.reversed) {
+  Color? _regexForegroundForCell(int row, int column, String lineText) {
+    for (final rule in _compiledRegexHighlights) {
       for (final match in rule.regex.allMatches(lineText)) {
         if (match.start == match.end) continue;
-        final end = math.min(match.end, line.length);
-        for (var column = match.start; column < end; column++) {
-          line.setForeground(column, rule.foreground);
+        if (column >= match.start && column < match.end) {
+          return rule.foreground;
         }
       }
     }
+    return null;
   }
 
   void _applyCursorBlinkMode() {
@@ -642,6 +598,9 @@ class _TerminalViewState extends State<TerminalView> {
                 cursorType: _xtermCursorType(settings.cursorStyle),
                 alwaysShowCursor: false,
                 cursorBlinkVisible: _cursorVisible,
+                foregroundColorResolver: _compiledRegexHighlights.isEmpty
+                    ? null
+                    : _regexForegroundForCell,
                 textStyle: xterm.TerminalStyle(
                   fontSize: settings.fontSize.toDouble(),
                   fontFamily: settings.fontFamily,
@@ -755,7 +714,7 @@ class _CompiledRegexHighlight {
   });
 
   final RegExp regex;
-  final int foreground;
+  final Color foreground;
 }
 
 class _TerminalContextMenuItem extends StatefulWidget {

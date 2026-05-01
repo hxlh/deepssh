@@ -44,6 +44,7 @@ class TerminalView extends StatefulWidget {
     this.cursorType = TerminalCursorType.block,
     this.alwaysShowCursor = false,
     this.cursorBlinkVisible = true,
+    this.foregroundColorResolver,
     this.deleteDetection = false,
     this.shortcuts,
     this.onKeyEvent,
@@ -118,6 +119,9 @@ class TerminalView extends StatefulWidget {
 
   /// Whether the cursor should be drawn by local presentation state.
   final bool cursorBlinkVisible;
+
+  /// Resolves temporary foreground overrides for cells during painting.
+  final ForegroundColorResolver? foregroundColorResolver;
 
   /// Workaround to detect delete key for platforms and IMEs that does not
   /// emit hardware delete event. Prefered on mobile platforms. [false] by
@@ -240,6 +244,7 @@ class TerminalViewState extends State<TerminalView> {
           cursorType: widget.cursorType,
           alwaysShowCursor: widget.alwaysShowCursor,
           cursorBlinkVisible: widget.cursorBlinkVisible,
+          foregroundColorResolver: widget.foregroundColorResolver,
           onEditableRect: _onEditableRect,
           composingText: _composingText,
         );
@@ -471,6 +476,7 @@ class _TerminalView extends LeafRenderObjectWidget {
     required this.cursorType,
     required this.alwaysShowCursor,
     required this.cursorBlinkVisible,
+    this.foregroundColorResolver,
     this.onEditableRect,
     this.composingText,
   });
@@ -499,6 +505,8 @@ class _TerminalView extends LeafRenderObjectWidget {
 
   final bool cursorBlinkVisible;
 
+  final ForegroundColorResolver? foregroundColorResolver;
+
   final EditableRectCallback? onEditableRect;
 
   final String? composingText;
@@ -518,6 +526,7 @@ class _TerminalView extends LeafRenderObjectWidget {
       cursorType: cursorType,
       alwaysShowCursor: alwaysShowCursor,
       cursorBlinkVisible: cursorBlinkVisible,
+      foregroundColorResolver: foregroundColorResolver,
       onEditableRect: onEditableRect,
       composingText: composingText,
     );
@@ -538,6 +547,7 @@ class _TerminalView extends LeafRenderObjectWidget {
       ..cursorType = cursorType
       ..alwaysShowCursor = alwaysShowCursor
       ..cursorBlinkVisible = cursorBlinkVisible
+      ..foregroundColorResolver = foregroundColorResolver
       ..onEditableRect = onEditableRect
       ..composingText = composingText;
   }
