@@ -1264,7 +1264,7 @@ void main() {
     expect(terminalView(tester).cursorBlinkVisible, isTrue);
   });
 
-  testWidgets('highlights terminal output that matches regex rules', (
+  testWidgets('writes regex highlight colors into terminal cells', (
     tester,
   ) async {
     final terminal = xterm.Terminal(maxLines: 3000);
@@ -1295,22 +1295,69 @@ void main() {
     );
 
     terminal.write('2026-04-26 ERROR request failed\r\n');
-    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pump();
 
-    final controller = terminalView(tester).controller;
-    expect(controller, isNotNull);
-    expect(controller!.highlights, hasLength(1));
-    final range = controller.highlights.single.range!;
-    expect(range.begin.x, 11);
-    expect(range.end.x, 16);
+    final line = terminal.buffer.lines[0];
     expect(
-      controller.highlights.single.foregroundColor,
-      const Color(0xFFF14C4C),
+      line.getForeground(10),
+      isNot(terminalRgbColor(const Color(0xFFF14C4C))),
     );
-    expect(controller.highlights.single.backgroundColor, isNull);
+    expect(line.getForeground(11), terminalRgbColor(const Color(0xFFF14C4C)));
+    expect(line.getForeground(15), terminalRgbColor(const Color(0xFFF14C4C)));
+    expect(
+      line.getForeground(16),
+      isNot(terminalRgbColor(const Color(0xFFF14C4C))),
+    );
+    expect(terminalView(tester).controller!.highlights, isEmpty);
   });
 
-  testWidgets('gives earlier regex highlight rules higher paint priority', (
+  testWidgets(
+    'gives earlier regex highlight rules higher cell color priority',
+    (tester) async {
+      final terminal = xterm.Terminal(maxLines: 3000);
+      final tab = OpenTerminalTab.ssh(
+        id: 'ssh-tab-1',
+        hostName: 'host1',
+        title: 'terminal1',
+        sessionId: 'session-1',
+        terminal: terminal,
+      );
+      final theme = _defaultTerminalTheme.copyWith(
+        regexHighlights: const [
+          RegexHighlight(pattern: 'ERROR', color: Color(0xFFF14C4C)),
+          RegexHighlight(pattern: 'ERROR request', color: Color(0xFFF5F543)),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TerminalView(
+              tab: tab,
+              sshBridge: RecordingSshBridgeClient(),
+              localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+              terminalThemeSettings: theme,
+            ),
+          ),
+        ),
+      );
+
+      terminal.write('ERROR request failed\r\n');
+      await tester.pump();
+
+      final line = terminal.buffer.lines[0];
+      expect(line.getForeground(0), terminalRgbColor(const Color(0xFFF14C4C)));
+      expect(line.getForeground(4), terminalRgbColor(const Color(0xFFF14C4C)));
+      expect(line.getForeground(5), terminalRgbColor(const Color(0xFFF5F543)));
+      expect(line.getForeground(12), terminalRgbColor(const Color(0xFFF5F543)));
+      expect(
+        line.getForeground(13),
+        isNot(terminalRgbColor(const Color(0xFFF5F543))),
+      );
+    },
+  );
+
+  testWidgets('regex setting changes only affect future terminal output', (
     tester,
   ) async {
     final terminal = xterm.Terminal(maxLines: 3000);
@@ -1321,10 +1368,14 @@ void main() {
       sessionId: 'session-1',
       terminal: terminal,
     );
-    final theme = _defaultTerminalTheme.copyWith(
+    final redTheme = _defaultTerminalTheme.copyWith(
       regexHighlights: const [
         RegexHighlight(pattern: 'ERROR', color: Color(0xFFF14C4C)),
-        RegexHighlight(pattern: 'ERROR request', color: Color(0xFFF5F543)),
+      ],
+    );
+    final yellowTheme = _defaultTerminalTheme.copyWith(
+      regexHighlights: const [
+        RegexHighlight(pattern: 'ERROR', color: Color(0xFFF5F543)),
       ],
     );
 
@@ -1335,26 +1386,39 @@ void main() {
             tab: tab,
             sshBridge: RecordingSshBridgeClient(),
             localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
-            terminalThemeSettings: theme,
+            terminalThemeSettings: redTheme,
           ),
         ),
       ),
     );
 
-    terminal.write('ERROR request failed\r\n');
-    await tester.pump(const Duration(milliseconds: 120));
+    terminal.write('ERROR old\r\n');
+    await tester.pump();
 
-    final controller = terminalView(tester).controller!;
-    expect(controller.highlights, hasLength(2));
-    expect(controller.highlights.first.range!.begin.x, 0);
-    expect(controller.highlights.first.range!.end.x, 13);
-    expect(
-      controller.highlights.first.foregroundColor,
-      const Color(0xFFF5F543),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            terminalThemeSettings: yellowTheme,
+          ),
+        ),
+      ),
     );
-    expect(controller.highlights.last.range!.begin.x, 0);
-    expect(controller.highlights.last.range!.end.x, 5);
-    expect(controller.highlights.last.foregroundColor, const Color(0xFFF14C4C));
+
+    terminal.write('ERROR new\r\n');
+    await tester.pump();
+
+    expect(
+      terminal.buffer.lines[0].getForeground(0),
+      terminalRgbColor(const Color(0xFFF14C4C)),
+    );
+    expect(
+      terminal.buffer.lines[1].getForeground(0),
+      terminalRgbColor(const Color(0xFFF5F543)),
+    );
   });
 
   test('foreground highlights are resolved before text painting', () {
@@ -1417,13 +1481,13 @@ void main() {
     terminal.write('WARN slow request\r\n');
     await tester.pump(const Duration(milliseconds: 120));
 
-    final controller = terminalView(tester).controller!;
-    expect(controller.highlights, hasLength(1));
-    expect(controller.highlights.single.range!.begin.x, 0);
-    expect(controller.highlights.single.range!.end.x, 4);
+    final line = terminal.buffer.lines[0];
+    expect(line.getForeground(0), terminalRgbColor(const Color(0xFFF5F543)));
+    expect(line.getForeground(3), terminalRgbColor(const Color(0xFFF5F543)));
+    expect(terminalView(tester).controller!.highlights, isEmpty);
   });
 
-  testWidgets('debounces regex highlighting during rapid terminal output', (
+  testWidgets('colors regex matches as terminal output arrives', (
     tester,
   ) async {
     final terminal = xterm.Terminal(maxLines: 3000);
@@ -1458,14 +1522,60 @@ void main() {
     terminal.write('path/c.dart ERROR\r\n');
     await tester.pump();
 
-    final controller = terminalView(tester).controller!;
-    expect(controller.highlights, isEmpty);
+    final line = terminal.buffer.lines[2];
+    expect(line.getForeground(12), terminalRgbColor(const Color(0xFFF14C4C)));
+    expect(line.getForeground(16), terminalRgbColor(const Color(0xFFF14C4C)));
+    expect(terminalView(tester).controller!.highlights, isEmpty);
+  });
 
-    await tester.pump(const Duration(milliseconds: 120));
+  testWidgets('colors regex matches after scrollback trims old lines', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 40);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final theme = _defaultTerminalTheme.copyWith(
+      regexHighlights: const [
+        RegexHighlight(pattern: 'ERROR', color: Color(0xFFF14C4C)),
+      ],
+    );
 
-    expect(controller.highlights, hasLength(1));
-    expect(controller.highlights.single.range!.begin.x, 12);
-    expect(controller.highlights.single.range!.end.x, 17);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            terminalThemeSettings: theme,
+          ),
+        ),
+      ),
+    );
+
+    for (var i = 0; i < 40; i++) {
+      terminal.write('old/$i\r\n');
+    }
+    await tester.pump();
+
+    terminal.write('new/a ERROR\r\nnew/b ERROR\r\n');
+    await tester.pump();
+
+    final firstNewLine = terminal.buffer.lines.length - 3;
+    final secondNewLine = terminal.buffer.lines.length - 2;
+    expect(
+      terminal.buffer.lines[firstNewLine].getForeground(6),
+      terminalRgbColor(const Color(0xFFF14C4C)),
+    );
+    expect(
+      terminal.buffer.lines[secondNewLine].getForeground(6),
+      terminalRgbColor(const Color(0xFFF14C4C)),
+    );
   });
 
   testWidgets('coalesces rapid SSH terminal viewport resize events', (
@@ -1498,6 +1608,10 @@ void main() {
     expect(bridge.resizeCalls.single.cols, 82);
     expect(bridge.resizeCalls.single.rows, 24);
   });
+}
+
+int terminalRgbColor(Color color) {
+  return xterm.CellColor.rgb | (color.toARGB32() & xterm.CellColor.valueMask);
 }
 
 xterm.TerminalView terminalView(WidgetTester tester) {
