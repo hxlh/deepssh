@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -61,10 +62,11 @@ class _TerminalViewState extends State<TerminalView> {
   final inputFocusNode = FocusNode();
   TextEditingController? _textController;
   final terminalController = xterm.TerminalController();
-  final regexHighlights = <xterm.TerminalHighlight>[];
   late final xterm.Terminal terminal;
+  late List<_CompiledRegexHighlight> _compiledRegexHighlights;
+  late int _lastRegexColorLineCount;
+  late int _lastRegexColorCursorRow;
   Timer? _resizeDebounce;
-  Timer? _regexHighlightDebounce;
   Timer? _cursorIdleTimer;
   Timer? _cursorBlinkTimer;
   bool _cursorVisible = true;
@@ -80,13 +82,15 @@ class _TerminalViewState extends State<TerminalView> {
     terminal =
         widget.tab.terminal ??
         xterm.Terminal(maxLines: widget.terminalThemeSettings.scrollbackLines);
+    _compiledRegexHighlights = _compileRegexHighlightRules();
+    _lastRegexColorLineCount = terminal.buffer.lines.length;
+    _lastRegexColorCursorRow = terminal.buffer.absoluteCursorY;
     _applyCursorBlinkMode();
     terminal.addListener(_handleTerminalChanged);
     if (!_isMacOS) {
       _textController = TextEditingController();
       _textController!.addListener(_handleTextEditingChanged);
     }
-    _refreshRegexHighlights();
 
     if (widget.tab.sourceType == TerminalSourceType.ssh) {
       if (widget.tab.terminal == null && widget.tab.history.isNotEmpty) {
@@ -163,51 +167,74 @@ class _TerminalViewState extends State<TerminalView> {
 
   void _handleTerminalChanged() {
     _resetCursorBlinkIdle();
-    _scheduleRegexHighlightsRefresh();
+    _applyRegexColorsToChangedRows();
   }
 
-  void _scheduleRegexHighlightsRefresh() {
-    _regexHighlightDebounce?.cancel();
-    _regexHighlightDebounce = Timer(const Duration(milliseconds: 80), () {
-      if (mounted) {
-        _refreshRegexHighlights();
-      }
-    });
-  }
-
-  void _refreshRegexHighlights() {
-    for (final highlight in regexHighlights) {
-      highlight.dispose();
-    }
-    regexHighlights.clear();
-
-    for (final rule in widget.terminalThemeSettings.regexHighlights.reversed) {
+  List<_CompiledRegexHighlight> _compileRegexHighlightRules() {
+    final rules = <_CompiledRegexHighlight>[];
+    for (final rule in widget.terminalThemeSettings.regexHighlights) {
       if (rule.pattern.isEmpty) continue;
-      final regex = _compileRegex(rule.pattern);
-      if (regex == null) continue;
+      try {
+        rules.add(
+          _CompiledRegexHighlight(
+            regex: RegExp(rule.pattern),
+            foreground: _terminalRgbColor(rule.color),
+          ),
+        );
+      } on FormatException {
+        continue;
+      }
+    }
+    return rules;
+  }
 
-      final lines = terminal.buffer.lines;
-      for (var row = 0; row < lines.length; row++) {
-        final lineText = lines[row].getText();
-        for (final match in regex.allMatches(lineText)) {
-          if (match.start == match.end) continue;
-          regexHighlights.add(
-            terminalController.highlight(
-              p1: terminal.buffer.createAnchor(match.start, row),
-              p2: terminal.buffer.createAnchor(match.end, row),
-              foregroundColor: rule.color,
-            ),
-          );
+  int _terminalRgbColor(Color color) {
+    return xterm.CellColor.rgb | (color.toARGB32() & xterm.CellColor.valueMask);
+  }
+
+  void _applyRegexColorsToChangedRows() {
+    final lines = terminal.buffer.lines;
+    if (lines.length == 0) return;
+
+    final lastRow = lines.length - 1;
+    final currentRow = terminal.buffer.absoluteCursorY.clamp(0, lastRow);
+    final previousRow = _lastRegexColorCursorRow.clamp(0, lastRow);
+    final previousLineCount = _lastRegexColorLineCount.clamp(0, lines.length);
+
+    var startRow = math.min(previousRow, currentRow);
+    var endRow = math.max(previousRow, currentRow);
+
+    if (lines.length > previousLineCount) {
+      startRow = math.min(startRow, math.max(0, previousLineCount - 1));
+      endRow = lastRow;
+    } else if (lines.length == lines.maxLength && currentRow == previousRow) {
+      startRow = 0;
+      endRow = lastRow;
+    }
+
+    if (_compiledRegexHighlights.isNotEmpty) {
+      for (var row = startRow; row <= endRow; row++) {
+        _applyRegexColorsToRow(row);
+      }
+    }
+
+    _lastRegexColorLineCount = lines.length;
+    _lastRegexColorCursorRow = currentRow;
+  }
+
+  void _applyRegexColorsToRow(int row) {
+    final line = terminal.buffer.lines[row];
+    final lineText = line.getText();
+    if (lineText.isEmpty) return;
+
+    for (final rule in _compiledRegexHighlights.reversed) {
+      for (final match in rule.regex.allMatches(lineText)) {
+        if (match.start == match.end) continue;
+        final end = math.min(match.end, line.length);
+        for (var column = match.start; column < end; column++) {
+          line.setForeground(column, rule.foreground);
         }
       }
-    }
-  }
-
-  RegExp? _compileRegex(String pattern) {
-    try {
-      return RegExp(pattern);
-    } on FormatException {
-      return null;
     }
   }
 
@@ -522,8 +549,7 @@ class _TerminalViewState extends State<TerminalView> {
     }
     if (oldWidget.terminalThemeSettings.regexHighlights !=
         widget.terminalThemeSettings.regexHighlights) {
-      _regexHighlightDebounce?.cancel();
-      _refreshRegexHighlights();
+      _compiledRegexHighlights = _compileRegexHighlightRules();
     }
     if (oldSessionId != sessionId && sessionId != null) {
       if (widget.tab.sourceType == TerminalSourceType.ssh) {
@@ -558,13 +584,8 @@ class _TerminalViewState extends State<TerminalView> {
   @override
   void dispose() {
     _resizeDebounce?.cancel();
-    _regexHighlightDebounce?.cancel();
     _cursorIdleTimer?.cancel();
     _cursorBlinkTimer?.cancel();
-    for (final highlight in regexHighlights) {
-      highlight.dispose();
-    }
-    regexHighlights.clear();
     _findSession?.dispose();
     _findScrollController.dispose();
     terminalController.dispose();
@@ -725,6 +746,16 @@ class _TerminalViewState extends State<TerminalView> {
       ),
     );
   }
+}
+
+class _CompiledRegexHighlight {
+  const _CompiledRegexHighlight({
+    required this.regex,
+    required this.foreground,
+  });
+
+  final RegExp regex;
+  final int foreground;
 }
 
 class _TerminalContextMenuItem extends StatefulWidget {
