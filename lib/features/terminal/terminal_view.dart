@@ -13,6 +13,8 @@ import '../ssh/ssh_bridge.dart';
 import 'terminal_find.dart';
 import 'terminal_state.dart';
 
+typedef SshTerminalInputWriter = void Function(String sessionId, String data);
+
 class TerminalView extends StatefulWidget {
   const TerminalView({
     super.key,
@@ -21,6 +23,7 @@ class TerminalView extends StatefulWidget {
     required this.localTerminalBridge,
     required this.terminalThemeSettings,
     this.onSshInput,
+    this.onSshTerminalInput,
     this.onLocalInput,
     this.findVisible = false,
     this.findQuery = '',
@@ -40,6 +43,7 @@ class TerminalView extends StatefulWidget {
   final LocalTerminalBridgeClient localTerminalBridge;
   final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String>? onSshInput;
+  final SshTerminalInputWriter? onSshTerminalInput;
   final ValueChanged<String>? onLocalInput;
   final bool findVisible;
   final String findQuery;
@@ -118,7 +122,12 @@ class _TerminalViewState extends State<TerminalView> {
     terminal.onOutput = (data) {
       _resetCursorBlinkIdle();
       widget.onSshInput?.call(data);
-      widget.sshBridge.writeToSession(sessionId, utf8.encode(data));
+      final inputWriter = widget.onSshTerminalInput;
+      if (inputWriter != null) {
+        inputWriter(sessionId, data);
+      } else {
+        widget.sshBridge.writeToSession(sessionId, utf8.encode(data));
+      }
     };
   }
 

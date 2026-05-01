@@ -8,6 +8,7 @@ import '../../features/ssh/ssh_bridge.dart';
 import '../../features/ssh_profiles/ssh_profile_form_page.dart';
 import '../../features/ssh_profiles/ssh_profiles_page.dart';
 import '../../features/terminal/terminal_tab_shell.dart';
+import '../../features/terminal/terminal_view.dart';
 import '../../features/tunnels/tunnel_config_form_page.dart';
 import '../../features/tunnels/tunnel_configs_page.dart';
 import '../../features/terminal/terminal_state.dart';
@@ -57,6 +58,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
     required this.sshBridge,
     required this.localTerminalBridge,
     this.onSshInput,
+    this.onSshTerminalInput,
   });
 
   final WorkbenchContentMode mode;
@@ -91,6 +93,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
   final ValueChanged<TerminalThemeSettings> onTerminalThemeChanged;
   final VoidCallback onBackFromConfig;
   final ValueChanged<String>? onSshInput;
+  final SshTerminalInputWriter? onSshTerminalInput;
 
   @override
   Widget build(BuildContext context) {
@@ -138,6 +141,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
           localTerminalBridge: localTerminalBridge,
           terminalThemeSettings: terminalThemeSettings,
           onSshInput: onSshInput,
+          onSshTerminalInput: onSshTerminalInput,
         );
       case WorkbenchContentMode.themeConfig:
         return ThemeConfigPage(

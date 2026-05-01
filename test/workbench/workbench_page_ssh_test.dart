@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
+import 'package:deepssh/features/ssh/ssh_zmodem_session.dart';
 import 'package:deepssh/features/terminal/terminal_view.dart' as app_terminal;
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/gestures.dart';
@@ -144,6 +145,25 @@ class FakeSshBridgeClient implements SshBridgeClient {
       sessionId: 'ssh-session-dup',
       title: 'duplicated',
     );
+  }
+}
+
+class FakeSshZModemBinding implements SshZModemBinding {
+  FakeSshZModemBinding({required this.sessionId, required this.stdout});
+
+  final String sessionId;
+  final Stream<List<int>> stdout;
+  final inputs = <String>[];
+  var disposed = false;
+
+  @override
+  void writeTerminalInput(String data) {
+    inputs.add(data);
+  }
+
+  @override
+  Future<void> dispose() async {
+    disposed = true;
   }
 }
 
@@ -936,5 +956,116 @@ void main() {
     await tester.pump();
 
     expect(find.text('ls -'), findsOneWidget);
+  });
+
+  testWidgets('remote terminal input uses injected SSH input writer', (
+    tester,
+  ) async {
+    final writes = <({String sessionId, String data})>[];
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkbenchPage(
+          sshBridge: bridge,
+          debugSshInputWriter: (sessionId, data) {
+            writes.add((sessionId: sessionId, data: data));
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
+
+    final terminalWidget = tester.widget<app_terminal.TerminalView>(
+      find.byType(app_terminal.TerminalView),
+    );
+    terminalWidget.tab.terminal!.onOutput?.call('ls\r');
+
+    expect(writes, [(sessionId: 'session-1', data: 'ls\r')]);
+    expect(bridge.writeToSessionCount, 0);
+  });
+
+  testWidgets('workbench creates zmodem binding for connected SSH session', (
+    tester,
+  ) async {
+    final bindings = <FakeSshZModemBinding>[];
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
+    bridge.outputControllers['session-1'] = StreamController<List<int>>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkbenchPage(
+          sshBridge: bridge,
+          debugSshZModemFactory:
+              ({
+                required sessionId,
+                required stdout,
+                required writeTerminal,
+                required onDone,
+              }) {
+                final binding = FakeSshZModemBinding(
+                  sessionId: sessionId,
+                  stdout: stdout,
+                );
+                bindings.add(binding);
+                stdout.listen((chunk) {
+                  writeTerminal(String.fromCharCodes(chunk));
+                }, onDone: onDone);
+                return binding;
+              },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
+
+    expect(bindings.single.sessionId, 'session-1');
+
+    bridge.outputControllers['session-1']!.add('hello from ssh\r\n'.codeUnits);
+    await tester.pump(const Duration(milliseconds: 20));
+
+    final terminalWidget = tester.widget<app_terminal.TerminalView>(
+      find.byType(app_terminal.TerminalView),
+    );
+    expect(
+      terminalWidget.tab.terminal!.buffer.toString(),
+      contains('hello from ssh'),
+    );
+
+    terminalWidget.tab.terminal!.onOutput?.call('pwd\r');
+    expect(bindings.single.inputs, ['pwd\r']);
   });
 }

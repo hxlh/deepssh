@@ -16,8 +16,11 @@ import '../features/hosts/host_tree.dart';
 import '../features/hosts/host_tree_state.dart';
 import '../features/local_terminal/local_terminal_bridge.dart';
 import '../features/ssh/ssh_bridge.dart';
+import '../features/ssh/ssh_zmodem_file_picker.dart';
+import '../features/ssh/ssh_zmodem_session.dart';
 import '../features/ssh_profiles/ssh_profile_form_page.dart';
 import '../features/terminal/terminal_state.dart';
+import '../features/terminal/terminal_view.dart';
 import '../features/theme/theme_bridge.dart';
 import '../features/tunnels/tunnel_bridge.dart';
 import '../features/tunnels/tunnel_config_form_page.dart';
@@ -34,6 +37,8 @@ class WorkbenchPage extends StatefulWidget {
     ThemeBridgeClient? themeBridge,
     this.onThemeChanged,
     this.errorLogger,
+    this.debugSshInputWriter,
+    this.debugSshZModemFactory,
   }) : sshBridge = sshBridge ?? const _DefaultSshBridgeClientHolder(),
        localTerminalBridge =
            localTerminalBridge ??
@@ -47,6 +52,8 @@ class WorkbenchPage extends StatefulWidget {
   final ThemeBridgeClient themeBridge;
   final VoidCallback? onThemeChanged;
   final ErrorLogger? errorLogger;
+  final SshTerminalInputWriter? debugSshInputWriter;
+  final SshZModemBindingFactory? debugSshZModemFactory;
 
   @override
   State<WorkbenchPage> createState() => _WorkbenchPageState();
@@ -296,7 +303,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   List<SshProfileItem> sshProfiles = const [];
   Map<String, List<SshSessionItem>> sshSessionsByProfileId = const {};
   int sshSessionCounter = 0;
-  final sshOutputSubscriptions = <String, StreamSubscription<String>>{};
+  final sshZModemSessions = <String, SshZModemBinding>{};
   final sshOutputBuffers = <String, StringBuffer>{};
   final sshOutputFlushTimers = <String, Timer>{};
   final closingSshSessionIds = <String>{};
@@ -339,8 +346,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     for (final timer in localOutputFlushTimers.values) {
       timer.cancel();
     }
-    for (final subscription in sshOutputSubscriptions.values) {
-      subscription.cancel();
+    for (final binding in sshZModemSessions.values) {
+      unawaited(binding.dispose());
     }
     for (final subscription in localOutputSubscriptions.values) {
       subscription.cancel();
@@ -930,28 +937,52 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
 
   void _startSshOutputSubscription(SshSessionItem session) {
     final sessionId = session.sessionId;
-    if (sessionId == null || sshOutputSubscriptions.containsKey(session.id)) {
+    if (sessionId == null || sshZModemSessions.containsKey(session.id)) {
       return;
     }
-    sshOutputSubscriptions[session.id] = widget.sshBridge
-        .outputStream(sessionId)
-        .transform(utf8.decoder)
-        .listen(
-          (text) {
-            if (!mounted || text.isEmpty) return;
-            final buffer = sshOutputBuffers.putIfAbsent(
-              session.id,
-              StringBuffer.new,
-            );
-            buffer.write(text);
-            _scheduleSshOutputFlush(session);
-          },
-          onDone: () {
-            sshOutputFlushTimers.remove(session.id)?.cancel();
-            _flushSshOutput(session);
-            sshOutputSubscriptions.remove(session.id);
-          },
-        );
+
+    void writeTerminalText(String text) {
+      if (!mounted || text.isEmpty) return;
+      final buffer = sshOutputBuffers.putIfAbsent(
+        session.id,
+        StringBuffer.new,
+      );
+      buffer.write(text);
+      _scheduleSshOutputFlush(session);
+    }
+
+    void handleDone() {
+      sshOutputFlushTimers.remove(session.id)?.cancel();
+      _flushSshOutput(session);
+      final binding = sshZModemSessions.remove(session.id);
+      if (binding != null) {
+        unawaited(binding.dispose());
+      }
+    }
+
+    final factory = widget.debugSshZModemFactory;
+    if (factory != null) {
+      sshZModemSessions[session.id] = factory(
+        sessionId: sessionId,
+        stdout: widget.sshBridge.outputStream(sessionId),
+        writeTerminal: writeTerminalText,
+        onDone: handleDone,
+      );
+      return;
+    }
+
+    final binding = RemoteSshZModemSession(
+      sessionId: sessionId,
+      stdout: widget.sshBridge.outputStream(sessionId),
+      writeToSession: widget.sshBridge.writeToSession,
+      writeTerminal: writeTerminalText,
+      selectDownloadDirectory: selectZModemDownloadDirectory,
+      selectUploadFiles: selectZModemUploadFiles,
+      logger: _errorLogger,
+      onDone: handleDone,
+    );
+    binding.start();
+    sshZModemSessions[session.id] = binding;
   }
 
   void _replaceSshSession(SshSessionItem session) {
@@ -971,6 +1002,28 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   void _updateSshSession(SshSessionItem session) {
     _replaceSshSession(session);
     _startSshOutputSubscription(session);
+  }
+
+  void _writeSshTerminalInput(String sessionId, String data) {
+    final debugWriter = widget.debugSshInputWriter;
+    if (debugWriter != null) {
+      debugWriter(sessionId, data);
+      return;
+    }
+
+    for (final sessions in sshSessionsByProfileId.values) {
+      for (final session in sessions) {
+        if (session.sessionId == sessionId) {
+          final binding = sshZModemSessions[session.id];
+          if (binding != null) {
+            binding.writeTerminalInput(data);
+            return;
+          }
+        }
+      }
+    }
+
+    widget.sshBridge.writeToSession(sessionId, utf8.encode(data));
   }
 
   void _handleSshInput(String data) {
@@ -1030,6 +1083,10 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     if (session.sessionId != null) {
       _sshCommandBuffers.remove(session.sessionId);
     }
+    final binding = sshZModemSessions.remove(session.id);
+    if (binding != null) {
+      unawaited(binding.dispose());
+    }
     setState(() {
       sshSessionsByProfileId = {
         ...sshSessionsByProfileId,
@@ -1074,7 +1131,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     }
 
     try {
-      await sshOutputSubscriptions.remove(session.id)?.cancel();
+      await sshZModemSessions.remove(session.id)?.dispose();
     } catch (_) {}
 
     closingSshSessionIds.remove(session.id);
@@ -1321,6 +1378,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               sshBridge: widget.sshBridge,
               localTerminalBridge: widget.localTerminalBridge,
               onSshInput: _handleSshInput,
+              onSshTerminalInput: _writeSshTerminalInput,
             ),
           ),
         ],
