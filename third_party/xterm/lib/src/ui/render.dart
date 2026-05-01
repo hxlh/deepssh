@@ -1,4 +1,4 @@
-import 'dart:math' show max;
+import 'dart:math' show max, min;
 import 'dart:ui';
 
 import 'package:flutter/rendering.dart';
@@ -19,6 +19,49 @@ import 'package:xterm/src/ui/terminal_text_style.dart';
 import 'package:xterm/src/ui/terminal_theme.dart';
 
 typedef EditableRectCallback = void Function(Rect rect, Rect caretRect);
+
+List<Color?> createForegroundHighlightMap(
+  List<TerminalHighlight> highlights, {
+  required int firstLine,
+  required int lastLine,
+  required int viewWidth,
+}) {
+  final width = viewWidth;
+  final foregroundColors = List<Color?>.filled(
+    (lastLine - firstLine + 1) * width,
+    null,
+  );
+
+  for (var highlight in highlights) {
+    final color = highlight.foregroundColor;
+    if (color == null) continue;
+    final range = highlight.range?.normalized;
+
+    if (range == null || range.begin.y > lastLine || range.end.y < firstLine) {
+      continue;
+    }
+
+    for (var segment in range.toSegments()) {
+      if (segment.line < firstLine) {
+        continue;
+      }
+
+      if (segment.line > lastLine) {
+        break;
+      }
+
+      final rowOffset = (segment.line - firstLine) * width;
+      final start = segment.start ?? 0;
+      final end = segment.end ?? viewWidth;
+
+      for (var i = start; i < min(end, width); i++) {
+        foregroundColors[rowOffset + i] = color;
+      }
+    }
+  }
+
+  return foregroundColors;
+}
 
 class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   RenderTerminal({
@@ -375,7 +418,9 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   }
 
   bool get _shouldShowCursor {
-    return (_terminal.cursorVisibleMode || _alwaysShowCursor || _isComposingText) &&
+    return (_terminal.cursorVisibleMode ||
+            _alwaysShowCursor ||
+            _isComposingText) &&
         _cursorBlinkVisible;
   }
 
@@ -431,20 +476,22 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       effectLastLine,
     );
 
+    final foregroundColors = createForegroundHighlightMap(
+      _controller.highlights,
+      firstLine: effectFirstLine,
+      lastLine: effectLastLine,
+      viewWidth: _terminal.viewWidth,
+    );
+
     for (var i = effectFirstLine; i <= effectLastLine; i++) {
       _painter.paintLine(
         canvas,
         offset.translate(0, (i * charHeight + _lineOffset).truncateToDouble()),
         lines[i],
+        foregroundColors: foregroundColors,
+        foregroundColorOffset: (i - effectFirstLine) * _terminal.viewWidth,
       );
     }
-
-    _paintHighlightForegrounds(
-      canvas,
-      _controller.highlights,
-      effectFirstLine,
-      effectLastLine,
-    );
 
     if (_terminal.buffer.absoluteCursorY >= effectFirstLine &&
         _terminal.buffer.absoluteCursorY <= effectLastLine) {
@@ -553,55 +600,6 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         }
 
         _paintSegment(canvas, segment, color);
-      }
-    }
-  }
-
-  void _paintHighlightForegrounds(
-    Canvas canvas,
-    List<TerminalHighlight> highlights,
-    int firstLine,
-    int lastLine,
-  ) {
-    final cellData = CellData.empty();
-
-    for (var highlight in highlights) {
-      final color = highlight.foregroundColor;
-      if (color == null) continue;
-      final range = highlight.range?.normalized;
-
-      if (range == null ||
-          range.begin.y > lastLine ||
-          range.end.y < firstLine) {
-        continue;
-      }
-
-      for (var segment in range.toSegments()) {
-        if (segment.line < firstLine) {
-          continue;
-        }
-
-        if (segment.line > lastLine) {
-          break;
-        }
-
-        final line = _terminal.buffer.lines[segment.line];
-        final start = segment.start ?? 0;
-        final end = segment.end ?? _terminal.viewWidth;
-
-        for (var i = start; i < end && i < line.length; i++) {
-          line.getCellData(i, cellData);
-          final cellOffset = Offset(
-            i * _painter.cellSize.width,
-            segment.line * _painter.cellSize.height + _lineOffset,
-          );
-          _painter.paintCellForeground(
-            canvas,
-            cellOffset,
-            cellData,
-            foregroundColor: color,
-          );
-        }
       }
     }
   }

@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xterm/src/ui/render.dart' as xterm_render;
 import 'package:xterm/xterm.dart' as xterm;
 
 final TerminalThemeSettings _defaultTerminalTheme =
@@ -1187,6 +1188,34 @@ void main() {
     expect(controller.highlights.last.range!.begin.x, 0);
     expect(controller.highlights.last.range!.end.x, 5);
     expect(controller.highlights.last.foregroundColor, const Color(0xFFF14C4C));
+  });
+
+  test('foreground highlights are resolved before text painting', () {
+    final terminal = xterm.Terminal()
+      ..resize(8, 1)
+      ..write('match');
+    final controller = xterm.TerminalController();
+    final highlight = controller.highlight(
+      p1: terminal.buffer.createAnchor(1, 0),
+      p2: terminal.buffer.createAnchor(4, 0),
+      foregroundColor: Colors.red,
+    );
+
+    final highlights = xterm_render.createForegroundHighlightMap(
+      controller.highlights,
+      firstLine: 0,
+      lastLine: 0,
+      viewWidth: terminal.viewWidth,
+    );
+
+    expect(highlights[0], isNull);
+    expect(highlights[1], Colors.red);
+    expect(highlights[2], Colors.red);
+    expect(highlights[3], Colors.red);
+    expect(highlights[4], isNull);
+
+    highlight.dispose();
+    controller.dispose();
   });
 
   testWidgets('skips invalid regex highlight rules', (tester) async {

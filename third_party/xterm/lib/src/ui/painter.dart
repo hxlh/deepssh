@@ -145,8 +145,10 @@ class TerminalPainter {
   void paintLine(
     Canvas canvas,
     Offset offset,
-    BufferLine line,
-  ) {
+    BufferLine line, {
+    List<Color?>? foregroundColors,
+    int foregroundColorOffset = 0,
+  }) {
     final cellData = CellData.empty();
     final cellWidth = _cellSize.width;
 
@@ -155,8 +157,11 @@ class TerminalPainter {
 
       final charWidth = cellData.content >> CellContent.widthShift;
       final cellOffset = offset.translate(i * cellWidth, 0);
+      final foregroundColor = foregroundColors == null
+          ? null
+          : foregroundColors[foregroundColorOffset + i];
 
-      paintCell(canvas, cellOffset, cellData);
+      paintCell(canvas, cellOffset, cellData, foregroundColor: foregroundColor);
 
       if (charWidth == 2) {
         i++;
@@ -165,9 +170,15 @@ class TerminalPainter {
   }
 
   @pragma('vm:prefer-inline')
-  void paintCell(Canvas canvas, Offset offset, CellData cellData) {
+  void paintCell(
+    Canvas canvas,
+    Offset offset,
+    CellData cellData, {
+    Color? foregroundColor,
+  }) {
     paintCellBackground(canvas, offset, cellData);
-    paintCellForeground(canvas, offset, cellData);
+    paintCellForeground(canvas, offset, cellData,
+        foregroundColor: foregroundColor);
   }
 
   /// Paints the character in the cell represented by [cellData] to [canvas] at
@@ -182,8 +193,9 @@ class TerminalPainter {
     final charCode = cellData.content & CellContent.codepointMask;
     if (charCode == 0) return;
 
-    final cacheKey =
-        cellData.getHash() ^ _textScaler.hashCode ^ (foregroundColor?.hashCode ?? 0);
+    final cacheKey = cellData.getHash() ^
+        _textScaler.hashCode ^
+        (foregroundColor?.hashCode ?? 0);
     var paragraph = _paragraphCache.getLayoutFromCache(cacheKey);
 
     if (paragraph == null) {
