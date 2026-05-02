@@ -234,7 +234,12 @@ class _TerminalViewState extends State<TerminalView> {
 
     for (var cell = 0; cell < end; cell++) {
       final codePoint = line.getCodePoint(cell);
-      if (codePoint == 0) continue;
+      if (codePoint == 0) {
+        if (cell == 0 || line.getWidth(cell - 1) != 2) {
+          textIndex++;
+        }
+        continue;
+      }
 
       final start = textIndex;
       final width = line.getWidth(cell);

@@ -1533,6 +1533,56 @@ void main() {
     },
   );
 
+  testWidgets('keeps regex foreground colors aligned after empty cells', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+    final theme = _defaultTerminalTheme.copyWith(
+      regexHighlights: const [
+        RegexHighlight(pattern: r'\d+', color: Color(0xFFF5F543)),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            terminalThemeSettings: theme,
+          ),
+        ),
+      ),
+    );
+
+    terminal.write('abc\x1b[5C12 ok\r\n');
+    await tester.pump();
+
+    final terminalWidget = tester.widget<xterm.TerminalView>(
+      find.byType(xterm.TerminalView),
+    );
+    final lineText = terminal.buffer.lines[0].getText();
+    expect(lineText, 'abc     12 ok');
+    expect(regexForegroundColor(terminalWidget, 0, 7, lineText), isNull);
+    expect(
+      regexForegroundColor(terminalWidget, 0, 8, lineText),
+      const Color(0xFFF5F543),
+    );
+    expect(
+      regexForegroundColor(terminalWidget, 0, 9, lineText),
+      const Color(0xFFF5F543),
+    );
+    expect(regexForegroundColor(terminalWidget, 0, 10, lineText), isNull);
+  });
+
   testWidgets('aligns regex highlight colors after wide terminal characters', (
     tester,
   ) async {
