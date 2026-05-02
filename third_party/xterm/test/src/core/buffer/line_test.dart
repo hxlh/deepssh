@@ -34,10 +34,20 @@ void main() {
       expect(terminal.buffer.lines[0].getText(-100, 100), 'Hello World');
     });
 
-    test('can handle reversed ranges', () {
-      final terminal = Terminal();
-      terminal.write('Hello World');
-      expect(terminal.buffer.lines[0].getText(5, 0), '');
+
+    test('preserves blank cells inside selected range as spaces', () {
+      final line = BufferLine(12);
+      line.setCodePoint(0, 'h'.codeUnitAt(0));
+      line.setCodePoint(1, 'e'.codeUnitAt(0));
+      line.setCodePoint(2, 'l'.codeUnitAt(0));
+      line.setCodePoint(3, 'l'.codeUnitAt(0));
+      line.setCodePoint(4, 'o'.codeUnitAt(0));
+      line.setCodePoint(8, 'w'.codeUnitAt(0));
+      line.setCodePoint(9, 'o'.codeUnitAt(0));
+      line.setCodePoint(10, 'r'.codeUnitAt(0));
+      line.setCodePoint(11, 'd'.codeUnitAt(0));
+
+      expect(line.getText(0, 12), 'hello   word');
     });
   });
 

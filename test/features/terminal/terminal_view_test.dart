@@ -20,6 +20,32 @@ import 'package:xterm/xterm.dart' as xterm;
 final TerminalThemeSettings _defaultTerminalTheme =
     TerminalThemeSettings.commandDeck();
 
+const xterm.TerminalTheme _selectionPaintTestTheme = xterm.TerminalTheme(
+  cursor: Colors.white,
+  selection: Color(0xFFFF0000),
+  foreground: Colors.white,
+  background: Colors.black,
+  black: Colors.black,
+  red: Colors.red,
+  green: Colors.green,
+  yellow: Colors.yellow,
+  blue: Colors.blue,
+  magenta: Colors.purple,
+  cyan: Colors.cyan,
+  white: Colors.white,
+  brightBlack: Colors.black54,
+  brightRed: Colors.redAccent,
+  brightGreen: Colors.greenAccent,
+  brightYellow: Colors.yellowAccent,
+  brightBlue: Colors.blueAccent,
+  brightMagenta: Colors.purpleAccent,
+  brightCyan: Colors.cyanAccent,
+  brightWhite: Colors.white,
+  searchHitBackground: Colors.yellow,
+  searchHitBackgroundCurrent: Colors.green,
+  searchHitForeground: Colors.black,
+);
+
 void main() {
   test('terminal style uses configured normal and bold font weights', () {
     const style = xterm.TerminalStyle(
@@ -406,6 +432,77 @@ void main() {
     expect(view.controller!.selection!.normalized.begin.y, lessThan(52));
 
     await gesture.up();
+  });
+
+  testWidgets('paints selection at the terminal render offset', (tester) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.resize(20, 5);
+    final controller = xterm.TerminalController();
+
+    const stackKey = Key('selection-paint-offset-stack');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            key: stackKey,
+            children: [
+              Positioned(
+                left: 40,
+                top: 48,
+                width: 360,
+                height: 120,
+                child: xterm.TerminalView(
+                  terminal,
+                  controller: controller,
+                  hardwareKeyboardOnly: true,
+                  theme: _selectionPaintTestTheme,
+                  textStyle: const xterm.TerminalStyle(fontSize: 20),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final renderTerminal =
+        tester.renderObject(
+              find.descendant(
+                of: find.byType(xterm.TerminalView),
+                matching: find.byWidgetPredicate(
+                  (widget) => widget.runtimeType.toString() == '_TerminalView',
+                ),
+              ),
+            )
+            as dynamic;
+    final cellSize = renderTerminal.cellSize as Size;
+    controller.setSelection(
+      terminal.buffer.createAnchor(1, 0),
+      terminal.buffer.createAnchor(4, 0),
+    );
+    await tester.pump();
+
+    expect(
+      tester.renderObject(find.byKey(stackKey)),
+      paints
+        ..rect(rect: const Rect.fromLTWH(40, 48, 360, 120), color: Colors.black)
+        ..rect(
+          rect: Rect.fromLTWH(40, 48, cellSize.width, cellSize.height),
+          color: Colors.white,
+        )
+        ..rect(
+          rect: Rect.fromLTWH(
+            40 + cellSize.width,
+            48,
+            cellSize.width * 3,
+            cellSize.height,
+          ),
+          color: const Color(0xFFFF0000),
+        ),
+    );
   });
 
   testWidgets(
@@ -953,6 +1050,66 @@ void main() {
       expect(bridge.writes, isEmpty);
     },
   );
+
+  testWidgets('copies blank terminal cells inside selected text as spaces', (
+    tester,
+  ) async {
+    final bridge = RecordingSshBridgeClient();
+    final terminal = xterm.Terminal(maxLines: 3000);
+    String? copiedText;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'Clipboard.setData') {
+            final data = Map<String, dynamic>.from(call.arguments as Map);
+            copiedText = data['text'] as String?;
+          }
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    terminal.write('hello\x1b[3Cword\r\n');
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: bridge,
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            terminalThemeSettings: _defaultTerminalTheme,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('terminal-input-proxy')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final controller = terminalView(tester).controller!;
+    controller.setSelection(
+      terminal.buffer.createAnchor(0, 0),
+      terminal.buffer.createAnchor(12, 0),
+    );
+    await tester.pump();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyC, character: '');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyC);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    expect(copiedText, 'hello   word');
+    expect(bridge.writes, isEmpty);
+  });
 
   testWidgets('sends Ctrl+C through SSH terminal input proxy', (tester) async {
     final bridge = RecordingSshBridgeClient();

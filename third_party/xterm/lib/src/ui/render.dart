@@ -514,6 +514,7 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
 
     _paintHighlightBackgrounds(
       canvas,
+      offset,
       _controller.highlights,
       effectFirstLine,
       effectLastLine,
@@ -566,6 +567,7 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     if (_controller.selection != null) {
       _paintSelection(
         canvas,
+        offset,
         _controller.selection!,
         effectFirstLine,
         effectLastLine,
@@ -606,6 +608,7 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
 
   void _paintSelection(
     Canvas canvas,
+    Offset offset,
     BufferRange selection,
     int firstLine,
     int lastLine,
@@ -623,12 +626,13 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         break;
       }
 
-      _paintSegment(canvas, segment, _painter.theme.selection);
+      _paintSegment(canvas, offset, segment, _painter.theme.selection);
     }
   }
 
   void _paintHighlightBackgrounds(
     Canvas canvas,
+    Offset offset,
     List<TerminalHighlight> highlights,
     int firstLine,
     int lastLine,
@@ -653,17 +657,22 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
           break;
         }
 
-        _paintSegment(canvas, segment, color);
+        _paintSegment(canvas, offset, segment, color);
       }
     }
   }
 
   @pragma('vm:prefer-inline')
-  void _paintSegment(Canvas canvas, BufferSegment segment, Color color) {
+  void _paintSegment(
+    Canvas canvas,
+    Offset offset,
+    BufferSegment segment,
+    Color color,
+  ) {
     final start = segment.start ?? 0;
     final end = segment.end ?? _terminal.viewWidth;
 
-    final startOffset = Offset(
+    final startOffset = offset.translate(
       start * _painter.cellSize.width,
       segment.line * _painter.cellSize.height + _lineOffset,
     );

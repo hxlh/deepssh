@@ -49,15 +49,24 @@ jobs:
         if: matrix.platform == 'macos'
         run: bash ./build.sh package --release
 
+      - name: Create release archive
+        shell: pwsh
+        run: |
+          $package = Get-ChildItem -Path dist -Directory -Filter "deepssh-${{ matrix.platform }}-*" | Select-Object -First 1
+          if (-not $package) {
+            throw "Package directory not found for ${{ matrix.platform }}"
+          }
+          Compress-Archive -Path $package.FullName -DestinationPath "$($package.FullName).zip" -Force
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: deepssh-${{ matrix.platform }}
-          path: dist/deepssh-${{ matrix.platform }}-*
+          path: dist/deepssh-${{ matrix.platform }}-*.zip
           if-no-files-found: error
 
       - name: Upload to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/deepssh-${{ matrix.platform }}-*
+          files: dist/deepssh-${{ matrix.platform }}-*.zip
