@@ -1,6 +1,7 @@
 import '../../core/models/ssh_profile_item.dart';
 import '../../src/rust/rust_init.dart';
 import '../../src/rust/profile.dart' as rust_profile;
+import '../../src/rust/ssh_auth.dart' as rust_auth;
 import '../../src/rust/ssh_session.dart' as rust_session;
 
 class SshConnectionResult {
@@ -8,6 +9,16 @@ class SshConnectionResult {
 
   final String sessionId;
   final String title;
+}
+
+class SshConnectException implements Exception {
+  const SshConnectException(this.code, this.message);
+
+  final rust_auth.SshConnectErrorCode code;
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 abstract class SshBridgeClient {
@@ -18,7 +29,9 @@ abstract class SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   });
 
@@ -28,13 +41,21 @@ abstract class SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   });
 
   Future<void> deleteProfile(String id);
 
-  Future<SshConnectionResult> connectProfile(String id, {int? rows, int? cols});
+  Future<SshConnectionResult> connectProfile(
+    String id, {
+    String? password,
+    String? passphrase,
+    int? rows,
+    int? cols,
+  });
 
   Stream<List<int>> outputStream(String sessionId);
 
@@ -71,7 +92,9 @@ class RustSshBridgeClient implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) async {
     await _ensureInitialized();
@@ -80,7 +103,9 @@ class RustSshBridgeClient implements SshBridgeClient {
       host: host,
       port: port,
       username: username,
+      authMode: _toRustAuthMode(authMode),
       password: password,
+      privateKeyPath: privateKeyPath,
       termType: termType,
     );
     return _toItem(profile);
@@ -93,7 +118,9 @@ class RustSshBridgeClient implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) async {
     await _ensureInitialized();
@@ -103,7 +130,9 @@ class RustSshBridgeClient implements SshBridgeClient {
       host: host,
       port: port,
       username: username,
+      authMode: _toRustAuthMode(authMode),
       password: password,
+      privateKeyPath: privateKeyPath,
       termType: termType,
     );
     return _toItem(profile);
@@ -118,23 +147,42 @@ class RustSshBridgeClient implements SshBridgeClient {
   @override
   Future<SshConnectionResult> connectProfile(
     String id, {
+    String? password,
+    String? passphrase,
     int? rows,
     int? cols,
   }) async {
     await _ensureInitialized();
     final profiles = await rust_profile.listProfiles();
     final profile = profiles.firstWhere((profile) => profile.id == id);
-    final session = await rust_session.connectProfile(
+    final result = await rust_session.connectProfile(
       profileId: profile.id,
       title: profile.name,
       host: profile.host,
       port: profile.port,
       username: profile.username,
-      password: profile.password,
+      credential: rust_auth.SshAuthCredential(
+        password: password ?? profile.password,
+        privateKeyPath: profile.privateKeyPath.isEmpty
+            ? null
+            : profile.privateKeyPath,
+        passphrase: passphrase,
+      ),
       termType: profile.termType,
       rows: rows ?? 24,
       cols: cols ?? 80,
     );
+    final error = result.error;
+    if (error != null) {
+      throw SshConnectException(error.code, error.message);
+    }
+    final session = result.session;
+    if (session == null) {
+      throw const SshConnectException(
+        rust_auth.SshConnectErrorCode.connectionFailed,
+        'SSH connect failed',
+      );
+    }
     return SshConnectionResult(
       sessionId: session.sessionId,
       title: session.title,
@@ -190,9 +238,25 @@ class RustSshBridgeClient implements SshBridgeClient {
       host: profile.host,
       port: profile.port,
       username: profile.username,
+      authMode: _fromRustAuthMode(profile.authMode),
       password: profile.password,
+      privateKeyPath: profile.privateKeyPath,
       termType: profile.termType,
     );
+  }
+
+  rust_profile.SshAuthMode _toRustAuthMode(SshAuthMode authMode) {
+    return switch (authMode) {
+      SshAuthMode.password => rust_profile.SshAuthMode.password,
+      SshAuthMode.privateKey => rust_profile.SshAuthMode.privateKey,
+    };
+  }
+
+  SshAuthMode _fromRustAuthMode(rust_profile.SshAuthMode authMode) {
+    return switch (authMode) {
+      rust_profile.SshAuthMode.password => SshAuthMode.password,
+      rust_profile.SshAuthMode.privateKey => SshAuthMode.privateKey,
+    };
   }
 }
 
@@ -211,7 +275,9 @@ class InMemorySshBridgeClient implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) async {
     final profile = SshProfileItem(
@@ -220,7 +286,9 @@ class InMemorySshBridgeClient implements SshBridgeClient {
       host: host,
       port: port,
       username: username,
+      authMode: authMode,
       password: password,
+      privateKeyPath: privateKeyPath,
       termType: termType,
     );
     _profiles.add(profile);
@@ -234,7 +302,9 @@ class InMemorySshBridgeClient implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) async {
     final index = _profiles.indexWhere((profile) => profile.id == id);
@@ -247,7 +317,9 @@ class InMemorySshBridgeClient implements SshBridgeClient {
       host: host,
       port: port,
       username: username,
+      authMode: authMode,
       password: password,
+      privateKeyPath: privateKeyPath,
       termType: termType,
     );
     _profiles[index] = profile;
@@ -262,6 +334,8 @@ class InMemorySshBridgeClient implements SshBridgeClient {
   @override
   Future<SshConnectionResult> connectProfile(
     String id, {
+    String? password,
+    String? passphrase,
     int? rows,
     int? cols,
   }) async {

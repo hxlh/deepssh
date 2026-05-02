@@ -1,3 +1,5 @@
+enum SshAuthMode { password, privateKey }
+
 class SshProfileItem {
   static const defaultTermType = 'xterm-256color';
   static const termTypeOptions = <String>[
@@ -14,7 +16,9 @@ class SshProfileItem {
     required this.host,
     required this.port,
     required this.username,
-    required this.password,
+    this.authMode = SshAuthMode.password,
+    this.password = '',
+    this.privateKeyPath = '',
     this.termType = defaultTermType,
   });
 
@@ -23,6 +27,8 @@ class SshProfileItem {
   final String host;
   final int port;
   final String username;
+  final SshAuthMode authMode;
   final String password;
+  final String privateKeyPath;
   final String termType;
 }

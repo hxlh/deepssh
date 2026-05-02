@@ -5,6 +5,7 @@ import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/ssh/ssh_zmodem_session.dart';
 import 'package:deepssh/features/terminal/terminal_view.dart' as app_terminal;
+import 'package:deepssh/src/rust/ssh_auth.dart' as rust_auth;
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,9 @@ class FakeSshBridgeClient implements SshBridgeClient {
   var outputStreamListenCount = 0;
   var writeToSessionCount = 0;
   var closeSessionCount = 0;
+  String? lastRuntimePassword;
+  String? lastRuntimePassphrase;
+  Object? connectError;
   Object? closeError;
   Object? cancelOutputSubscriptionError;
   final closedSessionIds = <String>[];
@@ -34,7 +38,9 @@ class FakeSshBridgeClient implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) async {
     final profile = SshProfileItem(
@@ -43,7 +49,9 @@ class FakeSshBridgeClient implements SshBridgeClient {
       host: host,
       port: port,
       username: username,
+      authMode: authMode,
       password: password,
+      privateKeyPath: privateKeyPath,
       termType: termType,
     );
     profiles.add(profile);
@@ -57,7 +65,9 @@ class FakeSshBridgeClient implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) async {
     final index = profiles.indexWhere((profile) => profile.id == id);
@@ -67,7 +77,9 @@ class FakeSshBridgeClient implements SshBridgeClient {
       host: host,
       port: port,
       username: username,
+      authMode: authMode,
       password: password,
+      privateKeyPath: privateKeyPath,
       termType: termType,
     );
     profiles[index] = updated;
@@ -82,10 +94,19 @@ class FakeSshBridgeClient implements SshBridgeClient {
   @override
   Future<SshConnectionResult> connectProfile(
     String id, {
+    String? password,
+    String? passphrase,
     int? rows,
     int? cols,
   }) async {
     connectCount += 1;
+    lastRuntimePassword = password;
+    lastRuntimePassphrase = passphrase;
+    final error = connectError;
+    if (error != null) {
+      connectError = null;
+      throw error;
+    }
     if (rows != null && cols != null) {
       connectSizes.add((rows: rows, cols: cols));
     }
@@ -257,6 +278,83 @@ void main() {
     expect(bridge.connectCount, 0);
     expect(find.text('terminal1'), findsNothing);
     expect(find.text('example.com · terminal1'), findsNothing);
+  });
+
+  testWidgets('connect with empty saved password prompts for password', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: '',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('SSH Password'), findsOneWidget);
+    await tester.enterText(find.bySemanticsLabel('Password'), 'typed-secret');
+    await tester.tap(find.text('Connect'));
+    await tester.pumpAndSettle();
+
+    expect(bridge.lastRuntimePassword, 'typed-secret');
+  });
+
+  testWidgets('private key passphrase required retries after prompt', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        authMode: SshAuthMode.privateKey,
+        privateKeyPath: '/home/root/.ssh/id_ed25519',
+      ),
+    );
+    bridge.connectError = const SshConnectException(
+      rust_auth.SshConnectErrorCode.passphraseRequired,
+      'Private key requires a passphrase',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Private Key Passphrase'), findsOneWidget);
+    await tester.enterText(
+      find.bySemanticsLabel('Passphrase'),
+      'key-passphrase',
+    );
+    await tester.tap(find.text('Connect'));
+    await tester.pumpAndSettle();
+
+    expect(bridge.connectCount, 2);
+    expect(bridge.lastRuntimePassphrase, 'key-passphrase');
   });
 
   testWidgets(
@@ -798,7 +896,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('xterm-truecolor').last);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Create'));
+      final createButton = find.widgetWithText(ElevatedButton, 'Create');
+      await tester.scrollUntilVisible(
+        createButton,
+        100,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(createButton);
       await tester.pumpAndSettle();
 
       expect(bridge.profiles.single.termType, 'xterm-truecolor');

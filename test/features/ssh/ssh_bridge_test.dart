@@ -34,7 +34,9 @@ void main() {
         host: 'example.com',
         port: 2222,
         username: 'root',
-        password: 'secret',
+        authMode: SshAuthMode.privateKey,
+        password: '',
+        privateKeyPath: '/home/root/.ssh/id_ed25519',
         termType: 'xterm-truecolor',
       );
 
@@ -43,7 +45,9 @@ void main() {
       expect(created.host, 'example.com');
       expect(created.port, 2222);
       expect(created.username, 'root');
-      expect(created.password, 'secret');
+      expect(created.authMode, SshAuthMode.privateKey);
+      expect(created.password, '');
+      expect(created.privateKeyPath, '/home/root/.ssh/id_ed25519');
       expect(created.termType, 'xterm-truecolor');
       expect(await bridge.listProfiles(), [created]);
 
@@ -53,7 +57,9 @@ void main() {
         host: '127.0.0.1',
         port: 22,
         username: 'ubuntu',
+        authMode: SshAuthMode.password,
         password: 'changed',
+        privateKeyPath: '',
         termType: 'xterm-256color',
       );
 
@@ -61,7 +67,9 @@ void main() {
       expect(updated.host, '127.0.0.1');
       expect(updated.port, 22);
       expect(updated.username, 'ubuntu');
+      expect(updated.authMode, SshAuthMode.password);
       expect(updated.password, 'changed');
+      expect(updated.privateKeyPath, '');
       expect(updated.termType, 'xterm-256color');
       expect(await bridge.listProfiles(), [updated]);
 
@@ -78,7 +86,9 @@ void main() {
       host: 'localhost',
       port: 22,
       username: 'dev',
+      authMode: SshAuthMode.password,
       password: 'secret',
+      privateKeyPath: '',
       termType: 'xterm-color',
     );
 

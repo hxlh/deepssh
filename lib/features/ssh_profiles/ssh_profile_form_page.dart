@@ -25,7 +25,9 @@ class SshProfileDraft {
     required this.host,
     required this.port,
     required this.username,
+    required this.authMode,
     required this.password,
+    required this.privateKeyPath,
     required this.termType,
   });
 
@@ -33,7 +35,9 @@ class SshProfileDraft {
   final String host;
   final int port;
   final String username;
+  final SshAuthMode authMode;
   final String password;
+  final String privateKeyPath;
   final String termType;
 }
 
@@ -44,12 +48,16 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
   late final TextEditingController portController;
   late final TextEditingController usernameController;
   late final TextEditingController passwordController;
+  late final TextEditingController privateKeyPathController;
   final nameFocusNode = FocusNode(debugLabel: 'Name');
   final hostFocusNode = FocusNode(debugLabel: 'Host');
   final portFocusNode = FocusNode(debugLabel: 'Port');
   final usernameFocusNode = FocusNode(debugLabel: 'Username');
+  final authModeFocusNode = FocusNode(debugLabel: 'Authentication');
   final passwordFocusNode = FocusNode(debugLabel: 'Password');
+  final privateKeyPathFocusNode = FocusNode(debugLabel: 'Private Key Path');
   final termTypeFocusNode = FocusNode(debugLabel: 'Terminal Type');
+  late SshAuthMode selectedAuthMode;
   late String selectedTermType;
 
   @override
@@ -63,6 +71,10 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
     );
     usernameController = TextEditingController(text: profile?.username ?? '');
     passwordController = TextEditingController(text: profile?.password ?? '');
+    privateKeyPathController = TextEditingController(
+      text: profile?.privateKeyPath ?? '',
+    );
+    selectedAuthMode = profile?.authMode ?? SshAuthMode.password;
     selectedTermType = profile?.termType ?? SshProfileItem.defaultTermType;
   }
 
@@ -73,11 +85,14 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
     portController.dispose();
     usernameController.dispose();
     passwordController.dispose();
+    privateKeyPathController.dispose();
     nameFocusNode.dispose();
     hostFocusNode.dispose();
     portFocusNode.dispose();
     usernameFocusNode.dispose();
+    authModeFocusNode.dispose();
     passwordFocusNode.dispose();
+    privateKeyPathFocusNode.dispose();
     termTypeFocusNode.dispose();
     super.dispose();
   }
@@ -124,7 +139,9 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
         host: hostController.text.trim(),
         port: int.parse(portController.text.trim()),
         username: usernameController.text.trim(),
+        authMode: selectedAuthMode,
         password: passwordController.text,
+        privateKeyPath: privateKeyPathController.text.trim(),
         termType: selectedTermType,
       ),
     );
@@ -190,7 +207,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
             const SizedBox(height: 12),
             Focus(
               onKeyEvent: (_, event) =>
-                  handleFieldKey(event, portFocusNode, passwordFocusNode),
+                  handleFieldKey(event, portFocusNode, authModeFocusNode),
               child: TextFormField(
                 focusNode: usernameFocusNode,
                 controller: usernameController,
@@ -198,28 +215,81 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
                 enableSuggestions: false,
                 autocorrect: false,
                 textInputAction: TextInputAction.next,
-                onFieldSubmitted: (_) => passwordFocusNode.requestFocus(),
+                onFieldSubmitted: (_) => authModeFocusNode.requestFocus(),
                 validator: requiredText,
               ),
             ),
             const SizedBox(height: 12),
             Focus(
-              onKeyEvent: (_, event) =>
-                  handleFieldKey(event, usernameFocusNode, termTypeFocusNode),
-              child: TextFormField(
-                focusNode: passwordFocusNode,
-                controller: passwordController,
-                decoration: const InputDecoration(labelText: 'Password'),
-                obscureText: true,
-                textInputAction: TextInputAction.next,
-                onFieldSubmitted: (_) => termTypeFocusNode.requestFocus(),
-                validator: requiredText,
+              onKeyEvent: (_, event) => handleFieldKey(
+                event,
+                usernameFocusNode,
+                selectedAuthMode == SshAuthMode.password
+                    ? passwordFocusNode
+                    : privateKeyPathFocusNode,
+              ),
+              child: DropdownButtonFormField<SshAuthMode>(
+                focusNode: authModeFocusNode,
+                initialValue: selectedAuthMode,
+                decoration: const InputDecoration(labelText: 'Authentication'),
+                items: const [
+                  DropdownMenuItem(
+                    value: SshAuthMode.password,
+                    child: Text('Password'),
+                  ),
+                  DropdownMenuItem(
+                    value: SshAuthMode.privateKey,
+                    child: Text('Private Key'),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    selectedAuthMode = value;
+                  });
+                },
               ),
             ),
             const SizedBox(height: 12),
+            if (selectedAuthMode == SshAuthMode.password)
+              Focus(
+                onKeyEvent: (_, event) =>
+                    handleFieldKey(event, authModeFocusNode, termTypeFocusNode),
+                child: TextFormField(
+                  focusNode: passwordFocusNode,
+                  controller: passwordController,
+                  decoration: const InputDecoration(labelText: 'Password'),
+                  obscureText: true,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => termTypeFocusNode.requestFocus(),
+                ),
+              )
+            else
+              Focus(
+                onKeyEvent: (_, event) =>
+                    handleFieldKey(event, authModeFocusNode, termTypeFocusNode),
+                child: TextFormField(
+                  focusNode: privateKeyPathFocusNode,
+                  controller: privateKeyPathController,
+                  decoration: const InputDecoration(
+                    labelText: 'Private Key Path',
+                  ),
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => termTypeFocusNode.requestFocus(),
+                  validator: requiredText,
+                ),
+              ),
+            const SizedBox(height: 12),
             Focus(
-              onKeyEvent: (_, event) =>
-                  handleFieldKey(event, passwordFocusNode, null),
+              onKeyEvent: (_, event) => handleFieldKey(
+                event,
+                selectedAuthMode == SshAuthMode.password
+                    ? passwordFocusNode
+                    : privateKeyPathFocusNode,
+                null,
+              ),
               child: DropdownButtonFormField<String>(
                 focusNode: termTypeFocusNode,
                 initialValue: selectedTermType,

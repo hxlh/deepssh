@@ -20,7 +20,7 @@ void main() {
     );
 
     await tester.enterText(find.bySemanticsLabel('Port'), '');
-    await tester.tap(find.text('Create'));
+    await tapFormButton(tester, 'Create');
     await tester.pumpAndSettle();
 
     expect(find.text('Required'), findsWidgets);
@@ -44,7 +44,7 @@ void main() {
     );
 
     await fillRequiredFields(tester);
-    await tester.tap(find.text('Create'));
+    await tapFormButton(tester, 'Create');
     await tester.pumpAndSettle();
 
     expect(savedDraft?.termType, 'xterm-256color');
@@ -71,7 +71,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('xterm-truecolor').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Create'));
+    await tapFormButton(tester, 'Create');
     await tester.pumpAndSettle();
 
     expect(savedDraft?.termType, 'xterm-truecolor');
@@ -102,7 +102,7 @@ void main() {
 
     expect(find.text('xterm-color'), findsOneWidget);
 
-    await tester.tap(find.text('Update'));
+    await tapFormButton(tester, 'Update');
     await tester.pumpAndSettle();
 
     expect(savedDraft?.termType, 'xterm-color');
@@ -125,6 +125,89 @@ void main() {
         .dy;
 
     expect(terminalTypeTop, greaterThan(passwordTop));
+  });
+
+  testWidgets('auth dropdown switches visible credential fields', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SshProfileFormPage(onCancel: () {}, onSaved: (_) {}),
+        ),
+      ),
+    );
+
+    expect(find.bySemanticsLabel('Password'), findsOneWidget);
+    expect(find.bySemanticsLabel('Private Key Path'), findsNothing);
+
+    await tester.tap(find.byType(DropdownButtonFormField<SshAuthMode>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Private Key').last);
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Password'), findsNothing);
+    expect(find.bySemanticsLabel('Private Key Path'), findsOneWidget);
+  });
+
+  testWidgets('password auth allows saving an empty password', (tester) async {
+    SshProfileDraft? savedDraft;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SshProfileFormPage(
+            onCancel: () {},
+            onSaved: (draft) => savedDraft = draft,
+          ),
+        ),
+      ),
+    );
+
+    await fillBaseFields(tester);
+    await tapFormButton(tester, 'Create');
+    await tester.pumpAndSettle();
+
+    expect(savedDraft?.authMode, SshAuthMode.password);
+    expect(savedDraft?.password, '');
+    expect(savedDraft?.privateKeyPath, '');
+  });
+
+  testWidgets('private key auth requires a key path', (tester) async {
+    SshProfileDraft? savedDraft;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SshProfileFormPage(
+            onCancel: () {},
+            onSaved: (draft) => savedDraft = draft,
+          ),
+        ),
+      ),
+    );
+
+    await fillBaseFields(tester);
+    await tester.tap(find.byType(DropdownButtonFormField<SshAuthMode>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Private Key').last);
+    await tester.pumpAndSettle();
+    await tapFormButton(tester, 'Create');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Required'), findsOneWidget);
+    expect(savedDraft, isNull);
+
+    await tester.enterText(
+      find.bySemanticsLabel('Private Key Path'),
+      '/home/root/.ssh/id_ed25519',
+    );
+    await tapFormButton(tester, 'Create');
+    await tester.pumpAndSettle();
+
+    expect(savedDraft?.authMode, SshAuthMode.privateKey);
+    expect(savedDraft?.password, '');
+    expect(savedDraft?.privateKeyPath, '/home/root/.ssh/id_ed25519');
   });
 
   testWidgets('moves focus to next SSH profile field on single Tab key down', (
@@ -193,11 +276,26 @@ void main() {
 }
 
 Future<void> fillRequiredFields(WidgetTester tester) async {
+  await fillBaseFields(tester);
+  await tester.enterText(find.bySemanticsLabel('Password'), 'secret');
+}
+
+Future<void> fillBaseFields(WidgetTester tester) async {
   await tester.enterText(find.bySemanticsLabel('Name'), 'Prod');
   await tester.enterText(find.bySemanticsLabel('Host'), 'example.com');
   await tester.enterText(find.bySemanticsLabel('Port'), '22');
   await tester.enterText(find.bySemanticsLabel('Username'), 'root');
-  await tester.enterText(find.bySemanticsLabel('Password'), 'secret');
+}
+
+Future<void> tapFormButton(WidgetTester tester, String label) async {
+  final button = find.widgetWithText(ElevatedButton, label).first;
+  await tester.scrollUntilVisible(
+    button,
+    100,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(button);
 }
 
 TextField textFieldByLabel(String label) {

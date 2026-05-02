@@ -1,5 +1,8 @@
+import '../../core/models/ssh_profile_item.dart';
 import '../../core/models/tunnel_config_item.dart';
+import '../../features/ssh/ssh_bridge.dart';
 import '../../src/rust/rust_init.dart';
+import '../../src/rust/ssh_auth.dart' as rust_auth;
 import '../../src/rust/tunnel.dart' as rust;
 
 abstract class TunnelBridgeClient {
@@ -28,7 +31,12 @@ abstract class TunnelBridgeClient {
 
   Future<void> deleteTunnel(String id);
 
-  Future<TunnelConfigItem> startTunnel(String id);
+  Future<TunnelConfigItem> startTunnel(
+    String id, {
+    required SshProfileItem sshProfile,
+    String? password,
+    String? passphrase,
+  });
 
   Future<TunnelConfigItem> stopTunnel(String id);
 }
@@ -101,7 +109,12 @@ class InMemoryTunnelBridgeClient implements TunnelBridgeClient {
   }
 
   @override
-  Future<TunnelConfigItem> startTunnel(String id) async {
+  Future<TunnelConfigItem> startTunnel(
+    String id, {
+    required SshProfileItem sshProfile,
+    String? password,
+    String? passphrase,
+  }) async {
     return _replaceStatus(id, TunnelRuntimeStatus.forwarding);
   }
 
@@ -233,9 +246,34 @@ class RustTunnelBridgeClient implements TunnelBridgeClient {
   }
 
   @override
-  Future<TunnelConfigItem> startTunnel(String id) async {
+  Future<TunnelConfigItem> startTunnel(
+    String id, {
+    required SshProfileItem sshProfile,
+    String? password,
+    String? passphrase,
+  }) async {
     await _ensureInitialized();
-    final config = await rust.startTunnel(id: id);
+    final result = await rust.startTunnel(
+      id: id,
+      credential: rust_auth.SshAuthCredential(
+        password: password ?? sshProfile.password,
+        privateKeyPath: sshProfile.privateKeyPath.isEmpty
+            ? null
+            : sshProfile.privateKeyPath,
+        passphrase: passphrase,
+      ),
+    );
+    final error = result.error;
+    if (error != null) {
+      throw SshConnectException(error.code, error.message);
+    }
+    final config = result.tunnel;
+    if (config == null) {
+      throw const SshConnectException(
+        rust_auth.SshConnectErrorCode.connectionFailed,
+        'Start tunnel failed',
+      );
+    }
     return _toTunnelConfigItem(config);
   }
 

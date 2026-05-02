@@ -18,6 +18,17 @@ struct ProfileStore {
     initialized: bool,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SshAuthMode {
+    Password,
+    PrivateKey,
+}
+
+fn default_auth_mode() -> SshAuthMode {
+    SshAuthMode::Password
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SshProfile {
     pub id: String,
@@ -25,7 +36,9 @@ pub struct SshProfile {
     pub host: String,
     pub port: u16,
     pub username: String,
+    pub auth_mode: SshAuthMode,
     pub password: String,
+    pub private_key_path: String,
     pub term_type: String,
 }
 
@@ -45,7 +58,12 @@ struct SshProfileConfig {
     host: String,
     port: u16,
     username: String,
+    #[serde(default = "default_auth_mode")]
+    auth_mode: SshAuthMode,
+    #[serde(default)]
     password: String,
+    #[serde(default)]
+    private_key_path: String,
     #[serde(default = "default_term_type")]
     term_type: String,
 }
@@ -69,7 +87,9 @@ impl SshProfileConfig {
                 host: self.host,
                 port: self.port,
                 username: self.username,
+                auth_mode: self.auth_mode,
                 password: self.password,
+                private_key_path: self.private_key_path,
                 term_type: self.term_type,
             },
             missing_id,
@@ -85,7 +105,9 @@ impl From<&SshProfile> for SshProfileConfig {
             host: profile.host.clone(),
             port: profile.port,
             username: profile.username.clone(),
+            auth_mode: profile.auth_mode.clone(),
             password: profile.password.clone(),
+            private_key_path: profile.private_key_path.clone(),
             term_type: profile.term_type.clone(),
         }
     }
@@ -157,7 +179,9 @@ pub fn create_profile(
     host: String,
     port: u16,
     username: String,
+    auth_mode: SshAuthMode,
     password: String,
+    private_key_path: String,
     term_type: String,
 ) -> Result<SshProfile> {
     let result = (|| {
@@ -169,7 +193,9 @@ pub fn create_profile(
             host,
             port,
             username,
+            auth_mode,
             password,
+            private_key_path,
             term_type,
         };
         store.profiles.push(profile.clone());
@@ -188,7 +214,9 @@ pub fn update_profile(
     host: String,
     port: u16,
     username: String,
+    auth_mode: SshAuthMode,
     password: String,
+    private_key_path: String,
     term_type: String,
 ) -> Result<SshProfile> {
     let result = (|| {
@@ -205,7 +233,9 @@ pub fn update_profile(
             host,
             port,
             username,
+            auth_mode,
             password,
+            private_key_path,
             term_type,
         };
         store.profiles[index] = profile.clone();
@@ -306,6 +336,83 @@ mod tests {
     }
 
     #[test]
+    fn legacy_yaml_without_auth_mode_defaults_to_password() {
+        let _guard = clear_profiles_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+        fs::create_dir_all(workspace.path().join("config")).unwrap();
+        fs::write(
+            workspace.config_path(),
+            r#"profiles:
+- id: legacy-id
+  name: Legacy
+  host: legacy.example.com
+  port: 22
+  username: root
+  password: secret
+"#,
+        )
+        .unwrap();
+
+        let profiles = list_profiles().unwrap();
+
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].auth_mode, SshAuthMode::Password);
+        assert_eq!(profiles[0].password, "secret");
+        assert_eq!(profiles[0].private_key_path, "");
+    }
+
+    #[test]
+    fn password_profile_can_save_empty_password() {
+        let _guard = clear_profiles_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+
+        let created = create_profile(
+            "Prod".to_string(),
+            "example.com".to_string(),
+            22,
+            "root".to_string(),
+            SshAuthMode::Password,
+            "".to_string(),
+            "".to_string(),
+            "xterm-256color".to_string(),
+        )
+        .unwrap();
+
+        let yaml = fs::read_to_string(workspace.config_path()).unwrap();
+        assert_eq!(created.auth_mode, SshAuthMode::Password);
+        assert_eq!(created.password, "");
+        assert!(yaml.contains("auth_mode: password"));
+        assert!(yaml.contains("password: ''"));
+    }
+
+    #[test]
+    fn private_key_profile_saves_key_path() {
+        let _guard = clear_profiles_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+
+        let created = create_profile(
+            "Key Prod".to_string(),
+            "example.com".to_string(),
+            22,
+            "root".to_string(),
+            SshAuthMode::PrivateKey,
+            "".to_string(),
+            "/home/root/.ssh/id_ed25519".to_string(),
+            "xterm-256color".to_string(),
+        )
+        .unwrap();
+
+        let yaml = fs::read_to_string(workspace.config_path()).unwrap();
+        assert_eq!(created.auth_mode, SshAuthMode::PrivateKey);
+        assert_eq!(created.private_key_path, "/home/root/.ssh/id_ed25519");
+        assert!(yaml.contains("auth_mode: private_key"));
+        assert!(yaml.contains("private_key_path: /home/root/.ssh/id_ed25519"));
+    }
+
+    #[test]
     fn creates_profile_yaml_with_stable_runtime_id() {
         let _guard = clear_profiles_for_test();
         let workspace = TestWorkspace::new();
@@ -316,7 +423,9 @@ mod tests {
             "example.com".to_string(),
             22,
             "root".to_string(),
+            SshAuthMode::Password,
             "secret".to_string(),
+            "".to_string(),
             "xterm-truecolor".to_string(),
         )
         .unwrap();
@@ -344,7 +453,9 @@ mod tests {
             "example.com".to_string(),
             22,
             "root".to_string(),
+            SshAuthMode::Password,
             "secret".to_string(),
+            "".to_string(),
             "xterm".to_string(),
         )
         .unwrap();
@@ -355,7 +466,9 @@ mod tests {
             "example.org".to_string(),
             2222,
             "admin".to_string(),
+            SshAuthMode::Password,
             "new-secret".to_string(),
+            "".to_string(),
             "xterm-256color".to_string(),
         )
         .unwrap();
@@ -384,7 +497,9 @@ mod tests {
             "example.com".to_string(),
             22,
             "root".to_string(),
+            SshAuthMode::Password,
             "secret".to_string(),
+            "".to_string(),
             "xterm-256color".to_string(),
         )
         .unwrap();
@@ -393,7 +508,9 @@ mod tests {
             "stage.example.com".to_string(),
             22,
             "deploy".to_string(),
+            SshAuthMode::Password,
             "stage-secret".to_string(),
+            "".to_string(),
             "xterm-color".to_string(),
         )
         .unwrap();
@@ -547,7 +664,9 @@ mod tests {
             "example.com".to_string(),
             22,
             "root".to_string(),
+            SshAuthMode::Password,
             "secret".to_string(),
+            "".to_string(),
             "xterm-256color".to_string(),
         );
         let delete_result = delete_profile("missing".to_string());

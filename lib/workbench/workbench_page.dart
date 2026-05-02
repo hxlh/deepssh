@@ -24,6 +24,7 @@ import '../features/terminal/terminal_view.dart';
 import '../features/theme/theme_bridge.dart';
 import '../features/tunnels/tunnel_bridge.dart';
 import '../features/tunnels/tunnel_config_form_page.dart';
+import '../src/rust/ssh_auth.dart' as rust_auth;
 import 'widgets/add_connection_button.dart';
 import 'widgets/sidebar.dart';
 import 'widgets/workbench_content_switcher.dart';
@@ -157,7 +158,17 @@ class _DefaultTunnelBridgeClientHolder implements TunnelBridgeClient {
   Future<void> deleteTunnel(String id) => _delegate.deleteTunnel(id);
 
   @override
-  Future<TunnelConfigItem> startTunnel(String id) => _delegate.startTunnel(id);
+  Future<TunnelConfigItem> startTunnel(
+    String id, {
+    required SshProfileItem sshProfile,
+    String? password,
+    String? passphrase,
+  }) => _delegate.startTunnel(
+    id,
+    sshProfile: sshProfile,
+    password: password,
+    passphrase: passphrase,
+  );
 
   @override
   Future<TunnelConfigItem> stopTunnel(String id) => _delegate.stopTunnel(id);
@@ -177,14 +188,18 @@ class _DefaultSshBridgeClientHolder implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) => _delegate.createProfile(
     name: name,
     host: host,
     port: port,
     username: username,
+    authMode: authMode,
     password: password,
+    privateKeyPath: privateKeyPath,
     termType: termType,
   );
 
@@ -195,7 +210,9 @@ class _DefaultSshBridgeClientHolder implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) => _delegate.updateProfile(
     id: id,
@@ -203,7 +220,9 @@ class _DefaultSshBridgeClientHolder implements SshBridgeClient {
     host: host,
     port: port,
     username: username,
+    authMode: authMode,
     password: password,
+    privateKeyPath: privateKeyPath,
     termType: termType,
   );
 
@@ -213,9 +232,17 @@ class _DefaultSshBridgeClientHolder implements SshBridgeClient {
   @override
   Future<SshConnectionResult> connectProfile(
     String id, {
+    String? password,
+    String? passphrase,
     int? rows,
     int? cols,
-  }) => _delegate.connectProfile(id, rows: rows, cols: cols);
+  }) => _delegate.connectProfile(
+    id,
+    password: password,
+    passphrase: passphrase,
+    rows: rows,
+    cols: cols,
+  );
 
   @override
   Stream<List<int>> outputStream(String sessionId) =>
@@ -782,7 +809,43 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
 
   Future<void> _handleStartTunnelConfig(TunnelConfigItem tunnel) async {
     try {
-      final started = await widget.tunnelBridge.startTunnel(tunnel.id);
+      final profile = sshProfiles.firstWhere(
+        (profile) => profile.id == tunnel.sshProfileId,
+      );
+      String? runtimePassword;
+      if (profile.authMode == SshAuthMode.password &&
+          profile.password.isEmpty) {
+        runtimePassword = await _promptSecret(
+          title: 'SSH Password',
+          label: 'Password',
+        );
+        if (runtimePassword == null || !mounted) return;
+      }
+
+      Future<TunnelConfigItem> start({String? passphrase}) {
+        return widget.tunnelBridge.startTunnel(
+          tunnel.id,
+          sshProfile: profile,
+          password: runtimePassword,
+          passphrase: passphrase,
+        );
+      }
+
+      TunnelConfigItem started;
+      try {
+        started = await start();
+      } on SshConnectException catch (error) {
+        if (profile.authMode != SshAuthMode.privateKey ||
+            error.code != rust_auth.SshConnectErrorCode.passphraseRequired) {
+          rethrow;
+        }
+        final passphrase = await _promptSecret(
+          title: 'Private Key Passphrase',
+          label: 'Passphrase',
+        );
+        if (passphrase == null || !mounted) return;
+        started = await start(passphrase: passphrase);
+      }
       _replaceTunnelConfig(started);
       _syncTunnelStatusRefresh([
         for (final item in tunnelConfigs)
@@ -843,7 +906,9 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         host: draft.host,
         port: draft.port,
         username: draft.username,
+        authMode: draft.authMode,
         password: draft.password,
+        privateKeyPath: draft.privateKeyPath,
         termType: draft.termType,
       );
     } else {
@@ -853,7 +918,9 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         host: draft.host,
         port: draft.port,
         username: draft.username,
+        authMode: draft.authMode,
         password: draft.password,
+        privateKeyPath: draft.privateKeyPath,
         termType: draft.termType,
       );
     }
@@ -1189,7 +1256,46 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     }
   }
 
+  Future<String?> _promptSecret({
+    required String title,
+    required String label,
+  }) async {
+    var secret = '';
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          decoration: InputDecoration(labelText: label),
+          obscureText: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          onChanged: (value) => secret = value,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(secret),
+            child: const Text('Connect'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleConnectSshProfile(SshProfileItem profile) async {
+    String? runtimePassword;
+    if (profile.authMode == SshAuthMode.password && profile.password.isEmpty) {
+      runtimePassword = await _promptSecret(
+        title: 'SSH Password',
+        label: 'Password',
+      );
+      if (runtimePassword == null || !mounted) return;
+    }
+
     final nextIndex = sshSessionCounter + 1;
     final session = SshSessionItem(
       id: 'ssh-pending-$nextIndex',
@@ -1216,11 +1322,38 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     if (!mounted) return;
 
     try {
-      final result = await widget.sshBridge.connectProfile(
-        profile.id,
-        rows: session.terminal?.viewHeight,
-        cols: session.terminal?.viewWidth,
-      );
+      Future<SshConnectionResult> connect({String? passphrase}) {
+        return widget.sshBridge.connectProfile(
+          profile.id,
+          password: runtimePassword,
+          passphrase: passphrase,
+          rows: session.terminal?.viewHeight,
+          cols: session.terminal?.viewWidth,
+        );
+      }
+
+      SshConnectionResult result;
+      try {
+        result = await connect();
+      } on SshConnectException catch (error) {
+        if (profile.authMode != SshAuthMode.privateKey ||
+            error.code != rust_auth.SshConnectErrorCode.passphraseRequired) {
+          rethrow;
+        }
+        final passphrase = await _promptSecret(
+          title: 'Private Key Passphrase',
+          label: 'Passphrase',
+        );
+        if (passphrase == null || !mounted) {
+          _removeSshSession(session);
+          if (!mounted) return;
+          setState(() {
+            contentMode = WorkbenchContentMode.sshProfiles;
+          });
+          return;
+        }
+        result = await connect(passphrase: passphrase);
+      }
       if (!mounted) return;
       if (removedPendingSshSessionIds.remove(session.id)) {
         try {

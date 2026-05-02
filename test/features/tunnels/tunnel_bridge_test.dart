@@ -1,3 +1,4 @@
+import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/models/tunnel_config_item.dart';
 import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,7 +70,16 @@ void main() {
       expect(updated.type, TunnelForwardType.remote);
       expect(updated.status, TunnelRuntimeStatus.stopped);
 
-      final started = await bridge.startTunnel(updated.id);
+      final started = await bridge.startTunnel(
+        updated.id,
+        sshProfile: const SshProfileItem(
+          id: 'profile-2',
+          name: 'Prod',
+          host: 'example.com',
+          port: 22,
+          username: 'root',
+        ),
+      );
       expect(started.status, TunnelRuntimeStatus.forwarding);
       expect(
         (await bridge.listTunnels()).single.status,
