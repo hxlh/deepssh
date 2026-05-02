@@ -99,6 +99,28 @@ void main() {
     controller.dispose();
   });
 
+  test('applies foreground resolver once per visible non-empty row', () {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.resize(80, 24);
+    terminal.write('INFO first line\r\n');
+    terminal.write('WARN second line\r\n');
+    final foregroundColors = List<Color?>.filled(2 * terminal.viewWidth, null);
+    var resolverCalls = 0;
+
+    xterm_render.applyForegroundColorResolver(
+      foregroundColors,
+      resolver: (row, lineText, colors, rowOffset, viewWidth) {
+        resolverCalls++;
+      },
+      lines: terminal.buffer.lines,
+      firstLine: 0,
+      lastLine: 1,
+      viewWidth: terminal.viewWidth,
+    );
+
+    expect(resolverCalls, 2);
+  });
+
   testWidgets('passes terminal theme font weights to xterm view', (
     tester,
   ) async {
@@ -1391,13 +1413,13 @@ void main() {
       find.byType(xterm.TerminalView),
     );
     final lineText = terminal.buffer.lines[0].getText();
-    expect(terminalWidget.foregroundColorResolver!(0, 4, lineText), isNull);
+    expect(regexForegroundColor(terminalWidget, 0, 4, lineText), isNull);
     expect(
-      terminalWidget.foregroundColorResolver!(0, 5, lineText),
+      regexForegroundColor(terminalWidget, 0, 5, lineText),
       const Color(0xFFF5F543),
     );
     expect(
-      terminalWidget.foregroundColorResolver!(0, 13, lineText),
+      regexForegroundColor(terminalWidget, 0, 13, lineText),
       const Color(0xFFF5F543),
     );
   });
@@ -1443,14 +1465,14 @@ void main() {
       expect(terminalWidget.foregroundColorResolver, isNotNull);
 
       expect(
-        terminalWidget.foregroundColorResolver!(0, 0, lineText),
+        regexForegroundColor(terminalWidget, 0, 0, lineText),
         const Color(0xFFF14C4C),
       );
       expect(
-        terminalWidget.foregroundColorResolver!(0, 5, lineText),
+        regexForegroundColor(terminalWidget, 0, 5, lineText),
         const Color(0xFFF5F543),
       );
-      expect(terminalWidget.foregroundColorResolver!(0, 13, lineText), isNull);
+      expect(regexForegroundColor(terminalWidget, 0, 13, lineText), isNull);
       expect(
         terminal.buffer.lines[0].getForeground(0),
         isNot(terminalRgbColor(const Color(0xFFF14C4C))),
@@ -1500,7 +1522,7 @@ void main() {
       find.byType(xterm.TerminalView),
     );
     expect(
-      terminalWidget.foregroundColorResolver!(0, 0, 'ERROR old'),
+      regexForegroundColor(terminalWidget, 0, 0, 'ERROR old'),
       const Color(0xFFF14C4C),
     );
 
@@ -1521,7 +1543,7 @@ void main() {
       find.byType(xterm.TerminalView),
     );
     expect(
-      terminalWidget.foregroundColorResolver!(0, 0, 'ERROR old'),
+      regexForegroundColor(terminalWidget, 0, 0, 'ERROR old'),
       const Color(0xFFF5F543),
     );
     expect(
@@ -1567,7 +1589,8 @@ void main() {
       find.byType(xterm.TerminalView),
     );
     expect(
-      terminalWidget.foregroundColorResolver!(
+      regexForegroundColor(
+        terminalWidget,
         0,
         0,
         terminal.buffer.lines[0].getText(),
@@ -1583,7 +1606,7 @@ void main() {
     );
     final lineText = terminal.buffer.lines[0].getText();
     expect(lineText.startsWith('clean'), isTrue);
-    expect(terminalWidget.foregroundColorResolver!(0, 0, lineText), isNull);
+    expect(regexForegroundColor(terminalWidget, 0, 0, lineText), isNull);
     expect(
       terminal.buffer.lines[0].getForeground(0),
       isNot(terminalRgbColor(const Color(0xFFF14C4C))),
@@ -1655,11 +1678,11 @@ void main() {
     );
     final lineText = terminal.buffer.lines[0].getText();
     expect(
-      terminalWidget.foregroundColorResolver!(0, 0, lineText),
+      regexForegroundColor(terminalWidget, 0, 0, lineText),
       const Color(0xFFF5F543),
     );
     expect(
-      terminalWidget.foregroundColorResolver!(0, 3, lineText),
+      regexForegroundColor(terminalWidget, 0, 3, lineText),
       const Color(0xFFF5F543),
     );
     expect(
@@ -1709,11 +1732,11 @@ void main() {
     );
     final lineText = terminal.buffer.lines[2].getText();
     expect(
-      terminalWidget.foregroundColorResolver!(2, 12, lineText),
+      regexForegroundColor(terminalWidget, 2, 12, lineText),
       const Color(0xFFF14C4C),
     );
     expect(
-      terminalWidget.foregroundColorResolver!(2, 16, lineText),
+      regexForegroundColor(terminalWidget, 2, 16, lineText),
       const Color(0xFFF14C4C),
     );
     expect(
@@ -1769,11 +1792,11 @@ void main() {
     final firstText = terminal.buffer.lines[firstNewLine].getText();
     final secondText = terminal.buffer.lines[secondNewLine].getText();
     expect(
-      terminalWidget.foregroundColorResolver!(firstNewLine, 6, firstText),
+      regexForegroundColor(terminalWidget, firstNewLine, 6, firstText),
       const Color(0xFFF14C4C),
     );
     expect(
-      terminalWidget.foregroundColorResolver!(secondNewLine, 6, secondText),
+      regexForegroundColor(terminalWidget, secondNewLine, 6, secondText),
       const Color(0xFFF14C4C),
     );
     expect(
@@ -1816,6 +1839,26 @@ void main() {
 
 int terminalRgbColor(Color color) {
   return xterm.CellColor.rgb | (color.toARGB32() & xterm.CellColor.valueMask);
+}
+
+Color? regexForegroundColor(
+  xterm.TerminalView terminalWidget,
+  int row,
+  int column,
+  String lineText,
+) {
+  final foregroundColors = List<Color?>.filled(
+    terminalWidget.terminal.viewWidth,
+    null,
+  );
+  terminalWidget.foregroundColorResolver!(
+    row,
+    lineText,
+    foregroundColors,
+    0,
+    terminalWidget.terminal.viewWidth,
+  );
+  return foregroundColors[column];
 }
 
 xterm.TerminalView terminalView(WidgetTester tester) {

@@ -22,10 +22,12 @@ import 'package:xterm/src/utils/circular_buffer.dart';
 
 typedef EditableRectCallback = void Function(Rect rect, Rect caretRect);
 
-typedef ForegroundColorResolver = Color? Function(
+typedef ForegroundColorResolver = void Function(
   int row,
-  int column,
   String lineText,
+  List<Color?> foregroundColors,
+  int rowOffset,
+  int viewWidth,
 );
 
 List<Color?> createForegroundHighlightMap(
@@ -84,13 +86,7 @@ void applyForegroundColorResolver(
     final lineText = line.getText();
     if (lineText.isEmpty) continue;
     final rowOffset = (row - firstLine) * viewWidth;
-    final end = min(line.length, viewWidth);
-    for (var column = 0; column < end; column++) {
-      final color = resolver(row, column, lineText);
-      if (color != null) {
-        foregroundColors[rowOffset + column] = color;
-      }
-    }
+    resolver(row, lineText, foregroundColors, rowOffset, viewWidth);
   }
 }
 

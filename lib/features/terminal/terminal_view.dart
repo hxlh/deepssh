@@ -196,37 +196,66 @@ class _TerminalViewState extends State<TerminalView> {
     return rules;
   }
 
-  Color? _regexForegroundForCell(int row, int column, String lineText) {
+  void _regexForegroundForRow(
+    int row,
+    String lineText,
+    List<Color?> foregroundColors,
+    int rowOffset,
+    int viewWidth,
+  ) {
     final line = terminal.buffer.lines[row];
-    final textIndex = _textIndexForCellColumn(line, column);
-    for (final rule in _compiledRegexHighlights) {
-      for (final match in rule.regex.allMatches(lineText)) {
-        if (match.start == match.end) continue;
-        if (textIndex >= match.start && textIndex < match.end) {
-          return rule.foreground;
-        }
-      }
+    final end = line.length < viewWidth ? line.length : viewWidth;
+    for (final rule in _compiledRegexHighlights.reversed) {
+      _applyRegexForegroundRule(
+        line: line,
+        regex: rule.regex,
+        lineText: lineText,
+        foreground: rule.foreground,
+        foregroundColors: foregroundColors,
+        rowOffset: rowOffset,
+        end: end,
+      );
     }
-    return null;
   }
 
-  int _textIndexForCellColumn(xterm.BufferLine line, int column) {
+  void _applyRegexForegroundRule({
+    required xterm.BufferLine line,
+    required RegExp regex,
+    required String lineText,
+    required Color foreground,
+    required List<Color?> foregroundColors,
+    required int rowOffset,
+    required int end,
+  }) {
+    final matches = regex.allMatches(lineText).iterator;
+    if (!matches.moveNext()) return;
+    var match = matches.current;
     var textIndex = 0;
-    for (var cell = 0; cell <= column && cell < line.length; cell++) {
+
+    for (var cell = 0; cell < end; cell++) {
       final codePoint = line.getCodePoint(cell);
-      if (codePoint == 0) {
-        if (cell == column) return textIndex;
-        continue;
-      }
+      if (codePoint == 0) continue;
 
       final start = textIndex;
       final width = line.getWidth(cell);
       textIndex += String.fromCharCode(codePoint).length;
-      if (cell == column || (width == 2 && cell + 1 == column)) {
-        return start;
+
+      while (match.start == match.end || start >= match.end) {
+        if (!matches.moveNext()) return;
+        match = matches.current;
+      }
+
+      final inMatch = start >= match.start && start < match.end;
+      if (inMatch) {
+        foregroundColors[rowOffset + cell] = foreground;
+        if (width == 2 && cell + 1 < end) {
+          foregroundColors[rowOffset + cell + 1] = foreground;
+        }
+      }
+      if (width == 2 && cell + 1 < end) {
+        cell++;
       }
     }
-    return textIndex;
   }
 
   void _applyCursorBlinkMode() {
@@ -663,7 +692,7 @@ class _TerminalViewState extends State<TerminalView> {
                 cursorBlinkVisible: _cursorVisible,
                 foregroundColorResolver: _compiledRegexHighlights.isEmpty
                     ? null
-                    : _regexForegroundForCell,
+                    : _regexForegroundForRow,
                 textStyle: xterm.TerminalStyle(
                   fontSize: settings.fontSize.toDouble(),
                   fontFamily: settings.fontFamily,
