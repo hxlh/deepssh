@@ -2,6 +2,8 @@ name: Package Desktop Builds
 
 on:
   workflow_dispatch:
+  release:
+    types: [published]
 
 jobs:
   package:
