@@ -63,6 +63,8 @@ class TerminalView extends StatefulWidget {
 
 class _TerminalViewState extends State<TerminalView> {
   final inputFocusNode = FocusNode();
+  final _xtermTerminalViewKey = GlobalKey<xterm.TerminalViewState>();
+  final _terminalStackKey = GlobalKey();
   TextEditingController? _textController;
   final terminalController = xterm.TerminalController();
   late final xterm.Terminal terminal;
@@ -74,6 +76,8 @@ class _TerminalViewState extends State<TerminalView> {
   final _findScrollController = ScrollController();
   TerminalFindSession? _findSession;
   bool _localFindVisible = false;
+  Offset _proxyInputOffset = Offset.zero;
+  bool _proxyInputOffsetUpdateScheduled = false;
 
   bool get _isMacOS => defaultTargetPlatform == TargetPlatform.macOS;
 
@@ -171,6 +175,7 @@ class _TerminalViewState extends State<TerminalView> {
 
   void _handleTerminalChanged() {
     _resetCursorBlinkIdle();
+    _scheduleProxyInputOffsetUpdate();
   }
 
   List<_CompiledRegexHighlight> _compileRegexHighlightRules() {
@@ -581,6 +586,31 @@ class _TerminalViewState extends State<TerminalView> {
     super.dispose();
   }
 
+  void _scheduleProxyInputOffsetUpdate() {
+    if (_isMacOS || _proxyInputOffsetUpdateScheduled) return;
+    _proxyInputOffsetUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _proxyInputOffsetUpdateScheduled = false;
+      if (!mounted) return;
+
+      final terminalState = _xtermTerminalViewKey.currentState;
+      final stackBox = _terminalStackKey.currentContext?.findRenderObject();
+      if (terminalState == null ||
+          stackBox is! RenderBox ||
+          !stackBox.hasSize) {
+        return;
+      }
+
+      final nextOffset = stackBox.globalToLocal(
+        terminalState.globalCursorRect.topLeft,
+      );
+      if (nextOffset == _proxyInputOffset) return;
+      setState(() {
+        _proxyInputOffset = nextOffset;
+      });
+    });
+  }
+
   xterm.TerminalCursorType _xtermCursorType(CursorStyle style) {
     switch (style) {
       case CursorStyle.block:
@@ -601,11 +631,13 @@ class _TerminalViewState extends State<TerminalView> {
 
   @override
   Widget build(BuildContext context) {
+    _scheduleProxyInputOffsetUpdate();
     final settings = widget.terminalThemeSettings;
     return Container(
       color: AppColors.panel,
       padding: const EdgeInsets.all(12),
       child: Stack(
+        key: _terminalStackKey,
         children: [
           Positioned.fill(
             child: Listener(
@@ -619,6 +651,7 @@ class _TerminalViewState extends State<TerminalView> {
               },
               child: xterm.TerminalView(
                 terminal,
+                key: _xtermTerminalViewKey,
                 controller: terminalController,
                 scrollController: _findScrollController,
                 focusNode: inputFocusNode,
@@ -671,6 +704,8 @@ class _TerminalViewState extends State<TerminalView> {
           ),
           if (!_isMacOS)
             Positioned(
+              left: _proxyInputOffset.dx,
+              top: _proxyInputOffset.dy,
               width: 1,
               height: 1,
               child: Opacity(

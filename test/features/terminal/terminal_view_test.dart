@@ -483,6 +483,50 @@ void main() {
     expect(scrollController.offset, lessThan(bottomOffset));
   });
 
+  testWidgets('positions non-macOS IME proxy at terminal cursor', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.write('prompt> ');
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            terminalThemeSettings: _defaultTerminalTheme,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final isMacOS = defaultTargetPlatform == TargetPlatform.macOS;
+    if (isMacOS) {
+      expect(find.byKey(const Key('terminal-input-proxy')), findsNothing);
+      return;
+    }
+
+    final terminalState = tester.state<xterm.TerminalViewState>(
+      find.byType(xterm.TerminalView),
+    );
+    final proxyTopLeft = tester.getTopLeft(
+      find.byKey(const Key('terminal-input-proxy')),
+    );
+
+    expect(proxyTopLeft.dx, terminalState.globalCursorRect.left);
+    expect(proxyTopLeft.dy, terminalState.globalCursorRect.top);
+  });
+
   testWidgets('enables text input so IME composition can enter SSH terminals', (
     tester,
   ) async {
