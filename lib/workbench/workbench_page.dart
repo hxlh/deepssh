@@ -301,6 +301,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   bool localExpanded = true;
   List<LocalTerminalItem> localTerminals = const [];
   List<SshProfileItem> sshProfiles = const [];
+  List<String> explorerSectionOrder = const [];
   Map<String, List<SshSessionItem>> sshSessionsByProfileId = const {};
   int sshSessionCounter = 0;
   final sshZModemSessions = <String, SshZModemBinding>{};
@@ -598,13 +599,18 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     });
   }
 
-  void _handleReorderProfiles(int oldIndex, int newIndex) {
+  void _handleExplorerSectionOrderChanged(List<String> next) {
     setState(() {
-      final next = [...sshProfiles];
-      final item = next.removeAt(oldIndex);
-      final insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
-      next.insert(insertAt, item);
-      sshProfiles = next;
+      explorerSectionOrder = next;
+      final profilesById = {
+        for (final profile in sshProfiles) profile.id: profile,
+      };
+      sshProfiles = [
+        for (final id in next)
+          if (id.startsWith('profile:') &&
+              profilesById[id.substring('profile:'.length)] != null)
+            profilesById[id.substring('profile:'.length)]!,
+      ];
     });
   }
 
@@ -943,10 +949,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
 
     void writeTerminalText(String text) {
       if (!mounted || text.isEmpty) return;
-      final buffer = sshOutputBuffers.putIfAbsent(
-        session.id,
-        StringBuffer.new,
-      );
+      final buffer = sshOutputBuffers.putIfAbsent(session.id, StringBuffer.new);
       buffer.write(text);
       _scheduleSshOutputFlush(session);
     }
@@ -1338,9 +1341,10 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               onOpenThemeConfig: _handleOpenThemeConfig,
               themeConfigActive:
                   contentMode == WorkbenchContentMode.themeConfig,
-              onReorderProfiles: _handleReorderProfiles,
               onReorderSessions: _handleReorderSessions,
               onReorderLocalTerminals: _handleReorderLocalTerminals,
+              sectionOrder: explorerSectionOrder,
+              onSectionOrderChanged: _handleExplorerSectionOrderChanged,
             ),
           ),
           VerticalDivider(width: 1, thickness: 1, color: AppColors.border),

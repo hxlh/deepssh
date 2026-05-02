@@ -30,9 +30,10 @@ class HostTree extends StatelessWidget {
     required this.onCloseLocalTerminal,
     required this.onOpenThemeConfig,
     required this.themeConfigActive,
-    this.onReorderProfiles,
     this.onReorderSessions,
     this.onReorderLocalTerminals,
+    this.sectionOrder = const [],
+    this.onSectionOrderChanged,
   });
 
   final HostTreeState state;
@@ -53,14 +54,45 @@ class HostTree extends StatelessWidget {
   final Future<void> Function(LocalTerminalItem) onCloseLocalTerminal;
   final VoidCallback onOpenThemeConfig;
   final bool themeConfigActive;
-  final void Function(int oldIndex, int newIndex)? onReorderProfiles;
   final void Function(String profileId, int oldIndex, int newIndex)?
   onReorderSessions;
   final void Function(int oldIndex, int newIndex)? onReorderLocalTerminals;
+  final List<String> sectionOrder;
+  final ValueChanged<List<String>>? onSectionOrderChanged;
 
   static const Color _menuAccent = Color(0xFFFFB280);
   static const double _menuItemHeight = 32;
   static const double _menuWidth = 150;
+  static const String _localSectionId = 'local';
+
+  String _profileSectionId(String profileId) => 'profile:$profileId';
+
+  String? _profileIdFromSectionId(String sectionId) {
+    const prefix = 'profile:';
+    if (!sectionId.startsWith(prefix)) return null;
+    return sectionId.substring(prefix.length);
+  }
+
+  List<String> _sectionIds() {
+    final available = [
+      for (final profile in sshProfiles) _profileSectionId(profile.id),
+      if (localTerminals.isNotEmpty) _localSectionId,
+    ];
+    return [
+      for (final id in sectionOrder)
+        if (available.contains(id)) id,
+      for (final id in available)
+        if (!sectionOrder.contains(id)) id,
+    ];
+  }
+
+  void _handleSectionReorder(int oldIndex, int newIndex) {
+    final next = _sectionIds();
+    final item = next.removeAt(oldIndex);
+    final insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
+    next.insert(insertAt, item);
+    onSectionOrderChanged?.call(next);
+  }
 
   RelativeRect _menuPosition(BuildContext context, Offset position) {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
@@ -252,8 +284,91 @@ class HostTree extends StatelessWidget {
     );
   }
 
+  Widget _profileSection(SshProfileItem profile, int sectionIndex) {
+    final sessions =
+        sshSessionsByProfileId[profile.id] ?? const <SshSessionItem>[];
+    return Column(
+      key: ValueKey('section-profile-${profile.id}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ReorderableDragStartListener(
+          index: sectionIndex,
+          child: _profileHeader(profile),
+        ),
+        if (sessions.isNotEmpty)
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: sessions.length,
+            onReorder: (oldIndex, newIndex) {
+              onReorderSessions?.call(profile.id, oldIndex, newIndex);
+            },
+            itemBuilder: (context, sessionIndex) {
+              return ReorderableDragStartListener(
+                index: sessionIndex,
+                key: ValueKey('session-${sessions[sessionIndex].id}'),
+                child: _sessionItem(context, sessions[sessionIndex]),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _localSection(int sectionIndex) {
+    return Column(
+      key: const ValueKey('section-local'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ReorderableDragStartListener(
+          index: sectionIndex,
+          child: InkWell(
+            onTap: onToggleLocal,
+            child: Container(
+              height: AppSpacing.itemHeight,
+              margin: const EdgeInsets.fromLTRB(8, 2, 8, 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.laptop, size: 16, color: AppColors.textMuted),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Text('Local')),
+                  Icon(
+                    localExpanded ? Icons.expand_more : Icons.chevron_right,
+                    size: 18,
+                    color: AppColors.textMuted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (localExpanded)
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: localTerminals.length,
+            onReorder: onReorderLocalTerminals ?? (_, __) {},
+            itemBuilder: (context, index) {
+              return ReorderableDragStartListener(
+                index: index,
+                key: ValueKey('local-${localTerminals[index].id}'),
+                child: _localTerminalItem(context, localTerminals[index]),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final sections = _sectionIds();
+    final profilesById = {
+      for (final profile in sshProfiles) profile.id: profile,
+    };
     return Column(
       children: [
         Expanded(
@@ -271,104 +386,26 @@ class HostTree extends StatelessWidget {
                       onToggle: () => onToggleHost(host.id),
                       onTerminalTap: onTerminalTap,
                     );
-                  })
-                else
+                  }),
+                if (sections.isNotEmpty)
                   ReorderableListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     buildDefaultDragHandles: false,
-                    itemCount: sshProfiles.length,
-                    onReorder: onReorderProfiles ?? (_, __) {},
-                    itemBuilder: (context, profileIndex) {
-                      final profile = sshProfiles[profileIndex];
-                      final sessions =
-                          sshSessionsByProfileId[profile.id] ??
-                          const <SshSessionItem>[];
-                      return Column(
-                        key: ValueKey('profile-${profile.id}'),
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          ReorderableDragStartListener(
-                            index: profileIndex,
-                            child: _profileHeader(profile),
-                          ),
-                          if (sessions.isNotEmpty)
-                            ReorderableListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              buildDefaultDragHandles: false,
-                              itemCount: sessions.length,
-                              onReorder: (oldIndex, newIndex) {
-                                onReorderSessions?.call(
-                                  profile.id,
-                                  oldIndex,
-                                  newIndex,
-                                );
-                              },
-                              itemBuilder: (context, sessionIndex) {
-                                return ReorderableDragStartListener(
-                                  index: sessionIndex,
-                                  key: ValueKey(
-                                    'session-${sessions[sessionIndex].id}',
-                                  ),
-                                  child: _sessionItem(
-                                    context,
-                                    sessions[sessionIndex],
-                                  ),
-                                );
-                              },
-                            ),
-                        ],
+                    itemCount: sections.length,
+                    onReorder: _handleSectionReorder,
+                    itemBuilder: (context, sectionIndex) {
+                      final sectionId = sections[sectionIndex];
+                      if (sectionId == _localSectionId) {
+                        return _localSection(sectionIndex);
+                      }
+                      final profileId = _profileIdFromSectionId(sectionId)!;
+                      return _profileSection(
+                        profilesById[profileId]!,
+                        sectionIndex,
                       );
                     },
                   ),
-                if (localTerminals.isNotEmpty) ...[
-                  InkWell(
-                    onTap: onToggleLocal,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: SizedBox(
-                        height: AppSpacing.itemHeight,
-                        child: Row(
-                          children: [
-                            Icon(
-                              localExpanded
-                                  ? Icons.expand_more
-                                  : Icons.chevron_right,
-                              size: 18,
-                              color: AppColors.textMuted,
-                            ),
-                            Icon(
-                              Icons.laptop,
-                              size: 16,
-                              color: AppColors.textMuted,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('Local'),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (localExpanded)
-                    ReorderableListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      buildDefaultDragHandles: false,
-                      itemCount: localTerminals.length,
-                      onReorder: onReorderLocalTerminals ?? (_, __) {},
-                      itemBuilder: (context, index) {
-                        return ReorderableDragStartListener(
-                          index: index,
-                          key: ValueKey('local-${localTerminals[index].id}'),
-                          child: _localTerminalItem(
-                            context,
-                            localTerminals[index],
-                          ),
-                        );
-                      },
-                    ),
-                ],
               ],
             ),
           ),
