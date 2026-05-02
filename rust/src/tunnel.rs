@@ -19,6 +19,7 @@ use uuid::Uuid;
 
 use crate::config_path::config_file_path;
 use crate::profile;
+use crate::ssh_auth::{self, SshAuthCredential, SshConnectError};
 use crate::ssh_session::TOKIO_RUNTIME;
 
 const CONFIG_FILE_NAME: &str = "tunnels.yaml";
@@ -64,6 +65,26 @@ pub struct TunnelConfig {
     pub target_host: String,
     pub target_port: u16,
     pub status: TunnelRuntimeStatus,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TunnelStartResult {
+    pub tunnel: Option<TunnelConfig>,
+    pub error: Option<SshConnectError>,
+}
+
+fn tunnel_start_success(tunnel: TunnelConfig) -> TunnelStartResult {
+    TunnelStartResult {
+        tunnel: Some(tunnel),
+        error: None,
+    }
+}
+
+fn tunnel_start_failure(error: SshConnectError) -> TunnelStartResult {
+    TunnelStartResult {
+        tunnel: None,
+        error: Some(error),
+    }
 }
 
 #[flutter_rust_bridge::frb(ignore)]
@@ -306,6 +327,7 @@ fn set_runtime_status(id: &str, status: TunnelRuntimeStatus) {
 
 async fn connect_ssh_profile(
     profile_id: &str,
+    credential: SshAuthCredential,
     remote_routes: Arc<Mutex<HashMap<String, RemoteRoute>>>,
 ) -> Result<client::Handle<TunnelClientHandler>> {
     let ssh_profile = profile::list_profiles()?
@@ -320,13 +342,9 @@ async fn connect_ssh_profile(
     let mut handle = client::connect(config, addr, TunnelClientHandler { remote_routes })
         .await
         .map_err(|error| anyhow!("SSH connect failed: {:?}", error))?;
-    let auth = handle
-        .authenticate_password(ssh_profile.username, ssh_profile.password)
+    ssh_auth::authenticate(&mut handle, ssh_profile.username, credential)
         .await
-        .map_err(|error| anyhow!("SSH auth failed: {:?}", error))?;
-    if !auth.success() {
-        return Err(anyhow!("SSH authentication failed"));
-    }
+        .map_err(|error| anyhow!(error.message))?;
     Ok(handle)
 }
 
@@ -497,7 +515,7 @@ pub fn delete_tunnel(id: String) -> Result<()> {
     result
 }
 
-pub fn start_tunnel(id: String) -> Result<TunnelConfig> {
+pub fn start_tunnel(id: String, credential: SshAuthCredential) -> Result<TunnelStartResult> {
     let result = (|| {
         let tunnel = {
             let mut store = TUNNEL_STORE.lock().unwrap();
@@ -511,7 +529,16 @@ pub fn start_tunnel(id: String) -> Result<TunnelConfig> {
         };
 
         if RUNTIME_STORE.lock().unwrap().contains_key(&id) {
-            return Ok(with_runtime_status(tunnel));
+            return Ok(tunnel_start_success(with_runtime_status(tunnel)));
+        }
+
+        if let Some(private_key_path) = &credential.private_key_path {
+            if let Err(error) = ssh_auth::load_private_key(
+                std::path::Path::new(private_key_path),
+                credential.passphrase.as_deref(),
+            ) {
+                return Ok(tunnel_start_failure(error));
+            }
         }
 
         let (stop_tx, stop_rx) = oneshot::channel::<()>();
@@ -523,8 +550,8 @@ pub fn start_tunnel(id: String) -> Result<TunnelConfig> {
             },
         );
 
-        TOKIO_RUNTIME.spawn(run_tunnel(tunnel.clone(), stop_rx));
-        Ok(with_runtime_status(tunnel))
+        TOKIO_RUNTIME.spawn(run_tunnel(tunnel.clone(), credential, stop_rx));
+        Ok(tunnel_start_success(with_runtime_status(tunnel)))
     })();
     if let Err(error) = &result {
         crate::app_log::log_error("tunnel.start", error);
@@ -557,10 +584,14 @@ pub fn stop_tunnel(id: String) -> Result<TunnelConfig> {
     result
 }
 
-async fn run_tunnel(tunnel: TunnelConfig, stop_rx: oneshot::Receiver<()>) {
+async fn run_tunnel(
+    tunnel: TunnelConfig,
+    credential: SshAuthCredential,
+    stop_rx: oneshot::Receiver<()>,
+) {
     let result = match tunnel.forward_type {
-        TunnelForwardType::Local => run_local_tunnel(tunnel.clone(), stop_rx).await,
-        TunnelForwardType::Remote => run_remote_tunnel(tunnel.clone(), stop_rx).await,
+        TunnelForwardType::Local => run_local_tunnel(tunnel.clone(), credential, stop_rx).await,
+        TunnelForwardType::Remote => run_remote_tunnel(tunnel.clone(), credential, stop_rx).await,
     };
     if let Err(error) = result {
         crate::app_log::log_error("tunnel.runtime", &error);
@@ -568,10 +599,20 @@ async fn run_tunnel(tunnel: TunnelConfig, stop_rx: oneshot::Receiver<()>) {
     RUNTIME_STORE.lock().unwrap().remove(&tunnel.id);
 }
 
-async fn run_local_tunnel(tunnel: TunnelConfig, mut stop_rx: oneshot::Receiver<()>) -> Result<()> {
+async fn run_local_tunnel(
+    tunnel: TunnelConfig,
+    credential: SshAuthCredential,
+    mut stop_rx: oneshot::Receiver<()>,
+) -> Result<()> {
     let remote_routes = Arc::new(Mutex::new(HashMap::new()));
-    let handle =
-        Arc::new(connect_ssh_profile(&tunnel.ssh_profile_id, Arc::clone(&remote_routes)).await?);
+    let handle = Arc::new(
+        connect_ssh_profile(
+            &tunnel.ssh_profile_id,
+            credential,
+            Arc::clone(&remote_routes),
+        )
+        .await?,
+    );
     let mut backoff = Duration::from_secs(1);
 
     loop {
@@ -644,9 +685,18 @@ async fn handle_local_tunnel_connection(
     relay_tcp_stream_and_channel(stream, channel).await
 }
 
-async fn run_remote_tunnel(tunnel: TunnelConfig, mut stop_rx: oneshot::Receiver<()>) -> Result<()> {
+async fn run_remote_tunnel(
+    tunnel: TunnelConfig,
+    credential: SshAuthCredential,
+    mut stop_rx: oneshot::Receiver<()>,
+) -> Result<()> {
     let remote_routes = Arc::new(Mutex::new(HashMap::new()));
-    let handle = connect_ssh_profile(&tunnel.ssh_profile_id, Arc::clone(&remote_routes)).await?;
+    let handle = connect_ssh_profile(
+        &tunnel.ssh_profile_id,
+        credential,
+        Arc::clone(&remote_routes),
+    )
+    .await?;
     let mut backoff = Duration::from_secs(1);
 
     loop {
@@ -704,7 +754,19 @@ mod tests {
     use std::{env, fs, path::Path, time::Duration};
 
     use super::*;
-    use crate::ssh_session::TOKIO_RUNTIME;
+    use crate::{
+        ssh_auth::{SshAuthCredential, SshConnectErrorCode},
+        ssh_session::TOKIO_RUNTIME,
+    };
+
+    const ENCRYPTED_ED25519_KEY: &str = r#"-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABD1phlku5
+A2G7Q9iP+DcOc9AAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIHeLC1lWiCYrXsf/
+85O/pkbUFZ6OGIt49PX3nw8iRoXEAAAAkKRF0st5ZI7xxo9g6A4m4l6NarkQre3mycqNXQ
+dP3jryYgvsCIBAA5jMWSjrmnOTXhidqcOy4xYCrAttzSnZ/cUadfBenL+DQq6neffw7j8r
+0tbCxVGp6yCQlKrgSZf6c0Hy7dNEIU2bJFGxLe6/kWChcUAt/5Ll5rI7DVQPJdLgehLzvv
+sJWR7W+cGvJ/vLsw==
+-----END OPENSSH PRIVATE KEY-----"#;
 
     struct TestWorkspace {
         original_dir: std::path::PathBuf,
@@ -891,5 +953,41 @@ mod tests {
 
         assert_eq!(tunnels.len(), 1);
         assert_eq!(tunnels[0].status, TunnelRuntimeStatus::Waiting);
+    }
+
+    #[test]
+    fn encrypted_private_key_tunnel_start_returns_passphrase_required() {
+        let _guard = clear_tunnels_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+        let key_path = workspace.path().join("id_ed25519");
+        fs::write(&key_path, ENCRYPTED_ED25519_KEY).unwrap();
+        let tunnel = create_tunnel(
+            "Dev API".to_string(),
+            TunnelForwardType::Local,
+            "profile-1".to_string(),
+            "127.0.0.1".to_string(),
+            18080,
+            "127.0.0.1".to_string(),
+            8080,
+        )
+        .unwrap();
+
+        let result = start_tunnel(
+            tunnel.id.clone(),
+            SshAuthCredential {
+                password: None,
+                private_key_path: Some(key_path.to_string_lossy().to_string()),
+                passphrase: None,
+            },
+        )
+        .unwrap();
+
+        assert!(result.tunnel.is_none());
+        assert_eq!(
+            result.error.unwrap().code,
+            SshConnectErrorCode::PassphraseRequired
+        );
+        assert!(!RUNTIME_STORE.lock().unwrap().contains_key(&tunnel.id));
     }
 }

@@ -12,6 +12,7 @@ import 'frb_generated.dart';
 import 'local_terminal.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 import 'profile.dart';
+import 'ssh_auth.dart';
 import 'ssh_session.dart';
 import 'theme.dart';
 import 'tunnel.dart';
@@ -39,7 +40,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  SshAuthCredential dco_decode_box_autoadd_ssh_auth_credential(dynamic raw);
+
+  @protected
+  SshConnectError dco_decode_box_autoadd_ssh_connect_error(dynamic raw);
+
+  @protected
+  SshSession dco_decode_box_autoadd_ssh_session(dynamic raw);
+
+  @protected
   ThemeSettings dco_decode_box_autoadd_theme_settings(dynamic raw);
+
+  @protected
+  TunnelConfig dco_decode_box_autoadd_tunnel_config(dynamic raw);
 
   @protected
   int dco_decode_box_autoadd_u_16(dynamic raw);
@@ -66,10 +79,37 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LocalTerminalSession dco_decode_local_terminal_session(dynamic raw);
 
   @protected
+  String? dco_decode_opt_String(dynamic raw);
+
+  @protected
+  SshConnectError? dco_decode_opt_box_autoadd_ssh_connect_error(dynamic raw);
+
+  @protected
+  SshSession? dco_decode_opt_box_autoadd_ssh_session(dynamic raw);
+
+  @protected
+  TunnelConfig? dco_decode_opt_box_autoadd_tunnel_config(dynamic raw);
+
+  @protected
   int? dco_decode_opt_box_autoadd_u_16(dynamic raw);
 
   @protected
   RegexHighlight dco_decode_regex_highlight(dynamic raw);
+
+  @protected
+  SshAuthCredential dco_decode_ssh_auth_credential(dynamic raw);
+
+  @protected
+  SshAuthMode dco_decode_ssh_auth_mode(dynamic raw);
+
+  @protected
+  SshConnectError dco_decode_ssh_connect_error(dynamic raw);
+
+  @protected
+  SshConnectErrorCode dco_decode_ssh_connect_error_code(dynamic raw);
+
+  @protected
+  SshConnectResult dco_decode_ssh_connect_result(dynamic raw);
 
   @protected
   SshProfile dco_decode_ssh_profile(dynamic raw);
@@ -91,6 +131,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TunnelRuntimeStatus dco_decode_tunnel_runtime_status(dynamic raw);
+
+  @protected
+  TunnelStartResult dco_decode_tunnel_start_result(dynamic raw);
 
   @protected
   int dco_decode_u_16(dynamic raw);
@@ -122,7 +165,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  SshAuthCredential sse_decode_box_autoadd_ssh_auth_credential(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SshConnectError sse_decode_box_autoadd_ssh_connect_error(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SshSession sse_decode_box_autoadd_ssh_session(SseDeserializer deserializer);
+
+  @protected
   ThemeSettings sse_decode_box_autoadd_theme_settings(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  TunnelConfig sse_decode_box_autoadd_tunnel_config(
     SseDeserializer deserializer,
   );
 
@@ -157,10 +218,47 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  SshConnectError? sse_decode_opt_box_autoadd_ssh_connect_error(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SshSession? sse_decode_opt_box_autoadd_ssh_session(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  TunnelConfig? sse_decode_opt_box_autoadd_tunnel_config(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer);
 
   @protected
   RegexHighlight sse_decode_regex_highlight(SseDeserializer deserializer);
+
+  @protected
+  SshAuthCredential sse_decode_ssh_auth_credential(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SshAuthMode sse_decode_ssh_auth_mode(SseDeserializer deserializer);
+
+  @protected
+  SshConnectError sse_decode_ssh_connect_error(SseDeserializer deserializer);
+
+  @protected
+  SshConnectErrorCode sse_decode_ssh_connect_error_code(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SshConnectResult sse_decode_ssh_connect_result(SseDeserializer deserializer);
 
   @protected
   SshProfile sse_decode_ssh_profile(SseDeserializer deserializer);
@@ -184,6 +282,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TunnelRuntimeStatus sse_decode_tunnel_runtime_status(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  TunnelStartResult sse_decode_tunnel_start_result(
     SseDeserializer deserializer,
   );
 
@@ -221,8 +324,32 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_ssh_auth_credential(
+    SshAuthCredential self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_ssh_connect_error(
+    SshConnectError self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_ssh_session(
+    SshSession self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_theme_settings(
     ThemeSettings self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_tunnel_config(
+    TunnelConfig self,
     SseSerializer serializer,
   );
 
@@ -266,11 +393,59 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_ssh_connect_error(
+    SshConnectError? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_ssh_session(
+    SshSession? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_tunnel_config(
+    TunnelConfig? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer);
 
   @protected
   void sse_encode_regex_highlight(
     RegexHighlight self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ssh_auth_credential(
+    SshAuthCredential self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ssh_auth_mode(SshAuthMode self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ssh_connect_error(
+    SshConnectError self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ssh_connect_error_code(
+    SshConnectErrorCode self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ssh_connect_result(
+    SshConnectResult self,
     SseSerializer serializer,
   );
 
@@ -298,6 +473,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_tunnel_runtime_status(
     TunnelRuntimeStatus self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_tunnel_start_result(
+    TunnelStartResult self,
     SseSerializer serializer,
   );
 

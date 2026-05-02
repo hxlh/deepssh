@@ -2,21 +2,27 @@ import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/models/tunnel_config_item.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
+import 'package:deepssh/src/rust/ssh_auth.dart' as rust_auth;
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeSshBridgeClient implements SshBridgeClient {
-  final profiles = <SshProfileItem>[
-    const SshProfileItem(
-      id: 'profile-1',
-      name: 'Prod',
-      host: 'example.com',
-      port: 22,
-      username: 'root',
-      password: 'secret',
-    ),
-  ];
+  FakeSshBridgeClient({List<SshProfileItem>? profiles})
+    : profiles =
+          profiles ??
+          <SshProfileItem>[
+            const SshProfileItem(
+              id: 'profile-1',
+              name: 'Prod',
+              host: 'example.com',
+              port: 22,
+              username: 'root',
+              password: 'secret',
+            ),
+          ];
+
+  final List<SshProfileItem> profiles;
 
   @override
   Future<List<SshProfileItem>> listProfiles() async => List.of(profiles);
@@ -27,7 +33,9 @@ class FakeSshBridgeClient implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) async => throw UnimplementedError();
 
@@ -38,7 +46,9 @@ class FakeSshBridgeClient implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) async => throw UnimplementedError();
 
@@ -48,6 +58,8 @@ class FakeSshBridgeClient implements SshBridgeClient {
   @override
   Future<SshConnectionResult> connectProfile(
     String id, {
+    String? password,
+    String? passphrase,
     int? rows,
     int? cols,
   }) async => throw UnimplementedError();
@@ -77,6 +89,9 @@ class FakeTunnelBridgeClient extends InMemoryTunnelBridgeClient {
   var listCount = 0;
   var startCount = 0;
   var stopCount = 0;
+  String? lastRuntimePassword;
+  String? lastRuntimePassphrase;
+  Object? startError;
 
   @override
   Future<List<TunnelConfigItem>> listTunnels() async {
@@ -85,9 +100,21 @@ class FakeTunnelBridgeClient extends InMemoryTunnelBridgeClient {
   }
 
   @override
-  Future<TunnelConfigItem> startTunnel(String id) async {
+  Future<TunnelConfigItem> startTunnel(
+    String id, {
+    required SshProfileItem sshProfile,
+    String? password,
+    String? passphrase,
+  }) async {
     startCount += 1;
-    return super.startTunnel(id);
+    lastRuntimePassword = password;
+    lastRuntimePassphrase = passphrase;
+    final error = startError;
+    if (error != null) {
+      startError = null;
+      throw error;
+    }
+    return super.startTunnel(id, sshProfile: sshProfile);
   }
 
   @override
@@ -176,5 +203,112 @@ void main() {
     await tester.pumpAndSettle();
     expect(tunnelBridge.stopCount, 1);
     expect(find.byKey(const Key('tunnel-start-tunnel-1')), findsOneWidget);
+  });
+
+  testWidgets('tunnel start with empty saved password prompts for password', (
+    tester,
+  ) async {
+    final sshBridge = FakeSshBridgeClient(
+      profiles: const [
+        SshProfileItem(
+          id: 'profile-1',
+          name: 'Prod',
+          host: 'example.com',
+          port: 22,
+          username: 'root',
+          password: '',
+        ),
+      ],
+    );
+    final tunnelBridge = FakeTunnelBridgeClient();
+    await tunnelBridge.createTunnel(
+      name: 'Dev API',
+      type: TunnelForwardType.local,
+      sshProfileId: 'profile-1',
+      listenHost: '127.0.0.1',
+      listenPort: 18080,
+      targetHost: '127.0.0.1',
+      targetPort: 8080,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkbenchPage(sshBridge: sshBridge, tunnelBridge: tunnelBridge),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('隧道连接'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('tunnel-start-tunnel-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('SSH Password'), findsOneWidget);
+
+    await tester.enterText(find.bySemanticsLabel('Password'), 'runtime-secret');
+    await tester.tap(find.text('Connect'));
+    await tester.pumpAndSettle();
+
+    expect(tunnelBridge.startCount, 1);
+    expect(tunnelBridge.lastRuntimePassword, 'runtime-secret');
+    expect(find.byKey(const Key('tunnel-stop-tunnel-1')), findsOneWidget);
+  });
+
+  testWidgets('private key tunnel start retries after passphrase prompt', (
+    tester,
+  ) async {
+    final sshBridge = FakeSshBridgeClient(
+      profiles: const [
+        SshProfileItem(
+          id: 'profile-1',
+          name: 'Prod',
+          host: 'example.com',
+          port: 22,
+          username: 'root',
+          authMode: SshAuthMode.privateKey,
+          privateKeyPath: 'C:/Users/hxlh/.ssh/id_ed25519',
+        ),
+      ],
+    );
+    final tunnelBridge = FakeTunnelBridgeClient()
+      ..startError = const SshConnectException(
+        rust_auth.SshConnectErrorCode.passphraseRequired,
+        'Private key requires a passphrase',
+      );
+    await tunnelBridge.createTunnel(
+      name: 'Dev API',
+      type: TunnelForwardType.local,
+      sshProfileId: 'profile-1',
+      listenHost: '127.0.0.1',
+      listenPort: 18080,
+      targetHost: '127.0.0.1',
+      targetPort: 8080,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkbenchPage(sshBridge: sshBridge, tunnelBridge: tunnelBridge),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('隧道连接'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('tunnel-start-tunnel-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Private Key Passphrase'), findsOneWidget);
+
+    await tester.enterText(find.bySemanticsLabel('Passphrase'), 'key-secret');
+    await tester.tap(find.text('Connect'));
+    await tester.pumpAndSettle();
+
+    expect(tunnelBridge.startCount, 2);
+    expect(tunnelBridge.lastRuntimePassphrase, 'key-secret');
+    expect(find.byKey(const Key('tunnel-stop-tunnel-1')), findsOneWidget);
   });
 }

@@ -1830,6 +1830,8 @@ class RecordingSshBridgeClient implements SshBridgeClient {
   @override
   Future<SshConnectionResult> connectProfile(
     String id, {
+    String? password,
+    String? passphrase,
     int? rows,
     int? cols,
   }) async {
@@ -1845,7 +1847,9 @@ class RecordingSshBridgeClient implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) async {
     return SshProfileItem(
@@ -1854,7 +1858,9 @@ class RecordingSshBridgeClient implements SshBridgeClient {
       host: host,
       port: port,
       username: username,
+      authMode: authMode,
       password: password,
+      privateKeyPath: privateKeyPath,
       termType: termType,
     );
   }
@@ -1884,7 +1890,9 @@ class RecordingSshBridgeClient implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) async {
     return SshProfileItem(
@@ -1893,7 +1901,9 @@ class RecordingSshBridgeClient implements SshBridgeClient {
       host: host,
       port: port,
       username: username,
+      authMode: authMode,
       password: password,
+      privateKeyPath: privateKeyPath,
       termType: termType,
     );
   }

@@ -11,6 +11,7 @@ import 'frb_generated.io.dart'
 import 'local_terminal.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'profile.dart';
+import 'ssh_auth.dart';
 import 'ssh_session.dart';
 import 'theme.dart';
 import 'tunnel.dart';
@@ -86,13 +87,13 @@ abstract class RustLibApi extends BaseApi {
 
   Future<bool> crateSshSessionCloseSession({required String sessionId});
 
-  Future<SshSession> crateSshSessionConnectProfile({
+  Future<SshConnectResult> crateSshSessionConnectProfile({
     required String profileId,
     required String title,
     required String host,
     required int port,
     required String username,
-    required String password,
+    required SshAuthCredential credential,
     required String termType,
     required int rows,
     required int cols,
@@ -111,7 +112,9 @@ abstract class RustLibApi extends BaseApi {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   });
 
@@ -158,7 +161,10 @@ abstract class RustLibApi extends BaseApi {
     int? cols,
   });
 
-  Future<TunnelConfig> crateTunnelStartTunnel({required String id});
+  Future<TunnelStartResult> crateTunnelStartTunnel({
+    required String id,
+    required SshAuthCredential credential,
+  });
 
   Future<TunnelConfig> crateTunnelStopTunnel({required String id});
 
@@ -168,7 +174,9 @@ abstract class RustLibApi extends BaseApi {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   });
 
@@ -264,13 +272,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "close_session", argNames: ["sessionId"]);
 
   @override
-  Future<SshSession> crateSshSessionConnectProfile({
+  Future<SshConnectResult> crateSshSessionConnectProfile({
     required String profileId,
     required String title,
     required String host,
     required int port,
     required String username,
-    required String password,
+    required SshAuthCredential credential,
     required String termType,
     required int rows,
     required int cols,
@@ -284,7 +292,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(host, serializer);
           sse_encode_u_16(port, serializer);
           sse_encode_String(username, serializer);
-          sse_encode_String(password, serializer);
+          sse_encode_box_autoadd_ssh_auth_credential(credential, serializer);
           sse_encode_String(termType, serializer);
           sse_encode_u_16(rows, serializer);
           sse_encode_u_16(cols, serializer);
@@ -296,7 +304,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_ssh_session,
+          decodeSuccessData: sse_decode_ssh_connect_result,
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateSshSessionConnectProfileConstMeta,
@@ -306,7 +314,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           host,
           port,
           username,
-          password,
+          credential,
           termType,
           rows,
           cols,
@@ -325,7 +333,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "host",
           "port",
           "username",
-          "password",
+          "credential",
           "termType",
           "rows",
           "cols",
@@ -416,7 +424,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) {
     return handler.executeNormal(
@@ -427,7 +437,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(host, serializer);
           sse_encode_u_16(port, serializer);
           sse_encode_String(username, serializer);
+          sse_encode_ssh_auth_mode(authMode, serializer);
           sse_encode_String(password, serializer);
+          sse_encode_String(privateKeyPath, serializer);
           sse_encode_String(termType, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
@@ -441,7 +453,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateProfileCreateProfileConstMeta,
-        argValues: [name, host, port, username, password, termType],
+        argValues: [
+          name,
+          host,
+          port,
+          username,
+          authMode,
+          password,
+          privateKeyPath,
+          termType,
+        ],
         apiImpl: this,
       ),
     );
@@ -449,7 +470,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateProfileCreateProfileConstMeta => const TaskConstMeta(
     debugName: "create_profile",
-    argNames: ["name", "host", "port", "username", "password", "termType"],
+    argNames: [
+      "name",
+      "host",
+      "port",
+      "username",
+      "authMode",
+      "password",
+      "privateKeyPath",
+      "termType",
+    ],
   );
 
   @override
@@ -820,12 +850,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<TunnelConfig> crateTunnelStartTunnel({required String id}) {
+  Future<TunnelStartResult> crateTunnelStartTunnel({
+    required String id,
+    required SshAuthCredential credential,
+  }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(id, serializer);
+          sse_encode_box_autoadd_ssh_auth_credential(credential, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -834,18 +868,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_tunnel_config,
+          decodeSuccessData: sse_decode_tunnel_start_result,
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateTunnelStartTunnelConstMeta,
-        argValues: [id],
+        argValues: [id, credential],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateTunnelStartTunnelConstMeta =>
-      const TaskConstMeta(debugName: "start_tunnel", argNames: ["id"]);
+  TaskConstMeta get kCrateTunnelStartTunnelConstMeta => const TaskConstMeta(
+    debugName: "start_tunnel",
+    argNames: ["id", "credential"],
+  );
 
   @override
   Future<TunnelConfig> crateTunnelStopTunnel({required String id}) {
@@ -882,7 +918,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) {
     return handler.executeNormal(
@@ -894,7 +932,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(host, serializer);
           sse_encode_u_16(port, serializer);
           sse_encode_String(username, serializer);
+          sse_encode_ssh_auth_mode(authMode, serializer);
           sse_encode_String(password, serializer);
+          sse_encode_String(privateKeyPath, serializer);
           sse_encode_String(termType, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
@@ -908,7 +948,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateProfileUpdateProfileConstMeta,
-        argValues: [id, name, host, port, username, password, termType],
+        argValues: [
+          id,
+          name,
+          host,
+          port,
+          username,
+          authMode,
+          password,
+          privateKeyPath,
+          termType,
+        ],
         apiImpl: this,
       ),
     );
@@ -922,7 +972,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       "host",
       "port",
       "username",
+      "authMode",
       "password",
+      "privateKeyPath",
       "termType",
     ],
   );
@@ -1088,9 +1140,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SshAuthCredential dco_decode_box_autoadd_ssh_auth_credential(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_ssh_auth_credential(raw);
+  }
+
+  @protected
+  SshConnectError dco_decode_box_autoadd_ssh_connect_error(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_ssh_connect_error(raw);
+  }
+
+  @protected
+  SshSession dco_decode_box_autoadd_ssh_session(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_ssh_session(raw);
+  }
+
+  @protected
   ThemeSettings dco_decode_box_autoadd_theme_settings(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_theme_settings(raw);
+  }
+
+  @protected
+  TunnelConfig dco_decode_box_autoadd_tunnel_config(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_tunnel_config(raw);
   }
 
   @protected
@@ -1148,6 +1224,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  String? dco_decode_opt_String(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_String(raw);
+  }
+
+  @protected
+  SshConnectError? dco_decode_opt_box_autoadd_ssh_connect_error(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_ssh_connect_error(raw);
+  }
+
+  @protected
+  SshSession? dco_decode_opt_box_autoadd_ssh_session(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_ssh_session(raw);
+  }
+
+  @protected
+  TunnelConfig? dco_decode_opt_box_autoadd_tunnel_config(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_tunnel_config(raw);
+  }
+
+  @protected
   int? dco_decode_opt_box_autoadd_u_16(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_u_16(raw);
@@ -1167,19 +1267,70 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SshAuthCredential dco_decode_ssh_auth_credential(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return SshAuthCredential(
+      password: dco_decode_opt_String(arr[0]),
+      privateKeyPath: dco_decode_opt_String(arr[1]),
+      passphrase: dco_decode_opt_String(arr[2]),
+    );
+  }
+
+  @protected
+  SshAuthMode dco_decode_ssh_auth_mode(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return SshAuthMode.values[raw as int];
+  }
+
+  @protected
+  SshConnectError dco_decode_ssh_connect_error(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return SshConnectError(
+      code: dco_decode_ssh_connect_error_code(arr[0]),
+      message: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  SshConnectErrorCode dco_decode_ssh_connect_error_code(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return SshConnectErrorCode.values[raw as int];
+  }
+
+  @protected
+  SshConnectResult dco_decode_ssh_connect_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return SshConnectResult(
+      session: dco_decode_opt_box_autoadd_ssh_session(arr[0]),
+      error: dco_decode_opt_box_autoadd_ssh_connect_error(arr[1]),
+    );
+  }
+
+  @protected
   SshProfile dco_decode_ssh_profile(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return SshProfile(
       id: dco_decode_String(arr[0]),
       name: dco_decode_String(arr[1]),
       host: dco_decode_String(arr[2]),
       port: dco_decode_u_16(arr[3]),
       username: dco_decode_String(arr[4]),
-      password: dco_decode_String(arr[5]),
-      termType: dco_decode_String(arr[6]),
+      authMode: dco_decode_ssh_auth_mode(arr[5]),
+      password: dco_decode_String(arr[6]),
+      privateKeyPath: dco_decode_String(arr[7]),
+      termType: dco_decode_String(arr[8]),
     );
   }
 
@@ -1267,6 +1418,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  TunnelStartResult dco_decode_tunnel_start_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return TunnelStartResult(
+      tunnel: dco_decode_opt_box_autoadd_tunnel_config(arr[0]),
+      error: dco_decode_opt_box_autoadd_ssh_connect_error(arr[1]),
+    );
+  }
+
+  @protected
   int dco_decode_u_16(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -1340,11 +1503,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SshAuthCredential sse_decode_box_autoadd_ssh_auth_credential(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_ssh_auth_credential(deserializer));
+  }
+
+  @protected
+  SshConnectError sse_decode_box_autoadd_ssh_connect_error(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_ssh_connect_error(deserializer));
+  }
+
+  @protected
+  SshSession sse_decode_box_autoadd_ssh_session(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_ssh_session(deserializer));
+  }
+
+  @protected
   ThemeSettings sse_decode_box_autoadd_theme_settings(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_theme_settings(deserializer));
+  }
+
+  @protected
+  TunnelConfig sse_decode_box_autoadd_tunnel_config(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_tunnel_config(deserializer));
   }
 
   @protected
@@ -1424,6 +1617,56 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_String(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  SshConnectError? sse_decode_opt_box_autoadd_ssh_connect_error(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_ssh_connect_error(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  SshSession? sse_decode_opt_box_autoadd_ssh_session(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_ssh_session(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  TunnelConfig? sse_decode_opt_box_autoadd_tunnel_config(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_tunnel_config(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -1448,6 +1691,53 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SshAuthCredential sse_decode_ssh_auth_credential(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_password = sse_decode_opt_String(deserializer);
+    var var_privateKeyPath = sse_decode_opt_String(deserializer);
+    var var_passphrase = sse_decode_opt_String(deserializer);
+    return SshAuthCredential(
+      password: var_password,
+      privateKeyPath: var_privateKeyPath,
+      passphrase: var_passphrase,
+    );
+  }
+
+  @protected
+  SshAuthMode sse_decode_ssh_auth_mode(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return SshAuthMode.values[inner];
+  }
+
+  @protected
+  SshConnectError sse_decode_ssh_connect_error(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_code = sse_decode_ssh_connect_error_code(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    return SshConnectError(code: var_code, message: var_message);
+  }
+
+  @protected
+  SshConnectErrorCode sse_decode_ssh_connect_error_code(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return SshConnectErrorCode.values[inner];
+  }
+
+  @protected
+  SshConnectResult sse_decode_ssh_connect_result(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_session = sse_decode_opt_box_autoadd_ssh_session(deserializer);
+    var var_error = sse_decode_opt_box_autoadd_ssh_connect_error(deserializer);
+    return SshConnectResult(session: var_session, error: var_error);
+  }
+
+  @protected
   SshProfile sse_decode_ssh_profile(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_id = sse_decode_String(deserializer);
@@ -1455,7 +1745,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_host = sse_decode_String(deserializer);
     var var_port = sse_decode_u_16(deserializer);
     var var_username = sse_decode_String(deserializer);
+    var var_authMode = sse_decode_ssh_auth_mode(deserializer);
     var var_password = sse_decode_String(deserializer);
+    var var_privateKeyPath = sse_decode_String(deserializer);
     var var_termType = sse_decode_String(deserializer);
     return SshProfile(
       id: var_id,
@@ -1463,7 +1755,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       host: var_host,
       port: var_port,
       username: var_username,
+      authMode: var_authMode,
       password: var_password,
+      privateKeyPath: var_privateKeyPath,
       termType: var_termType,
     );
   }
@@ -1574,6 +1868,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  TunnelStartResult sse_decode_tunnel_start_result(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_tunnel = sse_decode_opt_box_autoadd_tunnel_config(deserializer);
+    var var_error = sse_decode_opt_box_autoadd_ssh_connect_error(deserializer);
+    return TunnelStartResult(tunnel: var_tunnel, error: var_error);
+  }
+
+  @protected
   int sse_decode_u_16(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint16();
@@ -1664,12 +1968,48 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_ssh_auth_credential(
+    SshAuthCredential self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_ssh_auth_credential(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_ssh_connect_error(
+    SshConnectError self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_ssh_connect_error(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_ssh_session(
+    SshSession self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_ssh_session(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_theme_settings(
     ThemeSettings self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_theme_settings(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_tunnel_config(
+    TunnelConfig self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_tunnel_config(self, serializer);
   }
 
   @protected
@@ -1753,6 +2093,55 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_String(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_ssh_connect_error(
+    SshConnectError? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_ssh_connect_error(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_ssh_session(
+    SshSession? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_ssh_session(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_tunnel_config(
+    TunnelConfig? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_tunnel_config(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -1774,6 +2163,52 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_ssh_auth_credential(
+    SshAuthCredential self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_String(self.password, serializer);
+    sse_encode_opt_String(self.privateKeyPath, serializer);
+    sse_encode_opt_String(self.passphrase, serializer);
+  }
+
+  @protected
+  void sse_encode_ssh_auth_mode(SshAuthMode self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_ssh_connect_error(
+    SshConnectError self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_ssh_connect_error_code(self.code, serializer);
+    sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_ssh_connect_error_code(
+    SshConnectErrorCode self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_ssh_connect_result(
+    SshConnectResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_ssh_session(self.session, serializer);
+    sse_encode_opt_box_autoadd_ssh_connect_error(self.error, serializer);
+  }
+
+  @protected
   void sse_encode_ssh_profile(SshProfile self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.id, serializer);
@@ -1781,7 +2216,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.host, serializer);
     sse_encode_u_16(self.port, serializer);
     sse_encode_String(self.username, serializer);
+    sse_encode_ssh_auth_mode(self.authMode, serializer);
     sse_encode_String(self.password, serializer);
+    sse_encode_String(self.privateKeyPath, serializer);
     sse_encode_String(self.termType, serializer);
   }
 
@@ -1852,6 +2289,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_tunnel_start_result(
+    TunnelStartResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_tunnel_config(self.tunnel, serializer);
+    sse_encode_opt_box_autoadd_ssh_connect_error(self.error, serializer);
   }
 
   @protected

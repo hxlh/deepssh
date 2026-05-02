@@ -144,7 +144,8 @@ fn wire__crate__ssh_session__connect_profile_impl(
             let api_host = <String>::sse_decode(&mut deserializer);
             let api_port = <u16>::sse_decode(&mut deserializer);
             let api_username = <String>::sse_decode(&mut deserializer);
-            let api_password = <String>::sse_decode(&mut deserializer);
+            let api_credential =
+                <crate::ssh_auth::SshAuthCredential>::sse_decode(&mut deserializer);
             let api_term_type = <String>::sse_decode(&mut deserializer);
             let api_rows = <u16>::sse_decode(&mut deserializer);
             let api_cols = <u16>::sse_decode(&mut deserializer);
@@ -158,7 +159,7 @@ fn wire__crate__ssh_session__connect_profile_impl(
                             api_host,
                             api_port,
                             api_username,
-                            api_password,
+                            api_credential,
                             api_term_type,
                             api_rows,
                             api_cols,
@@ -277,7 +278,9 @@ fn wire__crate__profile__create_profile_impl(
             let api_host = <String>::sse_decode(&mut deserializer);
             let api_port = <u16>::sse_decode(&mut deserializer);
             let api_username = <String>::sse_decode(&mut deserializer);
+            let api_auth_mode = <crate::profile::SshAuthMode>::sse_decode(&mut deserializer);
             let api_password = <String>::sse_decode(&mut deserializer);
+            let api_private_key_path = <String>::sse_decode(&mut deserializer);
             let api_term_type = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
@@ -288,7 +291,9 @@ fn wire__crate__profile__create_profile_impl(
                             api_host,
                             api_port,
                             api_username,
+                            api_auth_mode,
                             api_password,
+                            api_private_key_path,
                             api_term_type,
                         )?;
                         Ok(output_ok)
@@ -729,11 +734,13 @@ fn wire__crate__tunnel__start_tunnel_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_id = <String>::sse_decode(&mut deserializer);
+            let api_credential =
+                <crate::ssh_auth::SshAuthCredential>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
                     (move || {
-                        let output_ok = crate::tunnel::start_tunnel(api_id)?;
+                        let output_ok = crate::tunnel::start_tunnel(api_id, api_credential)?;
                         Ok(output_ok)
                     })(),
                 )
@@ -803,7 +810,9 @@ fn wire__crate__profile__update_profile_impl(
             let api_host = <String>::sse_decode(&mut deserializer);
             let api_port = <u16>::sse_decode(&mut deserializer);
             let api_username = <String>::sse_decode(&mut deserializer);
+            let api_auth_mode = <crate::profile::SshAuthMode>::sse_decode(&mut deserializer);
             let api_password = <String>::sse_decode(&mut deserializer);
+            let api_private_key_path = <String>::sse_decode(&mut deserializer);
             let api_term_type = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
@@ -815,7 +824,9 @@ fn wire__crate__profile__update_profile_impl(
                             api_host,
                             api_port,
                             api_username,
+                            api_auth_mode,
                             api_password,
+                            api_private_key_path,
                             api_term_type,
                         )?;
                         Ok(output_ok)
@@ -1054,6 +1065,50 @@ impl SseDecode for crate::local_terminal::LocalTerminalSession {
     }
 }
 
+impl SseDecode for Option<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<String>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::ssh_auth::SshConnectError> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::ssh_auth::SshConnectError>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::ssh_session::SshSession> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::ssh_session::SshSession>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::tunnel::TunnelConfig> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::tunnel::TunnelConfig>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<u16> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1079,6 +1134,73 @@ impl SseDecode for crate::theme::RegexHighlight {
     }
 }
 
+impl SseDecode for crate::ssh_auth::SshAuthCredential {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_password = <Option<String>>::sse_decode(deserializer);
+        let mut var_privateKeyPath = <Option<String>>::sse_decode(deserializer);
+        let mut var_passphrase = <Option<String>>::sse_decode(deserializer);
+        return crate::ssh_auth::SshAuthCredential {
+            password: var_password,
+            private_key_path: var_privateKeyPath,
+            passphrase: var_passphrase,
+        };
+    }
+}
+
+impl SseDecode for crate::profile::SshAuthMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::profile::SshAuthMode::Password,
+            1 => crate::profile::SshAuthMode::PrivateKey,
+            _ => unreachable!("Invalid variant for SshAuthMode: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::ssh_auth::SshConnectError {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_code = <crate::ssh_auth::SshConnectErrorCode>::sse_decode(deserializer);
+        let mut var_message = <String>::sse_decode(deserializer);
+        return crate::ssh_auth::SshConnectError {
+            code: var_code,
+            message: var_message,
+        };
+    }
+}
+
+impl SseDecode for crate::ssh_auth::SshConnectErrorCode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::ssh_auth::SshConnectErrorCode::PassphraseRequired,
+            1 => crate::ssh_auth::SshConnectErrorCode::PrivateKeyFileUnreadable,
+            2 => crate::ssh_auth::SshConnectErrorCode::InvalidPrivateKey,
+            3 => crate::ssh_auth::SshConnectErrorCode::AuthenticationFailed,
+            4 => crate::ssh_auth::SshConnectErrorCode::ConnectionFailed,
+            5 => crate::ssh_auth::SshConnectErrorCode::ChannelFailed,
+            6 => crate::ssh_auth::SshConnectErrorCode::PtyFailed,
+            _ => unreachable!("Invalid variant for SshConnectErrorCode: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::ssh_session::SshConnectResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_session = <Option<crate::ssh_session::SshSession>>::sse_decode(deserializer);
+        let mut var_error = <Option<crate::ssh_auth::SshConnectError>>::sse_decode(deserializer);
+        return crate::ssh_session::SshConnectResult {
+            session: var_session,
+            error: var_error,
+        };
+    }
+}
+
 impl SseDecode for crate::profile::SshProfile {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1087,7 +1209,9 @@ impl SseDecode for crate::profile::SshProfile {
         let mut var_host = <String>::sse_decode(deserializer);
         let mut var_port = <u16>::sse_decode(deserializer);
         let mut var_username = <String>::sse_decode(deserializer);
+        let mut var_authMode = <crate::profile::SshAuthMode>::sse_decode(deserializer);
         let mut var_password = <String>::sse_decode(deserializer);
+        let mut var_privateKeyPath = <String>::sse_decode(deserializer);
         let mut var_termType = <String>::sse_decode(deserializer);
         return crate::profile::SshProfile {
             id: var_id,
@@ -1095,7 +1219,9 @@ impl SseDecode for crate::profile::SshProfile {
             host: var_host,
             port: var_port,
             username: var_username,
+            auth_mode: var_authMode,
             password: var_password,
+            private_key_path: var_privateKeyPath,
             term_type: var_termType,
         };
     }
@@ -1216,6 +1342,18 @@ impl SseDecode for crate::tunnel::TunnelRuntimeStatus {
             1 => crate::tunnel::TunnelRuntimeStatus::Waiting,
             2 => crate::tunnel::TunnelRuntimeStatus::Forwarding,
             _ => unreachable!("Invalid variant for TunnelRuntimeStatus: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::tunnel::TunnelStartResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_tunnel = <Option<crate::tunnel::TunnelConfig>>::sse_decode(deserializer);
+        let mut var_error = <Option<crate::ssh_auth::SshConnectError>>::sse_decode(deserializer);
+        return crate::tunnel::TunnelStartResult {
+            tunnel: var_tunnel,
+            error: var_error,
         };
     }
 }
@@ -1392,6 +1530,114 @@ impl flutter_rust_bridge::IntoIntoDart<crate::theme::RegexHighlight>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::ssh_auth::SshAuthCredential {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.password.into_into_dart().into_dart(),
+            self.private_key_path.into_into_dart().into_dart(),
+            self.passphrase.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::ssh_auth::SshAuthCredential
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::ssh_auth::SshAuthCredential>
+    for crate::ssh_auth::SshAuthCredential
+{
+    fn into_into_dart(self) -> crate::ssh_auth::SshAuthCredential {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::profile::SshAuthMode {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Password => 0.into_dart(),
+            Self::PrivateKey => 1.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::profile::SshAuthMode {}
+impl flutter_rust_bridge::IntoIntoDart<crate::profile::SshAuthMode>
+    for crate::profile::SshAuthMode
+{
+    fn into_into_dart(self) -> crate::profile::SshAuthMode {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::ssh_auth::SshConnectError {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.code.into_into_dart().into_dart(),
+            self.message.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::ssh_auth::SshConnectError
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::ssh_auth::SshConnectError>
+    for crate::ssh_auth::SshConnectError
+{
+    fn into_into_dart(self) -> crate::ssh_auth::SshConnectError {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::ssh_auth::SshConnectErrorCode {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::PassphraseRequired => 0.into_dart(),
+            Self::PrivateKeyFileUnreadable => 1.into_dart(),
+            Self::InvalidPrivateKey => 2.into_dart(),
+            Self::AuthenticationFailed => 3.into_dart(),
+            Self::ConnectionFailed => 4.into_dart(),
+            Self::ChannelFailed => 5.into_dart(),
+            Self::PtyFailed => 6.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::ssh_auth::SshConnectErrorCode
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::ssh_auth::SshConnectErrorCode>
+    for crate::ssh_auth::SshConnectErrorCode
+{
+    fn into_into_dart(self) -> crate::ssh_auth::SshConnectErrorCode {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::ssh_session::SshConnectResult {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.session.into_into_dart().into_dart(),
+            self.error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::ssh_session::SshConnectResult
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::ssh_session::SshConnectResult>
+    for crate::ssh_session::SshConnectResult
+{
+    fn into_into_dart(self) -> crate::ssh_session::SshConnectResult {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::profile::SshProfile {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -1400,7 +1646,9 @@ impl flutter_rust_bridge::IntoDart for crate::profile::SshProfile {
             self.host.into_into_dart().into_dart(),
             self.port.into_into_dart().into_dart(),
             self.username.into_into_dart().into_dart(),
+            self.auth_mode.into_into_dart().into_dart(),
             self.password.into_into_dart().into_dart(),
+            self.private_key_path.into_into_dart().into_dart(),
             self.term_type.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -1554,6 +1802,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::tunnel::TunnelRuntimeStatus>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::tunnel::TunnelStartResult {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.tunnel.into_into_dart().into_dart(),
+            self.error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::tunnel::TunnelStartResult
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::tunnel::TunnelStartResult>
+    for crate::tunnel::TunnelStartResult
+{
+    fn into_into_dart(self) -> crate::tunnel::TunnelStartResult {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::theme::UiTheme {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -1662,6 +1931,46 @@ impl SseEncode for crate::local_terminal::LocalTerminalSession {
     }
 }
 
+impl SseEncode for Option<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::ssh_auth::SshConnectError> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::ssh_auth::SshConnectError>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::ssh_session::SshSession> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::ssh_session::SshSession>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::tunnel::TunnelConfig> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::tunnel::TunnelConfig>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<u16> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1681,6 +1990,68 @@ impl SseEncode for crate::theme::RegexHighlight {
     }
 }
 
+impl SseEncode for crate::ssh_auth::SshAuthCredential {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<String>>::sse_encode(self.password, serializer);
+        <Option<String>>::sse_encode(self.private_key_path, serializer);
+        <Option<String>>::sse_encode(self.passphrase, serializer);
+    }
+}
+
+impl SseEncode for crate::profile::SshAuthMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::profile::SshAuthMode::Password => 0,
+                crate::profile::SshAuthMode::PrivateKey => 1,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::ssh_auth::SshConnectError {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::ssh_auth::SshConnectErrorCode>::sse_encode(self.code, serializer);
+        <String>::sse_encode(self.message, serializer);
+    }
+}
+
+impl SseEncode for crate::ssh_auth::SshConnectErrorCode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::ssh_auth::SshConnectErrorCode::PassphraseRequired => 0,
+                crate::ssh_auth::SshConnectErrorCode::PrivateKeyFileUnreadable => 1,
+                crate::ssh_auth::SshConnectErrorCode::InvalidPrivateKey => 2,
+                crate::ssh_auth::SshConnectErrorCode::AuthenticationFailed => 3,
+                crate::ssh_auth::SshConnectErrorCode::ConnectionFailed => 4,
+                crate::ssh_auth::SshConnectErrorCode::ChannelFailed => 5,
+                crate::ssh_auth::SshConnectErrorCode::PtyFailed => 6,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::ssh_session::SshConnectResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<crate::ssh_session::SshSession>>::sse_encode(self.session, serializer);
+        <Option<crate::ssh_auth::SshConnectError>>::sse_encode(self.error, serializer);
+    }
+}
+
 impl SseEncode for crate::profile::SshProfile {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1689,7 +2060,9 @@ impl SseEncode for crate::profile::SshProfile {
         <String>::sse_encode(self.host, serializer);
         <u16>::sse_encode(self.port, serializer);
         <String>::sse_encode(self.username, serializer);
+        <crate::profile::SshAuthMode>::sse_encode(self.auth_mode, serializer);
         <String>::sse_encode(self.password, serializer);
+        <String>::sse_encode(self.private_key_path, serializer);
         <String>::sse_encode(self.term_type, serializer);
     }
 }
@@ -1779,6 +2152,14 @@ impl SseEncode for crate::tunnel::TunnelRuntimeStatus {
             },
             serializer,
         );
+    }
+}
+
+impl SseEncode for crate::tunnel::TunnelStartResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<crate::tunnel::TunnelConfig>>::sse_encode(self.tunnel, serializer);
+        <Option<crate::ssh_auth::SshConnectError>>::sse_encode(self.error, serializer);
     }
 }
 

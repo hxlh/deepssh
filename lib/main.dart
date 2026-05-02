@@ -116,14 +116,18 @@ class _DefaultAppSshBridgeClientHolder implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) => _delegate.createProfile(
     name: name,
     host: host,
     port: port,
     username: username,
+    authMode: authMode,
     password: password,
+    privateKeyPath: privateKeyPath,
     termType: termType,
   );
 
@@ -134,7 +138,9 @@ class _DefaultAppSshBridgeClientHolder implements SshBridgeClient {
     required String host,
     required int port,
     required String username,
+    required SshAuthMode authMode,
     required String password,
+    required String privateKeyPath,
     required String termType,
   }) => _delegate.updateProfile(
     id: id,
@@ -142,7 +148,9 @@ class _DefaultAppSshBridgeClientHolder implements SshBridgeClient {
     host: host,
     port: port,
     username: username,
+    authMode: authMode,
     password: password,
+    privateKeyPath: privateKeyPath,
     termType: termType,
   );
 
@@ -152,9 +160,17 @@ class _DefaultAppSshBridgeClientHolder implements SshBridgeClient {
   @override
   Future<SshConnectionResult> connectProfile(
     String id, {
+    String? password,
+    String? passphrase,
     int? rows,
     int? cols,
-  }) => _delegate.connectProfile(id, rows: rows, cols: cols);
+  }) => _delegate.connectProfile(
+    id,
+    password: password,
+    passphrase: passphrase,
+    rows: rows,
+    cols: cols,
+  );
 
   @override
   Stream<List<int>> outputStream(String sessionId) =>

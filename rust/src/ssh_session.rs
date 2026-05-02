@@ -13,6 +13,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::frb_generated::StreamSink;
+use crate::ssh_auth::{self, SshAuthCredential, SshConnectError, SshConnectErrorCode};
 
 static SESSION_STORE: Lazy<Mutex<HashMap<String, SshSession>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -39,6 +40,26 @@ pub struct SshSession {
     pub rows: u16,
     pub cols: u16,
     pub term_type: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SshConnectResult {
+    pub session: Option<SshSession>,
+    pub error: Option<SshConnectError>,
+}
+
+fn connect_success(session: SshSession) -> SshConnectResult {
+    SshConnectResult {
+        session: Some(session),
+        error: None,
+    }
+}
+
+fn connect_failure(error: SshConnectError) -> SshConnectResult {
+    SshConnectResult {
+        session: None,
+        error: Some(error),
+    }
 }
 
 enum SshCommand {
@@ -84,43 +105,57 @@ pub fn connect_profile(
     host: String,
     port: u16,
     username: String,
-    password: String,
+    credential: SshAuthCredential,
     term_type: String,
     rows: u16,
     cols: u16,
-) -> Result<SshSession> {
+) -> Result<SshConnectResult> {
     let result = TOKIO_RUNTIME.block_on(async move {
         let addr = format!("{}:{}", host, port);
         let mut config = client::Config::default();
         config.nodelay = true;
         config.keepalive_interval = Some(Duration::from_secs(30));
         let config = Arc::new(config);
-        let mut handle = client::connect(config, addr, SshClientHandler)
-            .await
-            .map_err(|e| anyhow!("SSH connect failed: {:?}", e))?;
+        let mut handle = match client::connect(config, addr, SshClientHandler).await {
+            Ok(handle) => handle,
+            Err(error) => {
+                return Ok(connect_failure(ssh_auth::connect_error(
+                    SshConnectErrorCode::ConnectionFailed,
+                    format!("SSH connect failed: {error:?}"),
+                )))
+            }
+        };
 
-        let auth = handle
-            .authenticate_password(username, password)
-            .await
-            .map_err(|e| anyhow!("SSH auth failed: {:?}", e))?;
-        if !auth.success() {
-            return Err(anyhow!("SSH authentication failed"));
+        if let Err(error) = ssh_auth::authenticate(&mut handle, username, credential).await {
+            return Ok(connect_failure(error));
         }
 
         let connection_id = Uuid::new_v4().to_string();
-        let channel = handle
-            .channel_open_session()
-            .await
-            .map_err(|e| anyhow!("SSH channel creation failed: {:?}", e))?;
+        let channel = match handle.channel_open_session().await {
+            Ok(channel) => channel,
+            Err(error) => {
+                return Ok(connect_failure(ssh_auth::connect_error(
+                    SshConnectErrorCode::ChannelFailed,
+                    format!("SSH channel creation failed: {error:?}"),
+                )))
+            }
+        };
         let pty_term_type = pty_term_type(&term_type);
-        channel
+        if let Err(error) = channel
             .request_pty(true, &pty_term_type, cols as u32, rows as u32, 0, 0, &[])
             .await
-            .map_err(|e| anyhow!("PTY request failed: {:?}", e))?;
-        channel
-            .request_shell(true)
-            .await
-            .map_err(|e| anyhow!("Shell start failed: {:?}", e))?;
+        {
+            return Ok(connect_failure(ssh_auth::connect_error(
+                SshConnectErrorCode::PtyFailed,
+                format!("PTY request failed: {error:?}"),
+            )));
+        }
+        if let Err(error) = channel.request_shell(true).await {
+            return Ok(connect_failure(ssh_auth::connect_error(
+                SshConnectErrorCode::ChannelFailed,
+                format!("Shell start failed: {error:?}"),
+            )));
+        }
 
         let session_id = Uuid::new_v4().to_string();
         let session = SshSession {
@@ -158,7 +193,7 @@ pub fn connect_profile(
             cmd_rx,
         ));
 
-        Ok(session)
+        Ok(connect_success(session))
     });
     if let Err(error) = &result {
         crate::app_log::log_error("ssh.connect", error);
@@ -516,13 +551,22 @@ mod tests {
             "127.0.0.1".to_string(),
             1,
             "user".to_string(),
-            "pass".to_string(),
+            SshAuthCredential {
+                password: Some("pass".to_string()),
+                private_key_path: None,
+                passphrase: None,
+            },
             "xterm-truecolor".to_string(),
             24,
             80,
-        );
+        )
+        .unwrap();
 
-        assert!(result.is_err());
+        assert!(result.session.is_none());
+        assert_eq!(
+            result.error.unwrap().code,
+            SshConnectErrorCode::ConnectionFailed
+        );
     }
 
     #[test]

@@ -5,10 +5,11 @@
 
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'ssh_auth.dart';
 
-// These functions are ignored because they are not marked as `pub`: `connect_ssh_profile`, `ensure_tunnels_loaded`, `handle_local_tunnel_connection`, `into_config_with_migration`, `load_tunnels_from_disk`, `local_tcp_port_is_open`, `next_backoff_delay`, `relay_tcp_stream_and_channel`, `remote_route_key`, `remote_target_is_open_via_ssh`, `run_local_tunnel`, `run_remote_tunnel`, `run_tunnel`, `runtime_status`, `set_runtime_status`, `with_runtime_status`, `write_tunnels_to_disk`
+// These functions are ignored because they are not marked as `pub`: `connect_ssh_profile`, `ensure_tunnels_loaded`, `handle_local_tunnel_connection`, `into_config_with_migration`, `load_tunnels_from_disk`, `local_tcp_port_is_open`, `next_backoff_delay`, `relay_tcp_stream_and_channel`, `remote_route_key`, `remote_target_is_open_via_ssh`, `run_local_tunnel`, `run_remote_tunnel`, `run_tunnel`, `runtime_status`, `set_runtime_status`, `tunnel_start_failure`, `tunnel_start_success`, `with_runtime_status`, `write_tunnels_to_disk`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `RemoteRoute`, `TunnelClientHandler`, `TunnelConfigFile`, `TunnelForwardTypeFile`, `TunnelRuntime`, `TunnelStore`, `TunnelsFile`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `check_server_key`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `server_channel_open_forwarded_tcpip`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `check_server_key`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `server_channel_open_forwarded_tcpip`
 // These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`, `default`
 
 Future<List<TunnelConfig>> listTunnels() =>
@@ -55,8 +56,11 @@ Future<TunnelConfig> updateTunnel({
 Future<void> deleteTunnel({required String id}) =>
     RustLib.instance.api.crateTunnelDeleteTunnel(id: id);
 
-Future<TunnelConfig> startTunnel({required String id}) =>
-    RustLib.instance.api.crateTunnelStartTunnel(id: id);
+Future<TunnelStartResult> startTunnel({
+  required String id,
+  required SshAuthCredential credential,
+}) =>
+    RustLib.instance.api.crateTunnelStartTunnel(id: id, credential: credential);
 
 Future<TunnelConfig> stopTunnel({required String id}) =>
     RustLib.instance.api.crateTunnelStopTunnel(id: id);
@@ -115,3 +119,21 @@ class TunnelConfig {
 enum TunnelForwardType { local, remote }
 
 enum TunnelRuntimeStatus { stopped, waiting, forwarding }
+
+class TunnelStartResult {
+  final TunnelConfig? tunnel;
+  final SshConnectError? error;
+
+  const TunnelStartResult({this.tunnel, this.error});
+
+  @override
+  int get hashCode => tunnel.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TunnelStartResult &&
+          runtimeType == other.runtimeType &&
+          tunnel == other.tunnel &&
+          error == other.error;
+}

@@ -6,9 +6,9 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `default_term_type`, `ensure_profiles_loaded`, `into_profile_with_migration`, `load_profiles_from_disk`, `write_profiles_to_disk`
+// These functions are ignored because they are not marked as `pub`: `default_auth_mode`, `default_term_type`, `ensure_profiles_loaded`, `into_profile_with_migration`, `load_profiles_from_disk`, `write_profiles_to_disk`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ProfileStore`, `SshProfileConfig`, `SshProfilesFile`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 // These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`, `default`
 
 Future<List<SshProfile>> listProfiles() =>
@@ -19,14 +19,18 @@ Future<SshProfile> createProfile({
   required String host,
   required int port,
   required String username,
+  required SshAuthMode authMode,
   required String password,
+  required String privateKeyPath,
   required String termType,
 }) => RustLib.instance.api.crateProfileCreateProfile(
   name: name,
   host: host,
   port: port,
   username: username,
+  authMode: authMode,
   password: password,
+  privateKeyPath: privateKeyPath,
   termType: termType,
 );
 
@@ -36,7 +40,9 @@ Future<SshProfile> updateProfile({
   required String host,
   required int port,
   required String username,
+  required SshAuthMode authMode,
   required String password,
+  required String privateKeyPath,
   required String termType,
 }) => RustLib.instance.api.crateProfileUpdateProfile(
   id: id,
@@ -44,12 +50,16 @@ Future<SshProfile> updateProfile({
   host: host,
   port: port,
   username: username,
+  authMode: authMode,
   password: password,
+  privateKeyPath: privateKeyPath,
   termType: termType,
 );
 
 Future<void> deleteProfile({required String id}) =>
     RustLib.instance.api.crateProfileDeleteProfile(id: id);
+
+enum SshAuthMode { password, privateKey }
 
 class SshProfile {
   final String id;
@@ -57,7 +67,9 @@ class SshProfile {
   final String host;
   final int port;
   final String username;
+  final SshAuthMode authMode;
   final String password;
+  final String privateKeyPath;
   final String termType;
 
   const SshProfile({
@@ -66,7 +78,9 @@ class SshProfile {
     required this.host,
     required this.port,
     required this.username,
+    required this.authMode,
     required this.password,
+    required this.privateKeyPath,
     required this.termType,
   });
 
@@ -77,7 +91,9 @@ class SshProfile {
       host.hashCode ^
       port.hashCode ^
       username.hashCode ^
+      authMode.hashCode ^
       password.hashCode ^
+      privateKeyPath.hashCode ^
       termType.hashCode;
 
   @override
@@ -90,6 +106,8 @@ class SshProfile {
           host == other.host &&
           port == other.port &&
           username == other.username &&
+          authMode == other.authMode &&
           password == other.password &&
+          privateKeyPath == other.privateKeyPath &&
           termType == other.termType;
 }
