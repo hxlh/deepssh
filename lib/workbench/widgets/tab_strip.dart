@@ -1,10 +1,12 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../features/terminal/terminal_state.dart';
 
-class TabStrip extends StatelessWidget {
+class TabStrip extends StatefulWidget {
   const TabStrip({
     super.key,
     required this.tabs,
@@ -21,32 +23,76 @@ class TabStrip extends StatelessWidget {
   final void Function(int oldIndex, int newIndex) onReorder;
 
   @override
+  State<TabStrip> createState() => _TabStripState();
+}
+
+class _TabStripState extends State<TabStrip> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent ||
+        event.kind != PointerDeviceKind.mouse ||
+        HardwareKeyboard.instance.logicalKeysPressed.contains(
+          LogicalKeyboardKey.shiftLeft,
+        ) ||
+        HardwareKeyboard.instance.logicalKeysPressed.contains(
+          LogicalKeyboardKey.shiftRight,
+        )) {
+      return;
+    }
+
+    final dy = event.scrollDelta.dy;
+    if (dy == 0 || !_scrollController.hasClients) {
+      return;
+    }
+
+    final position = _scrollController.position;
+    final target = (position.pixels + dy).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (target != position.pixels) {
+      position.jumpTo(target);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      height: AppSpacing.tabHeight,
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: ReorderableListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: tabs.length,
-        onReorder: onReorder,
-        buildDefaultDragHandles: false,
-        itemBuilder: (context, index) {
-          final tab = tabs[index];
-          final active = tab.id == activeTabId;
-          return ReorderableDragStartListener(
-            key: ValueKey(tab.id),
-            index: index,
-            child: _TabItem(
-              tab: tab,
-              active: active,
-              onSelect: () => onSelect(tab.id),
-              onClose: () => onClose(tab.id),
-            ),
-          );
-        },
+    return Listener(
+      onPointerSignal: _handlePointerSignal,
+      child: Container(
+        height: AppSpacing.tabHeight,
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          border: Border(bottom: BorderSide(color: AppColors.border)),
+        ),
+        child: ReorderableListView.builder(
+          scrollController: _scrollController,
+          scrollDirection: Axis.horizontal,
+          itemCount: widget.tabs.length,
+          onReorder: widget.onReorder,
+          buildDefaultDragHandles: false,
+          itemBuilder: (context, index) {
+            final tab = widget.tabs[index];
+            final active = tab.id == widget.activeTabId;
+            return ReorderableDragStartListener(
+              key: ValueKey(tab.id),
+              index: index,
+              child: _TabItem(
+                tab: tab,
+                active: active,
+                onSelect: () => widget.onSelect(tab.id),
+                onClose: () => widget.onClose(tab.id),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
