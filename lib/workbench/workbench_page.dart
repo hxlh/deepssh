@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
 import 'package:xterm/xterm.dart' as xterm;
@@ -12,6 +13,7 @@ import '../core/models/terminal_item.dart';
 import '../core/models/theme_settings.dart';
 import '../core/models/tunnel_config_item.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
 import '../features/hosts/host_tree.dart';
 import '../features/hosts/host_tree_state.dart';
 import '../features/local_terminal/local_terminal_bridge.dart';
@@ -26,6 +28,7 @@ import '../features/tunnels/tunnel_bridge.dart';
 import '../features/tunnels/tunnel_config_form_page.dart';
 import '../src/rust/ssh_auth.dart' as rust_auth;
 import 'widgets/add_connection_button.dart';
+import 'widgets/resize_handle.dart';
 import 'widgets/sidebar.dart';
 import 'widgets/workbench_content_switcher.dart';
 
@@ -353,6 +356,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       TerminalThemeSettings.commandDeck();
   bool _themeSaveInFlight = false;
   bool _themeSaveQueued = false;
+  static const double _minSidebarWidth = 120;
+  double _sidebarWidth = AppSpacing.sidebarWidth;
 
   ErrorLogger get _errorLogger =>
       widget.errorLogger ?? FileErrorLogger.frontend();
@@ -1453,6 +1458,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       body: Row(
         children: [
           Sidebar(
+            width: _sidebarWidth,
             onAddConnectionSelected: _handleAddConnection,
             child: HostTree(
               state: hostTreeState,
@@ -1480,7 +1486,13 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               onSectionOrderChanged: _handleExplorerSectionOrderChanged,
             ),
           ),
-          VerticalDivider(width: 1, thickness: 1, color: AppColors.border),
+          ResizeHandle(
+            onDrag: (delta) {
+              setState(() {
+                _sidebarWidth = max(_minSidebarWidth, _sidebarWidth + delta);
+              });
+            },
+          ),
           Expanded(
             child: WorkbenchContentSwitcher(
               mode: contentMode,

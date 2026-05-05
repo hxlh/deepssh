@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_spacing.dart';
 import 'add_connection_button.dart';
 
 class Sidebar extends StatelessWidget {
@@ -9,15 +8,17 @@ class Sidebar extends StatelessWidget {
     super.key,
     required this.child,
     required this.onAddConnectionSelected,
+    required this.width,
   });
 
   final Widget child;
   final ValueChanged<AddConnectionAction> onAddConnectionSelected;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: AppSpacing.sidebarWidth,
+      width: width,
       decoration: BoxDecoration(
         color: AppColors.sidebar,
         border: Border(right: BorderSide(color: AppColors.border)),
