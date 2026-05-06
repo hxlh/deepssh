@@ -514,11 +514,21 @@ class EscapeParser {
                 i = params.length;
                 break;
               }
-              final r = params[i + 2];
-              final g = params[i + 3];
-              final b = params[i + 4];
+              var rgbOffset = i + 2;
+              // ISO 8613-6 colon format may include an optional colorspace
+              // parameter (e.g. 38:2::R:G:B). Skip it when present.
+              if (params[rgbOffset] == 0 && i + 5 < params.length) {
+                rgbOffset++;
+              }
+              if (rgbOffset + 2 >= params.length) {
+                i = params.length;
+                break;
+              }
+              final r = params[rgbOffset];
+              final g = params[rgbOffset + 1];
+              final b = params[rgbOffset + 2];
               handler.setForegroundColorRgb(r, g, b);
-              i += 4;
+              i = rgbOffset + 2;
               break;
             case 5:
               if (i + 2 >= params.length) {
@@ -570,11 +580,21 @@ class EscapeParser {
                 i = params.length;
                 break;
               }
-              final r = params[i + 2];
-              final g = params[i + 3];
-              final b = params[i + 4];
+              var rgbOffset = i + 2;
+              // ISO 8613-6 colon format may include an optional colorspace
+              // parameter (e.g. 48:2::R:G:B). Skip it when present.
+              if (params[rgbOffset] == 0 && i + 5 < params.length) {
+                rgbOffset++;
+              }
+              if (rgbOffset + 2 >= params.length) {
+                i = params.length;
+                break;
+              }
+              final r = params[rgbOffset];
+              final g = params[rgbOffset + 1];
+              final b = params[rgbOffset + 2];
               handler.setBackgroundColorRgb(r, g, b);
-              i += 4;
+              i = rgbOffset + 2;
               break;
             case 5:
               if (i + 2 >= params.length) {

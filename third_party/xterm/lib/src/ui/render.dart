@@ -313,8 +313,7 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   /// The distance from the top of the terminal to the top of the viewport.
   // double get _scrollOffset => _offset.pixels;
   double get _scrollOffset {
-    // return _offset.pixels ~/ _painter.cellSize.height * _painter.cellSize.height;
-    return _offset.pixels;
+    return _offset.pixels ~/ _painter.cellSize.height * _painter.cellSize.height;
   }
 
   /// The height of a terminal line in pixels. This includes the line spacing.

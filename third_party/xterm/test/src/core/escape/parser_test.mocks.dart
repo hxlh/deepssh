@@ -28,7 +28,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #writeChar,
           [char],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void bell() => super.noSuchMethod(
@@ -36,7 +35,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #bell,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void backspaceReturn() => super.noSuchMethod(
@@ -44,7 +42,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #backspaceReturn,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void tab() => super.noSuchMethod(
@@ -52,7 +49,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #tab,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void lineFeed() => super.noSuchMethod(
@@ -60,7 +56,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #lineFeed,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void carriageReturn() => super.noSuchMethod(
@@ -68,7 +63,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #carriageReturn,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void shiftOut() => super.noSuchMethod(
@@ -76,7 +70,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #shiftOut,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void shiftIn() => super.noSuchMethod(
@@ -84,7 +77,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #shiftIn,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unknownSBC(int? char) => super.noSuchMethod(
@@ -92,7 +84,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unknownSBC,
           [char],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void saveCursor() => super.noSuchMethod(
@@ -100,7 +91,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #saveCursor,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void restoreCursor() => super.noSuchMethod(
@@ -108,7 +98,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #restoreCursor,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void index() => super.noSuchMethod(
@@ -116,7 +105,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #index,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void nextLine() => super.noSuchMethod(
@@ -124,7 +112,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #nextLine,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setTapStop() => super.noSuchMethod(
@@ -132,7 +119,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setTapStop,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void reverseIndex() => super.noSuchMethod(
@@ -140,7 +126,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #reverseIndex,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void designateCharset(int? charset, int? name) => super.noSuchMethod(
@@ -148,7 +133,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #designateCharset,
           [charset, name],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unkownEscape(int? char) => super.noSuchMethod(
@@ -156,7 +140,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unkownEscape,
           [char],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void repeatPreviousCharacter(int? n) => super.noSuchMethod(
@@ -164,7 +147,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #repeatPreviousCharacter,
           [n],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursor(
@@ -179,7 +161,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
             y,
           ],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorX(int? x) => super.noSuchMethod(
@@ -187,7 +168,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorX,
           [x],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorY(int? y) => super.noSuchMethod(
@@ -195,7 +175,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorY,
           [y],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void sendPrimaryDeviceAttributes() => super.noSuchMethod(
@@ -203,7 +182,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #sendPrimaryDeviceAttributes,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void clearTabStopUnderCursor() => super.noSuchMethod(
@@ -211,7 +189,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #clearTabStopUnderCursor,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void clearAllTabStops() => super.noSuchMethod(
@@ -219,7 +196,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #clearAllTabStops,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void moveCursorX(int? offset) => super.noSuchMethod(
@@ -227,7 +203,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #moveCursorX,
           [offset],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void moveCursorY(int? n) => super.noSuchMethod(
@@ -235,7 +210,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #moveCursorY,
           [n],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void sendSecondaryDeviceAttributes() => super.noSuchMethod(
@@ -243,7 +217,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #sendSecondaryDeviceAttributes,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void sendTertiaryDeviceAttributes() => super.noSuchMethod(
@@ -251,7 +224,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #sendTertiaryDeviceAttributes,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void sendOperatingStatus() => super.noSuchMethod(
@@ -259,7 +231,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #sendOperatingStatus,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void sendCursorPosition() => super.noSuchMethod(
@@ -267,7 +238,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #sendCursorPosition,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setMargins(
@@ -282,7 +252,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
             bottom,
           ],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void cursorNextLine(int? amount) => super.noSuchMethod(
@@ -290,7 +259,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #cursorNextLine,
           [amount],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void cursorPrecedingLine(int? amount) => super.noSuchMethod(
@@ -298,7 +266,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #cursorPrecedingLine,
           [amount],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void eraseDisplayBelow() => super.noSuchMethod(
@@ -306,7 +273,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #eraseDisplayBelow,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void eraseDisplayAbove() => super.noSuchMethod(
@@ -314,7 +280,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #eraseDisplayAbove,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void eraseDisplay() => super.noSuchMethod(
@@ -322,7 +287,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #eraseDisplay,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void eraseScrollbackOnly() => super.noSuchMethod(
@@ -330,7 +294,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #eraseScrollbackOnly,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void eraseLineRight() => super.noSuchMethod(
@@ -338,7 +301,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #eraseLineRight,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void eraseLineLeft() => super.noSuchMethod(
@@ -346,7 +308,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #eraseLineLeft,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void eraseLine() => super.noSuchMethod(
@@ -354,7 +315,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #eraseLine,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void insertLines(int? amount) => super.noSuchMethod(
@@ -362,7 +322,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #insertLines,
           [amount],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void deleteLines(int? amount) => super.noSuchMethod(
@@ -370,7 +329,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #deleteLines,
           [amount],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void deleteChars(int? amount) => super.noSuchMethod(
@@ -378,7 +336,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #deleteChars,
           [amount],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void scrollUp(int? amount) => super.noSuchMethod(
@@ -386,7 +343,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #scrollUp,
           [amount],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void scrollDown(int? amount) => super.noSuchMethod(
@@ -394,7 +350,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #scrollDown,
           [amount],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void eraseChars(int? amount) => super.noSuchMethod(
@@ -402,7 +357,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #eraseChars,
           [amount],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void insertBlankChars(int? amount) => super.noSuchMethod(
@@ -410,7 +364,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #insertBlankChars,
           [amount],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unknownCSI(int? finalByte) => super.noSuchMethod(
@@ -418,7 +371,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unknownCSI,
           [finalByte],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setInsertMode(bool? enabled) => super.noSuchMethod(
@@ -426,7 +378,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setInsertMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setLineFeedMode(bool? enabled) => super.noSuchMethod(
@@ -434,7 +385,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setLineFeedMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setUnknownMode(
@@ -449,7 +399,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
             enabled,
           ],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorKeysMode(bool? enabled) => super.noSuchMethod(
@@ -457,7 +406,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorKeysMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setReverseDisplayMode(bool? enabled) => super.noSuchMethod(
@@ -465,7 +413,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setReverseDisplayMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setOriginMode(bool? enabled) => super.noSuchMethod(
@@ -473,7 +420,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setOriginMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setColumnMode(bool? enabled) => super.noSuchMethod(
@@ -481,7 +427,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setColumnMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setAutoWrapMode(bool? enabled) => super.noSuchMethod(
@@ -489,7 +434,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setAutoWrapMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setMouseMode(_i3.MouseMode? mode) => super.noSuchMethod(
@@ -497,7 +441,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setMouseMode,
           [mode],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorBlinkMode(bool? enabled) => super.noSuchMethod(
@@ -505,7 +448,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorBlinkMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorVisibleMode(bool? enabled) => super.noSuchMethod(
@@ -513,7 +455,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorVisibleMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void useAltBuffer() => super.noSuchMethod(
@@ -521,7 +462,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #useAltBuffer,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void useMainBuffer() => super.noSuchMethod(
@@ -529,7 +469,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #useMainBuffer,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void clearAltBuffer() => super.noSuchMethod(
@@ -537,7 +476,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #clearAltBuffer,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setAppKeypadMode(bool? enabled) => super.noSuchMethod(
@@ -545,7 +483,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setAppKeypadMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setReportFocusMode(bool? enabled) => super.noSuchMethod(
@@ -553,7 +490,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setReportFocusMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setMouseReportMode(_i3.MouseReportMode? mode) => super.noSuchMethod(
@@ -561,7 +497,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setMouseReportMode,
           [mode],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setAltBufferMouseScrollMode(bool? enabled) => super.noSuchMethod(
@@ -569,7 +504,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setAltBufferMouseScrollMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setBracketedPasteMode(bool? enabled) => super.noSuchMethod(
@@ -577,7 +511,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setBracketedPasteMode,
           [enabled],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setUnknownDecMode(
@@ -592,7 +525,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
             enabled,
           ],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void resize(
@@ -607,7 +539,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
             rows,
           ],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void sendSize() => super.noSuchMethod(
@@ -615,7 +546,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #sendSize,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void resetCursorStyle() => super.noSuchMethod(
@@ -623,7 +553,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #resetCursorStyle,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorBold() => super.noSuchMethod(
@@ -631,7 +560,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorBold,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorFaint() => super.noSuchMethod(
@@ -639,7 +567,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorFaint,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorItalic() => super.noSuchMethod(
@@ -647,7 +574,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorItalic,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorUnderline() => super.noSuchMethod(
@@ -655,7 +581,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorUnderline,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorBlink() => super.noSuchMethod(
@@ -663,7 +588,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorBlink,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorInverse() => super.noSuchMethod(
@@ -671,7 +595,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorInverse,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorInvisible() => super.noSuchMethod(
@@ -679,7 +602,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorInvisible,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setCursorStrikethrough() => super.noSuchMethod(
@@ -687,7 +609,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setCursorStrikethrough,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unsetCursorBold() => super.noSuchMethod(
@@ -695,7 +616,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unsetCursorBold,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unsetCursorFaint() => super.noSuchMethod(
@@ -703,7 +623,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unsetCursorFaint,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unsetCursorItalic() => super.noSuchMethod(
@@ -711,7 +630,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unsetCursorItalic,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unsetCursorUnderline() => super.noSuchMethod(
@@ -719,7 +637,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unsetCursorUnderline,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unsetCursorBlink() => super.noSuchMethod(
@@ -727,7 +644,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unsetCursorBlink,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unsetCursorInverse() => super.noSuchMethod(
@@ -735,7 +651,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unsetCursorInverse,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unsetCursorInvisible() => super.noSuchMethod(
@@ -743,7 +658,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unsetCursorInvisible,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unsetCursorStrikethrough() => super.noSuchMethod(
@@ -751,7 +665,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unsetCursorStrikethrough,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setForegroundColor16(int? color) => super.noSuchMethod(
@@ -759,7 +672,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setForegroundColor16,
           [color],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setForegroundColor256(int? index) => super.noSuchMethod(
@@ -767,7 +679,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setForegroundColor256,
           [index],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setForegroundColorRgb(
@@ -784,7 +695,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
             b,
           ],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void resetForeground() => super.noSuchMethod(
@@ -792,7 +702,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #resetForeground,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setBackgroundColor16(int? color) => super.noSuchMethod(
@@ -800,7 +709,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setBackgroundColor16,
           [color],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setBackgroundColor256(int? index) => super.noSuchMethod(
@@ -808,7 +716,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setBackgroundColor256,
           [index],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setBackgroundColorRgb(
@@ -825,7 +732,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
             b,
           ],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void resetBackground() => super.noSuchMethod(
@@ -833,7 +739,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #resetBackground,
           [],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unsupportedStyle(int? param) => super.noSuchMethod(
@@ -841,7 +746,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unsupportedStyle,
           [param],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setTitle(String? name) => super.noSuchMethod(
@@ -849,7 +753,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setTitle,
           [name],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void setIconName(String? name) => super.noSuchMethod(
@@ -857,7 +760,6 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #setIconName,
           [name],
         ),
-        returnValueForMissingStub: null,
       );
   @override
   void unknownOSC(String? code, List<String>? args) => super.noSuchMethod(
@@ -865,6 +767,5 @@ class MockEscapeHandler extends _i1.Mock implements _i2.EscapeHandler {
           #unknownOSC,
           [code],
         ),
-        returnValueForMissingStub: null,
       );
 }
