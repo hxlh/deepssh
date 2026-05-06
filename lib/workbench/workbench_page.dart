@@ -1225,15 +1225,20 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       hostName: session.hostName,
       title: 'terminal$nextIndex',
       terminal: xterm.Terminal(maxLines: terminalThemeSettings.scrollbackLines),
+      connectionGroupId: session.connectionGroupId,
     );
     final sessions =
         sshSessionsByProfileId[session.profileId] ?? const <SshSessionItem>[];
+    final sourceIndex = sessions.indexWhere((s) => s.id == session.id);
+    final insertIndex = sourceIndex >= 0 ? sourceIndex + 1 : sessions.length;
+    final nextSessions = [...sessions];
+    nextSessions.insert(insertIndex, newSession);
 
     setState(() {
       sshSessionCounter = nextIndex;
       sshSessionsByProfileId = {
         ...sshSessionsByProfileId,
-        session.profileId: [...sessions, newSession],
+        session.profileId: nextSessions,
       };
       terminalState = terminalState.open(_sshTabFromSession(newSession));
       contentMode = WorkbenchContentMode.terminal;
@@ -1302,12 +1307,14 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     }
 
     final nextIndex = sshSessionCounter + 1;
+    final connectionGroupId = 'conn-${DateTime.now().millisecondsSinceEpoch}-$nextIndex';
     final session = SshSessionItem(
       id: 'ssh-pending-$nextIndex',
       profileId: profile.id,
       hostName: profile.host,
       title: 'terminal$nextIndex',
       terminal: xterm.Terminal(maxLines: terminalThemeSettings.scrollbackLines),
+      connectionGroupId: connectionGroupId,
     );
     final sessions =
         sshSessionsByProfileId[profile.id] ?? const <SshSessionItem>[];

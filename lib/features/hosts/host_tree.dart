@@ -65,6 +65,13 @@ class HostTree extends StatelessWidget {
   static const double _menuWidth = 150;
   static const String _localSectionId = 'local';
 
+  Color _groupColor(String connectionGroupId) {
+    if (connectionGroupId.isEmpty) return Colors.transparent;
+    final hash = connectionGroupId.hashCode.abs();
+    final hue = (hash % 360).toDouble();
+    return HSLColor.fromAHSL(1.0, hue, 0.70, 0.45).toColor();
+  }
+
   String _profileSectionId(String profileId) => 'profile:$profileId';
 
   String? _profileIdFromSectionId(String sectionId) {
@@ -193,6 +200,8 @@ class HostTree extends StatelessWidget {
   }
 
   Widget _sessionItem(BuildContext context, SshSessionItem session) {
+    final isSelected = selectedTerminalId == session.id;
+    final groupColor = _groupColor(session.connectionGroupId);
     return InkWell(
       onTap: () => onSshSessionTap(session),
       onSecondaryTapDown: (details) {
@@ -209,9 +218,9 @@ class HostTree extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(24, 2, 8, 2),
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: selectedTerminalId == session.id
-              ? AppColors.selection
-              : Colors.transparent,
+          color: isSelected
+              ? groupColor.withOpacity(0.30)
+              : groupColor.withOpacity(0.12),
           borderRadius: BorderRadius.circular(AppSpacing.radius),
         ),
         child: Row(
