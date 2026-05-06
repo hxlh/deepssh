@@ -184,6 +184,29 @@ run_package() {
       cp "$rust_lib" "$frameworks_dir/"
       # Ensure the main binary is executable (cp -a may not guarantee this in CI)
       chmod +x "$macos_dir/$APP_NAME"
+
+      # Verify critical Flutter resources are present
+      local flutter_assets="$target/$app_name/Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets"
+      local icudtl="$target/$app_name/Contents/Frameworks/FlutterMacOS.framework/Versions/A/Resources/icudtl.dat"
+      if [[ ! -d "$flutter_assets" ]]; then
+        echo "ERROR: flutter_assets not found in packaged app: $flutter_assets" >&2
+        exit 1
+      fi
+      if [[ ! -f "$icudtl" ]]; then
+        echo "ERROR: icudtl.dat not found in packaged app: $icudtl" >&2
+        exit 1
+      fi
+      # Verify symlinks inside Frameworks are intact (broken symlinks break Flutter at runtime)
+      local app_fw_res="$target/$app_name/Contents/Frameworks/App.framework/Resources"
+      local flutter_fw_res="$target/$app_name/Contents/Frameworks/FlutterMacOS.framework/Resources"
+      if [[ ! -L "$app_fw_res" ]] || [[ ! -e "$app_fw_res" ]]; then
+        echo "ERROR: App.framework/Resources symlink is broken or missing" >&2
+        exit 1
+      fi
+      if [[ ! -L "$flutter_fw_res" ]] || [[ ! -e "$flutter_fw_res" ]]; then
+        echo "ERROR: FlutterMacOS.framework/Resources symlink is broken or missing" >&2
+        exit 1
+      fi
     done
   else
     cp -a "$source"/. "$target/"
