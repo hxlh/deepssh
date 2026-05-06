@@ -173,17 +173,20 @@ run_package() {
       echo "macOS app bundle not found in: $source" >&2
       exit 1
     fi
-    cp -R "${apps[@]}" "$target/"
+    cp -a "${apps[@]}" "$target/"
     local rust_lib="rust/target/$(cargo_target_dir "$mode")/libdeepssh_rust.dylib"
     for app in "${apps[@]}"; do
       local app_name
       app_name="$(basename "$app")"
       local frameworks_dir="$target/$app_name/Contents/Frameworks"
+      local macos_dir="$target/$app_name/Contents/MacOS"
       mkdir -p "$frameworks_dir"
       cp "$rust_lib" "$frameworks_dir/"
+      # Ensure the main binary is executable (cp -a may not guarantee this in CI)
+      chmod +x "$macos_dir/$APP_NAME"
     done
   else
-    cp -R "$source"/. "$target/"
+    cp -a "$source"/. "$target/"
   fi
 
   echo "Packaged: $target"
