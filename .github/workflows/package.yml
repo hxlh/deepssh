@@ -49,7 +49,8 @@ jobs:
         if: matrix.platform == 'macos'
         run: bash ./build.sh package --release
 
-      - name: Create release archive
+      - name: Create release archive (Windows)
+        if: matrix.platform == 'windows'
         shell: pwsh
         run: |
           $package = Get-ChildItem -Path dist -Directory -Filter "deepssh-${{ matrix.platform }}-*" | Select-Object -First 1
@@ -57,6 +58,18 @@ jobs:
             throw "Package directory not found for ${{ matrix.platform }}"
           }
           Compress-Archive -Path $package.FullName -DestinationPath "$($package.FullName).zip" -Force
+
+      - name: Create release archive (macOS)
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          package=$(ls -d dist/deepssh-macos-* 2>/dev/null | head -n1)
+          if [ -z "$package" ]; then
+            echo "Package directory not found for macOS" >&2
+            exit 1
+          fi
+          # Use ditto to preserve symlinks, extended attributes, and resource forks
+          ditto -c -k --sequesterRsrc --keepParent "$package" "$package.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

@@ -173,17 +173,76 @@ run_package() {
       echo "macOS app bundle not found in: $source" >&2
       exit 1
     fi
-    cp -R "${apps[@]}" "$target/"
+    cp -a "${apps[@]}" "$target/"
     local rust_lib="rust/target/$(cargo_target_dir "$mode")/libdeepssh_rust.dylib"
     for app in "${apps[@]}"; do
       local app_name
       app_name="$(basename "$app")"
       local frameworks_dir="$target/$app_name/Contents/Frameworks"
+      local macos_dir="$target/$app_name/Contents/MacOS"
       mkdir -p "$frameworks_dir"
-      cp "$rust_lib" "$frameworks_dir/"
+      # Create a proper macOS framework bundle for the Rust library so that
+      # flutter_rust_bridge can locate it via FRB_DART_LOAD_EXTERNAL_LIBRARY_NATIVE_LIB_DIR.
+      # FRB on macOS resolves stem 'deepssh_rust' to deepssh_rust.framework/deepssh_rust.
+      local rust_fw="$frameworks_dir/deepssh_rust.framework"
+      mkdir -p "$rust_fw/Versions/A/Resources"
+      cp "$rust_lib" "$rust_fw/Versions/A/deepssh_rust"
+      ln -sf "A" "$rust_fw/Versions/Current"
+      ln -sf "Versions/Current/deepssh_rust" "$rust_fw/deepssh_rust"
+      ln -sf "Versions/Current/Resources" "$rust_fw/Resources"
+      cat > "$rust_fw/Versions/A/Resources/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleExecutable</key>
+  <string>deepssh_rust</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.deepssh.rust</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>deepssh_rust</string>
+  <key>CFBundlePackageType</key>
+  <string>FMWK</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+</dict>
+</plist>
+PLIST
+
+      # Ensure the main binary is executable (cp -a may not guarantee this in CI)
+      chmod +x "$macos_dir/$APP_NAME"
+
+      # Verify critical Flutter resources are present
+      local flutter_assets="$target/$app_name/Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets"
+      local icudtl="$target/$app_name/Contents/Frameworks/FlutterMacOS.framework/Versions/A/Resources/icudtl.dat"
+      if [[ ! -d "$flutter_assets" ]]; then
+        echo "ERROR: flutter_assets not found in packaged app: $flutter_assets" >&2
+        exit 1
+      fi
+      if [[ ! -f "$icudtl" ]]; then
+        echo "ERROR: icudtl.dat not found in packaged app: $icudtl" >&2
+        exit 1
+      fi
+      # Verify symlinks inside Frameworks are intact (broken symlinks break Flutter at runtime)
+      local app_fw_res="$target/$app_name/Contents/Frameworks/App.framework/Resources"
+      local flutter_fw_res="$target/$app_name/Contents/Frameworks/FlutterMacOS.framework/Resources"
+      if [[ ! -L "$app_fw_res" ]] || [[ ! -e "$app_fw_res" ]]; then
+        echo "ERROR: App.framework/Resources symlink is broken or missing" >&2
+        exit 1
+      fi
+      if [[ ! -L "$flutter_fw_res" ]] || [[ ! -e "$flutter_fw_res" ]]; then
+        echo "ERROR: FlutterMacOS.framework/Resources symlink is broken or missing" >&2
+        exit 1
+      fi
     done
   else
-    cp -R "$source"/. "$target/"
+    cp -a "$source"/. "$target/"
   fi
 
   echo "Packaged: $target"
