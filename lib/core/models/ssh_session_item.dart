@@ -11,6 +11,7 @@ class SshSessionItem {
     this.sessionId,
     this.history = '',
     this.terminal,
+    this.connectionGroupId = '',
   });
 
   final String id;
@@ -22,6 +23,7 @@ class SshSessionItem {
   final String? sessionId;
   final String history;
   final xterm.Terminal? terminal;
+  final String connectionGroupId;
 
   String get displayTitle {
     final trimmedNote = note.trim();
@@ -37,6 +39,7 @@ class SshSessionItem {
     String? sessionId,
     String? history,
     xterm.Terminal? terminal,
+    String? connectionGroupId,
   }) {
     return SshSessionItem(
       id: id,
@@ -48,6 +51,7 @@ class SshSessionItem {
       sessionId: sessionId ?? this.sessionId,
       history: history ?? this.history,
       terminal: terminal ?? this.terminal,
+      connectionGroupId: connectionGroupId ?? this.connectionGroupId,
     );
   }
 }
