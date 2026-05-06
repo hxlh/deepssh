@@ -126,6 +126,7 @@ pub fn spawn_local_terminal(rows: Option<u16>, cols: Option<u16>) -> Result<Loca
 
     let mut command = CommandBuilder::new(shell);
     command.cwd(cwd);
+    command.env("TERM", "xterm-256color");
 
     let child = pair.slave.spawn_command(command)?;
     drop(pair.slave);

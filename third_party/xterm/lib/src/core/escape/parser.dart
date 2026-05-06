@@ -216,6 +216,7 @@ class EscapeParser {
     }
 
     _csi.params.clear();
+    _csi.hasColon = false;
 
     // test whether the csi is a `CSI ? Ps ...` or `CSI Ps ...`
     final prefix = _queue.peek();
@@ -250,6 +251,7 @@ class EscapeParser {
         }
         param = 0;
         hasParam = false;
+        _csi.hasColon = true;
         continue;
       }
 
@@ -516,8 +518,10 @@ class EscapeParser {
               }
               var rgbOffset = i + 2;
               // ISO 8613-6 colon format may include an optional colorspace
-              // parameter (e.g. 38:2::R:G:B). Skip it when present.
-              if (params[rgbOffset] == 0 && i + 5 < params.length) {
+              // parameter (e.g. 38:2::R:G:B). Only skip it when the sequence
+              // actually used colons, to avoid misinterpreting semicolon-format
+              // sequences where red is legitimately 0.
+              if (_csi.hasColon && params[rgbOffset] == 0 && i + 5 < params.length) {
                 rgbOffset++;
               }
               if (rgbOffset + 2 >= params.length) {
@@ -582,8 +586,10 @@ class EscapeParser {
               }
               var rgbOffset = i + 2;
               // ISO 8613-6 colon format may include an optional colorspace
-              // parameter (e.g. 48:2::R:G:B). Skip it when present.
-              if (params[rgbOffset] == 0 && i + 5 < params.length) {
+              // parameter (e.g. 48:2::R:G:B). Only skip it when the sequence
+              // actually used colons, to avoid misinterpreting semicolon-format
+              // sequences where red is legitimately 0.
+              if (_csi.hasColon && params[rgbOffset] == 0 && i + 5 < params.length) {
                 rgbOffset++;
               }
               if (rgbOffset + 2 >= params.length) {
@@ -1184,6 +1190,8 @@ class _Csi {
   });
 
   int? prefix;
+
+  bool hasColon = false;
 
   List<int> params;
 
