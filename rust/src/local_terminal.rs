@@ -198,7 +198,17 @@ fn run_output_loop(session_id: String, mut reader: Box<dyn Read + Send>) {
     loop {
         match reader.read(&mut buffer) {
             Ok(0) => break,
-            Ok(size) => push_output(&session_id, buffer[..size].to_vec()),
+            Ok(size) => {
+                let data = buffer[..size].to_vec();
+                let hex = data.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ");
+                let preview = String::from_utf8_lossy(&data);
+                crate::app_log::log_error_message(
+                    "local_terminal.raw",
+                    &format!("size={size} hex={hex} preview={preview}"),
+                    None,
+                );
+                push_output(&session_id, data);
+            }
             Err(error) => {
                 crate::app_log::log_error_message(
                     "local_terminal.read",
