@@ -548,7 +548,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     }
     localOutputSubscriptions[terminal.id] = widget.localTerminalBridge
         .outputStream(sessionId)
-        .transform(utf8.decoder)
+        .transform(const Utf8Decoder(allowMalformed: true))
         .listen(
           (text) {
             if (!mounted || text.isEmpty) return;
