@@ -243,7 +243,10 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   var _stickToBottom = true;
 
   void _onScroll() {
-    _stickToBottom = _scrollOffset >= _maxScrollExtent;
+    // Use a half-line-height tolerance because _scrollOffset is quantized
+    // to line-height multiples and may not exactly reach _maxScrollExtent.
+    _stickToBottom =
+        _maxScrollExtent - _scrollOffset <= _painter.cellSize.height / 2;
     markNeedsLayout();
     _notifyEditableRect();
   }
