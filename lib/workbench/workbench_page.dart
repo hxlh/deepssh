@@ -616,7 +616,11 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   void _handleTabClose(String tabId) {
     for (final terminal in localTerminals) {
       if (terminal.id == tabId) {
-        unawaited(_handleCloseLocalTerminal(terminal));
+        // Close the tab UI only; keep the underlying terminal process alive
+        // so the user can reopen it from the host tree.
+        setState(() {
+          terminalState = terminalState.close(tabId);
+        });
         return;
       }
     }
