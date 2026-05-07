@@ -243,10 +243,11 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   var _stickToBottom = true;
 
   void _onScroll() {
-    // Use a half-line-height tolerance because _scrollOffset is quantized
-    // to line-height multiples and may not exactly reach _maxScrollExtent.
-    _stickToBottom =
-        _maxScrollExtent - _scrollOffset <= _painter.cellSize.height / 2;
+    // Use the raw _offset.pixels (not quantized _scrollOffset) so the
+    // bottom-detection is accurate. The quantized getter can undershoot
+    // _maxScrollExtent when the viewport height is not a multiple of
+    // cell height, causing _stickToBottom to stay false forever.
+    _stickToBottom = _offset.pixels >= _maxScrollExtent - 1.0;
     markNeedsLayout();
     _notifyEditableRect();
   }
@@ -305,7 +306,10 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     _updateScrollOffset();
 
     if (_stickToBottom) {
-      _offset.correctBy(_maxScrollExtent - _scrollOffset);
+      // Use the raw offset so we land exactly at maxScrollExtent.
+      // Using the quantized _scrollOffset here could push the offset past
+      // the valid range when maxScrollExtent is not a cell-height multiple.
+      _offset.correctBy(_maxScrollExtent - _offset.pixels);
     }
   }
 
