@@ -521,8 +521,8 @@ class _TerminalViewState extends State<TerminalView> {
     _findSession ??= TerminalFindSession(
       terminal: terminal,
       terminalController: terminalController,
-      searchHitBackground: const Color(0xFF264F78),
-      searchHitBackgroundCurrent: const Color(0xFF515C6A),
+      searchHitBackground: AppColors.accent.withOpacity(0.3),
+      searchHitBackgroundCurrent: AppColors.accent.withOpacity(0.7),
     );
     _findSession!.setCaseSensitive(_effectiveFindCaseSensitive);
     _findSession!.setWholeWord(_effectiveFindWholeWord);
@@ -732,8 +732,8 @@ class _TerminalViewState extends State<TerminalView> {
                   brightMagenta: const Color(0xFFD670D6),
                   brightCyan: const Color(0xFF29B8DB),
                   brightWhite: const Color(0xFFE5E5E5),
-                  searchHitBackground: const Color(0xFF264F78),
-                  searchHitBackgroundCurrent: const Color(0xFF515C6A),
+                  searchHitBackground: AppColors.accent.withOpacity(0.3),
+                  searchHitBackgroundCurrent: AppColors.accent.withOpacity(0.7),
                   searchHitForeground: settings.foreground,
                 ),
               ),
