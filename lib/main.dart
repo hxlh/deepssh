@@ -13,6 +13,15 @@ import 'features/theme/theme_bridge.dart';
 import 'workbench/workbench_page.dart';
 
 Future<void> main(List<String> args) async {
+  // Bind early so we can touch PaintingBinding before the first frame.
+  WidgetsFlutterBinding.ensureInitialized();
+  // Default maximumSizeBytes is 100 MiB which is way too generous for a
+  // terminal app that barely shows images. Capping at 10 MiB / 100 entries
+  // keeps the cache from holding decoded bitmaps after view changes.
+  final imageCache = PaintingBinding.instance.imageCache;
+  imageCache.maximumSize = 100;
+  imageCache.maximumSizeBytes = 10 << 20;
+
   if (shouldEnableVmService(args)) {
     await _enableVmService();
   }

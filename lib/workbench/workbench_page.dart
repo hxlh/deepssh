@@ -323,6 +323,11 @@ class _DefaultThemeBridgeClientHolder implements ThemeBridgeClient {
 
 class _WorkbenchPageState extends State<WorkbenchPage> {
   static const int sshSessionHistoryLineLimit = 3000;
+  // Force an immediate flush when the per-session output buffer crosses this
+  // size, instead of waiting for the 16ms debounce timer. Stops bursty
+  // producers (e.g. `rg` over SSH dumping match output) from piling several
+  // MiB into one StringBuffer before the next frame fires.
+  static const int outputFlushSizeLimit = 32 * 1024;
 
   HostTreeState hostTreeState = HostTreeState();
   TerminalState terminalState = const TerminalState();
@@ -505,6 +510,21 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       ];
       terminalState = terminalState.close(terminal.id);
     });
+    _collectIdleResourcesIfDrained();
+  }
+
+  // Releases Flutter-side caches when the user has closed every terminal and
+  // SSH session. Pairs with the Rust `collect_idle_pages_if_drained` hook —
+  // mimalloc handles the native heap, this clears the image/raster cache that
+  // Skia keeps until evicted.
+  void _collectIdleResourcesIfDrained() {
+    final hasSshSessions = sshSessionsByProfileId.values.any(
+      (sessions) => sessions.isNotEmpty,
+    );
+    if (hasSshSessions || localTerminals.isNotEmpty) return;
+    final imageCache = PaintingBinding.instance.imageCache;
+    imageCache.clear();
+    imageCache.clearLiveImages();
   }
 
   void _scheduleLocalOutputFlush(LocalTerminalItem terminal) {
@@ -557,7 +577,12 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               StringBuffer.new,
             );
             buffer.write(text);
-            _scheduleLocalOutputFlush(terminal);
+            if (buffer.length >= outputFlushSizeLimit) {
+              localOutputFlushTimers.remove(terminal.id)?.cancel();
+              _flushLocalOutput(terminal);
+            } else {
+              _scheduleLocalOutputFlush(terminal);
+            }
           },
           onDone: () {
             localOutputFlushTimers.remove(terminal.id)?.cancel();
@@ -964,12 +989,34 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     });
   }
 
+  // Appends [text] to [history], capping at sshSessionHistoryLineLimit lines
+  // by trimming from the front. The previous implementation built a full
+  // List<String> via split/join on every call — at 60 Hz with rg-style
+  // streams that allocated tens of MiB of garbage per second. Now we scan
+  // code units once, then either return the bare concat or take a single
+  // substring from the cut point.
   String _appendSshHistory(String history, String text) {
-    final lines = '$history$text'.split('\n');
-    if (lines.length <= sshSessionHistoryLineLimit) {
-      return '$history$text';
+    if (text.isEmpty) return history;
+    final combined = history + text;
+    int newlineCount = 0;
+    for (int i = 0; i < combined.length; i++) {
+      if (combined.codeUnitAt(i) == 0x0A) newlineCount++;
     }
-    return lines.skip(lines.length - sshSessionHistoryLineLimit).join('\n');
+    if (newlineCount <= sshSessionHistoryLineLimit) {
+      return combined;
+    }
+    int toDrop = newlineCount - sshSessionHistoryLineLimit;
+    int cut = 0;
+    for (int i = 0; i < combined.length; i++) {
+      if (combined.codeUnitAt(i) == 0x0A) {
+        toDrop--;
+        if (toDrop == 0) {
+          cut = i + 1;
+          break;
+        }
+      }
+    }
+    return combined.substring(cut);
   }
 
   void _scheduleSshOutputFlush(SshSessionItem session) {
@@ -1027,7 +1074,12 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       if (!mounted || text.isEmpty) return;
       final buffer = sshOutputBuffers.putIfAbsent(session.id, StringBuffer.new);
       buffer.write(text);
-      _scheduleSshOutputFlush(session);
+      if (buffer.length >= outputFlushSizeLimit) {
+        sshOutputFlushTimers.remove(session.id)?.cancel();
+        _flushSshOutput(session);
+      } else {
+        _scheduleSshOutputFlush(session);
+      }
     }
 
     void handleDone() {
@@ -1173,6 +1225,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       };
       terminalState = terminalState.close(session.id);
     });
+    _collectIdleResourcesIfDrained();
   }
 
   Future<void> _handleEditSshSessionNote(SshSessionItem session) async {

@@ -24,11 +24,38 @@ static OUTPUT_SINK_STORE: Lazy<Mutex<HashMap<String, StreamSink<Vec<u8>>>>> =
 static SSH_CLIENT_STORE: Lazy<Mutex<HashMap<String, SshConnectionInfo>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 pub(crate) static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
-    Builder::new_multi_thread()
+    // SSH/PTY work is I/O-bound. The default num_cpus workers each carry a
+    // 2 MiB stack and live for the lifetime of the static, which dominates
+    // the post-close RSS floor. One worker + 256 KiB stack is enough for a
+    // typical 1-3 sessions; russh handshakes are short and cooperative.
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(1)
+        .max_blocking_threads(4)
+        .thread_keep_alive(Duration::from_secs(5))
+        .thread_stack_size(256 * 1024)
         .enable_all()
         .thread_name("deepssh-russh")
         .build()
-        .unwrap()
+        .unwrap();
+
+    // Defensive periodic purge: the close hook already calls
+    // `collect_idle_pages_if_drained` on every session close, but a long-idle
+    // user (open session, walk away) won't hit that path. Re-fire every 60 s
+    // so fragmented arenas eventually return to the OS even without close
+    // events. The idle-check inside the hook makes this a no-op when sessions
+    // are active.
+    runtime.spawn(async {
+        let mut tick = tokio::time::interval(Duration::from_secs(60));
+        // First tick fires immediately — skip it so the first run waits a
+        // full minute, otherwise we'd race the very first allocation burst.
+        tick.tick().await;
+        loop {
+            tick.tick().await;
+            crate::collect_idle_pages_if_drained();
+        }
+    });
+
+    runtime
 });
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -70,6 +97,7 @@ enum SshCommand {
 
 struct SshChannel {
     cmd_tx: mpsc::UnboundedSender<SshCommand>,
+    task: tokio::task::JoinHandle<()>,
 }
 
 struct SshConnectionInfo {
@@ -177,21 +205,22 @@ pub fn connect_profile(
                 session_ids: vec![session_id.clone()],
             },
         );
-        CONNECTION_STORE
-            .lock()
-            .unwrap()
-            .insert(session_id.clone(), SshChannel { cmd_tx });
-        SESSION_STORE
-            .lock()
-            .unwrap()
-            .insert(session_id.clone(), session.clone());
 
-        TOKIO_RUNTIME.spawn(run_session_loop(
+        let task = TOKIO_RUNTIME.spawn(run_session_loop(
             session_id.clone(),
             read_half,
             write_half,
             cmd_rx,
         ));
+
+        CONNECTION_STORE
+            .lock()
+            .unwrap()
+            .insert(session_id.clone(), SshChannel { cmd_tx, task });
+        SESSION_STORE
+            .lock()
+            .unwrap()
+            .insert(session_id.clone(), session.clone());
 
         Ok(connect_success(session))
     });
@@ -254,10 +283,17 @@ pub fn duplicate_session(session_id: String) -> Result<SshSession> {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<SshCommand>();
         let (read_half, write_half) = channel.split();
 
+        let task = TOKIO_RUNTIME.spawn(run_session_loop(
+            new_session_id.clone(),
+            read_half,
+            write_half,
+            cmd_rx,
+        ));
+
         CONNECTION_STORE
             .lock()
             .unwrap()
-            .insert(new_session_id.clone(), SshChannel { cmd_tx });
+            .insert(new_session_id.clone(), SshChannel { cmd_tx, task });
         SESSION_STORE
             .lock()
             .unwrap()
@@ -269,13 +305,6 @@ pub fn duplicate_session(session_id: String) -> Result<SshSession> {
                 conn_info.session_ids.push(new_session_id.clone());
             }
         }
-
-        TOKIO_RUNTIME.spawn(run_session_loop(
-            new_session_id.clone(),
-            read_half,
-            write_half,
-            cmd_rx,
-        ));
 
         Ok(session)
     });
@@ -339,6 +368,7 @@ pub fn close_session(session_id: String) -> Result<bool> {
     let removed_channel = CONNECTION_STORE.lock().unwrap().remove(&session_id);
     if let Some(channel) = removed_channel.as_ref() {
         let _ = channel.cmd_tx.send(SshCommand::Close);
+        channel.task.abort();
     }
 
     let removed_session = SESSION_STORE.lock().unwrap().remove(&session_id);
@@ -359,6 +389,7 @@ pub fn close_session(session_id: String) -> Result<bool> {
         }
     }
 
+    crate::collect_idle_pages_if_drained();
     Ok(removed_session.is_some() || removed_channel.is_some())
 }
 
@@ -442,6 +473,8 @@ fn cleanup_session_after_loop(session_id: &str) {
             SSH_CLIENT_STORE.lock().unwrap().remove(&conn_id);
         }
     }
+
+    crate::collect_idle_pages_if_drained();
 }
 
 fn push_output(session_id: &str, data: Vec<u8>) {
@@ -477,21 +510,21 @@ fn register_session_for_test(profile_id: String, title: String, term_type: Strin
         cols: 80,
         term_type,
     };
-    CONNECTION_STORE
-        .lock()
-        .unwrap()
-        .insert(session_id.clone(), SshChannel { cmd_tx });
-    SESSION_STORE
-        .lock()
-        .unwrap()
-        .insert(session_id.clone(), session.clone());
-    TOKIO_RUNTIME.spawn(async move {
+    let task = TOKIO_RUNTIME.spawn(async move {
         while let Some(command) = cmd_rx.recv().await {
             if matches!(command, SshCommand::Close) {
                 break;
             }
         }
     });
+    CONNECTION_STORE
+        .lock()
+        .unwrap()
+        .insert(session_id.clone(), SshChannel { cmd_tx, task });
+    SESSION_STORE
+        .lock()
+        .unwrap()
+        .insert(session_id.clone(), session.clone());
     session
 }
 

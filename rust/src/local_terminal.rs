@@ -189,10 +189,12 @@ pub fn close_local_terminal(session_id: String) -> Result<()> {
         .remove(&session_id)
         .ok_or_else(|| anyhow!("Local terminal session not found"))?;
     OUTPUT_SINK_STORE.lock().unwrap().remove(&session_id);
-    session
+    let result = session
         .cmd_tx
         .send(LocalTerminalCommand::Close)
-        .map_err(|_| anyhow!("Local terminal session closed"))
+        .map_err(|_| anyhow!("Local terminal session closed"));
+    crate::collect_idle_pages_if_drained();
+    result
 }
 
 pub(crate) fn count_sessions() -> usize {
@@ -205,15 +207,7 @@ fn run_output_loop(session_id: String, mut reader: Box<dyn Read + Send>) {
         match reader.read(&mut buffer) {
             Ok(0) => break,
             Ok(size) => {
-                let data = buffer[..size].to_vec();
-                let hex = data.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ");
-                let preview = String::from_utf8_lossy(&data);
-                crate::app_log::log_error_message(
-                    "local_terminal.raw",
-                    &format!("size={size} hex={hex} preview={preview}"),
-                    None,
-                );
-                push_output(&session_id, data);
+                push_output(&session_id, buffer[..size].to_vec());
             }
             Err(error) => {
                 crate::app_log::log_error_message(
@@ -276,6 +270,7 @@ fn run_command_loop(
 fn cleanup_session_after_loop(session_id: &str) {
     SESSION_STORE.lock().unwrap().remove(session_id);
     OUTPUT_SINK_STORE.lock().unwrap().remove(session_id);
+    crate::collect_idle_pages_if_drained();
 }
 
 fn push_output(session_id: &str, data: Vec<u8>) {

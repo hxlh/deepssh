@@ -18,7 +18,18 @@ portable-pty = "0.8"
 russh = { version = "0.60.1", default-features = false, features = ["ring", "rsa"] }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
-tokio = { version = "1", features = ["full"] }
+# Pulling only the features we actually use keeps the runtime smaller at boot:
+# rt-multi-thread (Builder/Runtime), io-util (AsyncReadExt/WriteExt),
+# sync (mpsc/oneshot), net (TcpListener/Stream), time (timeout/sleep),
+# macros (select!). Avoids "full" which drags in signal/process/fs/etc.
+tokio = { version = "1", default-features = false, features = [
+    "rt-multi-thread",
+    "io-util",
+    "sync",
+    "net",
+    "time",
+    "macros",
+] }
 uuid = { version = "1", features = ["v4"] }
 
 # Windows-only: needed to call EmptyWorkingSet after the drain hook so the OS
