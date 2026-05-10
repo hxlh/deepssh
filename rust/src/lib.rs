@@ -7,6 +7,7 @@ pub(crate) mod app_log;
 pub mod config_path;
 mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
 pub mod local_terminal;
+pub mod mem_metrics;
 pub mod profile;
 pub mod ssh_auth;
 pub mod ssh_session;

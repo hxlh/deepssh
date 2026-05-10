@@ -739,6 +739,14 @@ async fn run_remote_tunnel(
     Ok(())
 }
 
+pub(crate) fn count_configs() -> usize {
+    TUNNEL_STORE.lock().unwrap().configs.len()
+}
+
+pub(crate) fn count_running_runtimes() -> usize {
+    RUNTIME_STORE.lock().unwrap().len()
+}
+
 #[cfg(test)]
 fn clear_tunnels_for_test() -> std::sync::MutexGuard<'static, ()> {
     let guard = crate::test_support::WORKSPACE_LOCK.lock().unwrap();

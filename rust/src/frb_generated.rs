@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1567238282;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1354039263;
 
 // Section: executor
 
@@ -639,6 +639,72 @@ fn wire__crate__ssh_session__resize_session_impl(
         },
     )
 }
+fn wire__crate__mem_metrics__rust_mem_snapshot_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "rust_mem_snapshot",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::mem_metrics::rust_mem_snapshot())?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__mem_metrics__rust_mimalloc_collect_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "rust_mimalloc_collect",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok({
+                        crate::mem_metrics::rust_mimalloc_collect();
+                    })?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__theme__save_theme_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1134,6 +1200,44 @@ impl SseDecode for crate::theme::RegexHighlight {
     }
 }
 
+impl SseDecode for crate::mem_metrics::RustMemSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_currentRss = <u64>::sse_decode(deserializer);
+        let mut var_peakRss = <u64>::sse_decode(deserializer);
+        let mut var_currentCommit = <u64>::sse_decode(deserializer);
+        let mut var_peakCommit = <u64>::sse_decode(deserializer);
+        let mut var_pageFaults = <u64>::sse_decode(deserializer);
+        let mut var_elapsedMs = <u64>::sse_decode(deserializer);
+        let mut var_userMs = <u64>::sse_decode(deserializer);
+        let mut var_systemMs = <u64>::sse_decode(deserializer);
+        let mut var_sshSessions = <u64>::sse_decode(deserializer);
+        let mut var_sshConnections = <u64>::sse_decode(deserializer);
+        let mut var_sshClients = <u64>::sse_decode(deserializer);
+        let mut var_localTerminals = <u64>::sse_decode(deserializer);
+        let mut var_tunnelConfigs = <u64>::sse_decode(deserializer);
+        let mut var_tunnelsRunning = <u64>::sse_decode(deserializer);
+        let mut var_mimallocStatsText = <String>::sse_decode(deserializer);
+        return crate::mem_metrics::RustMemSnapshot {
+            current_rss: var_currentRss,
+            peak_rss: var_peakRss,
+            current_commit: var_currentCommit,
+            peak_commit: var_peakCommit,
+            page_faults: var_pageFaults,
+            elapsed_ms: var_elapsedMs,
+            user_ms: var_userMs,
+            system_ms: var_systemMs,
+            ssh_sessions: var_sshSessions,
+            ssh_connections: var_sshConnections,
+            ssh_clients: var_sshClients,
+            local_terminals: var_localTerminals,
+            tunnel_configs: var_tunnelConfigs,
+            tunnels_running: var_tunnelsRunning,
+            mimalloc_stats_text: var_mimallocStatsText,
+        };
+    }
+}
+
 impl SseDecode for crate::ssh_auth::SshAuthCredential {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1372,6 +1476,13 @@ impl SseDecode for u32 {
     }
 }
 
+impl SseDecode for u64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u64::<NativeEndian>().unwrap()
+    }
+}
+
 impl SseDecode for u8 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1453,24 +1564,28 @@ fn pde_ffi_dispatcher_primary_impl(
             data_len,
         ),
         15 => wire__crate__ssh_session__resize_session_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__theme__save_theme_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__local_terminal__spawn_local_terminal_impl(
+        16 => wire__crate__mem_metrics__rust_mem_snapshot_impl(port, ptr, rust_vec_len, data_len),
+        17 => {
+            wire__crate__mem_metrics__rust_mimalloc_collect_impl(port, ptr, rust_vec_len, data_len)
+        }
+        18 => wire__crate__theme__save_theme_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__local_terminal__spawn_local_terminal_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        18 => wire__crate__tunnel__start_tunnel_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__tunnel__stop_tunnel_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__profile__update_profile_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__tunnel__update_tunnel_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__local_terminal__write_to_local_terminal_impl(
+        20 => wire__crate__tunnel__start_tunnel_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__tunnel__stop_tunnel_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__profile__update_profile_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__tunnel__update_tunnel_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__local_terminal__write_to_local_terminal_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        23 => wire__crate__ssh_session__write_to_session_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__ssh_session__write_to_session_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1526,6 +1641,40 @@ impl flutter_rust_bridge::IntoIntoDart<crate::theme::RegexHighlight>
     for crate::theme::RegexHighlight
 {
     fn into_into_dart(self) -> crate::theme::RegexHighlight {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mem_metrics::RustMemSnapshot {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.current_rss.into_into_dart().into_dart(),
+            self.peak_rss.into_into_dart().into_dart(),
+            self.current_commit.into_into_dart().into_dart(),
+            self.peak_commit.into_into_dart().into_dart(),
+            self.page_faults.into_into_dart().into_dart(),
+            self.elapsed_ms.into_into_dart().into_dart(),
+            self.user_ms.into_into_dart().into_dart(),
+            self.system_ms.into_into_dart().into_dart(),
+            self.ssh_sessions.into_into_dart().into_dart(),
+            self.ssh_connections.into_into_dart().into_dart(),
+            self.ssh_clients.into_into_dart().into_dart(),
+            self.local_terminals.into_into_dart().into_dart(),
+            self.tunnel_configs.into_into_dart().into_dart(),
+            self.tunnels_running.into_into_dart().into_dart(),
+            self.mimalloc_stats_text.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mem_metrics::RustMemSnapshot
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mem_metrics::RustMemSnapshot>
+    for crate::mem_metrics::RustMemSnapshot
+{
+    fn into_into_dart(self) -> crate::mem_metrics::RustMemSnapshot {
         self
     }
 }
@@ -1990,6 +2139,27 @@ impl SseEncode for crate::theme::RegexHighlight {
     }
 }
 
+impl SseEncode for crate::mem_metrics::RustMemSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u64>::sse_encode(self.current_rss, serializer);
+        <u64>::sse_encode(self.peak_rss, serializer);
+        <u64>::sse_encode(self.current_commit, serializer);
+        <u64>::sse_encode(self.peak_commit, serializer);
+        <u64>::sse_encode(self.page_faults, serializer);
+        <u64>::sse_encode(self.elapsed_ms, serializer);
+        <u64>::sse_encode(self.user_ms, serializer);
+        <u64>::sse_encode(self.system_ms, serializer);
+        <u64>::sse_encode(self.ssh_sessions, serializer);
+        <u64>::sse_encode(self.ssh_connections, serializer);
+        <u64>::sse_encode(self.ssh_clients, serializer);
+        <u64>::sse_encode(self.local_terminals, serializer);
+        <u64>::sse_encode(self.tunnel_configs, serializer);
+        <u64>::sse_encode(self.tunnels_running, serializer);
+        <String>::sse_encode(self.mimalloc_stats_text, serializer);
+    }
+}
+
 impl SseEncode for crate::ssh_auth::SshAuthCredential {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2174,6 +2344,13 @@ impl SseEncode for u32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_u32::<NativeEndian>(self).unwrap();
+    }
+}
+
+impl SseEncode for u64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u64::<NativeEndian>(self).unwrap();
     }
 }
 

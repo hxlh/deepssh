@@ -195,6 +195,10 @@ pub fn close_local_terminal(session_id: String) -> Result<()> {
         .map_err(|_| anyhow!("Local terminal session closed"))
 }
 
+pub(crate) fn count_sessions() -> usize {
+    SESSION_STORE.lock().unwrap().len()
+}
+
 fn run_output_loop(session_id: String, mut reader: Box<dyn Read + Send>) {
     let mut buffer = [0_u8; 8192];
     loop {

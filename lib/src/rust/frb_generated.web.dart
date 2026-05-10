@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'frb_generated.dart';
 import 'local_terminal.dart';
+import 'mem_metrics.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 import 'profile.dart';
 import 'ssh_auth.dart';
@@ -97,6 +98,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RegexHighlight dco_decode_regex_highlight(dynamic raw);
 
   @protected
+  RustMemSnapshot dco_decode_rust_mem_snapshot(dynamic raw);
+
+  @protected
   SshAuthCredential dco_decode_ssh_auth_credential(dynamic raw);
 
   @protected
@@ -140,6 +144,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int dco_decode_u_32(dynamic raw);
+
+  @protected
+  BigInt dco_decode_u_64(dynamic raw);
 
   @protected
   int dco_decode_u_8(dynamic raw);
@@ -242,6 +249,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RegexHighlight sse_decode_regex_highlight(SseDeserializer deserializer);
 
   @protected
+  RustMemSnapshot sse_decode_rust_mem_snapshot(SseDeserializer deserializer);
+
+  @protected
   SshAuthCredential sse_decode_ssh_auth_credential(
     SseDeserializer deserializer,
   );
@@ -295,6 +305,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
+
+  @protected
+  BigInt sse_decode_u_64(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_8(SseDeserializer deserializer);
@@ -423,6 +436,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_rust_mem_snapshot(
+    RustMemSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_ssh_auth_credential(
     SshAuthCredential self,
     SseSerializer serializer,
@@ -487,6 +506,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_64(BigInt self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_8(int self, SseSerializer serializer);

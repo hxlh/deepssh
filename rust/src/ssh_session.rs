@@ -451,6 +451,18 @@ fn push_output(session_id: &str, data: Vec<u8>) {
     }
 }
 
+pub(crate) fn count_sessions() -> usize {
+    SESSION_STORE.lock().unwrap().len()
+}
+
+pub(crate) fn count_connections() -> usize {
+    CONNECTION_STORE.lock().unwrap().len()
+}
+
+pub(crate) fn count_clients() -> usize {
+    SSH_CLIENT_STORE.lock().unwrap().len()
+}
+
 #[cfg(test)]
 fn register_session_for_test(profile_id: String, title: String, term_type: String) -> SshSession {
     let session_id = Uuid::new_v4().to_string();

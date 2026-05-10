@@ -9,6 +9,7 @@ import 'frb_generated.dart';
 import 'frb_generated.io.dart'
     if (dart.library.js_interop) 'frb_generated.web.dart';
 import 'local_terminal.dart';
+import 'mem_metrics.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'profile.dart';
 import 'ssh_auth.dart';
@@ -69,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 1567238282;
+  int get rustContentHash => -1354039263;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -153,6 +154,10 @@ abstract class RustLibApi extends BaseApi {
     required int rows,
     required int cols,
   });
+
+  Future<RustMemSnapshot> crateMemMetricsRustMemSnapshot();
+
+  Future<void> crateMemMetricsRustMimallocCollect();
 
   Future<void> crateThemeSaveTheme({required ThemeSettings settings});
 
@@ -787,6 +792,60 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<RustMemSnapshot> crateMemMetricsRustMemSnapshot() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 16,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_rust_mem_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateMemMetricsRustMemSnapshotConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateMemMetricsRustMemSnapshotConstMeta =>
+      const TaskConstMeta(debugName: "rust_mem_snapshot", argNames: []);
+
+  @override
+  Future<void> crateMemMetricsRustMimallocCollect() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 17,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateMemMetricsRustMimallocCollectConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateMemMetricsRustMimallocCollectConstMeta =>
+      const TaskConstMeta(debugName: "rust_mimalloc_collect", argNames: []);
+
+  @override
   Future<void> crateThemeSaveTheme({required ThemeSettings settings}) {
     return handler.executeNormal(
       NormalTask(
@@ -796,7 +855,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 18,
             port: port_,
           );
         },
@@ -828,7 +887,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 19,
             port: port_,
           );
         },
@@ -863,7 +922,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 20,
             port: port_,
           );
         },
@@ -893,7 +952,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 21,
             port: port_,
           );
         },
@@ -939,7 +998,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 22,
             port: port_,
           );
         },
@@ -1005,7 +1064,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 23,
             port: port_,
           );
         },
@@ -1057,7 +1116,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 24,
             port: port_,
           );
         },
@@ -1092,7 +1151,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 25,
             port: port_,
           );
         },
@@ -1263,6 +1322,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       pattern: dco_decode_String(arr[0]),
       color: dco_decode_String(arr[1]),
       note: dco_decode_String(arr[2]),
+    );
+  }
+
+  @protected
+  RustMemSnapshot dco_decode_rust_mem_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 15)
+      throw Exception('unexpected arr length: expect 15 but see ${arr.length}');
+    return RustMemSnapshot(
+      currentRss: dco_decode_u_64(arr[0]),
+      peakRss: dco_decode_u_64(arr[1]),
+      currentCommit: dco_decode_u_64(arr[2]),
+      peakCommit: dco_decode_u_64(arr[3]),
+      pageFaults: dco_decode_u_64(arr[4]),
+      elapsedMs: dco_decode_u_64(arr[5]),
+      userMs: dco_decode_u_64(arr[6]),
+      systemMs: dco_decode_u_64(arr[7]),
+      sshSessions: dco_decode_u_64(arr[8]),
+      sshConnections: dco_decode_u_64(arr[9]),
+      sshClients: dco_decode_u_64(arr[10]),
+      localTerminals: dco_decode_u_64(arr[11]),
+      tunnelConfigs: dco_decode_u_64(arr[12]),
+      tunnelsRunning: dco_decode_u_64(arr[13]),
+      mimallocStatsText: dco_decode_String(arr[14]),
     );
   }
 
@@ -1439,6 +1523,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int dco_decode_u_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
+  }
+
+  @protected
+  BigInt dco_decode_u_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dcoDecodeU64(raw);
   }
 
   @protected
@@ -1691,6 +1781,43 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RustMemSnapshot sse_decode_rust_mem_snapshot(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_currentRss = sse_decode_u_64(deserializer);
+    var var_peakRss = sse_decode_u_64(deserializer);
+    var var_currentCommit = sse_decode_u_64(deserializer);
+    var var_peakCommit = sse_decode_u_64(deserializer);
+    var var_pageFaults = sse_decode_u_64(deserializer);
+    var var_elapsedMs = sse_decode_u_64(deserializer);
+    var var_userMs = sse_decode_u_64(deserializer);
+    var var_systemMs = sse_decode_u_64(deserializer);
+    var var_sshSessions = sse_decode_u_64(deserializer);
+    var var_sshConnections = sse_decode_u_64(deserializer);
+    var var_sshClients = sse_decode_u_64(deserializer);
+    var var_localTerminals = sse_decode_u_64(deserializer);
+    var var_tunnelConfigs = sse_decode_u_64(deserializer);
+    var var_tunnelsRunning = sse_decode_u_64(deserializer);
+    var var_mimallocStatsText = sse_decode_String(deserializer);
+    return RustMemSnapshot(
+      currentRss: var_currentRss,
+      peakRss: var_peakRss,
+      currentCommit: var_currentCommit,
+      peakCommit: var_peakCommit,
+      pageFaults: var_pageFaults,
+      elapsedMs: var_elapsedMs,
+      userMs: var_userMs,
+      systemMs: var_systemMs,
+      sshSessions: var_sshSessions,
+      sshConnections: var_sshConnections,
+      sshClients: var_sshClients,
+      localTerminals: var_localTerminals,
+      tunnelConfigs: var_tunnelConfigs,
+      tunnelsRunning: var_tunnelsRunning,
+      mimallocStatsText: var_mimallocStatsText,
+    );
+  }
+
+  @protected
   SshAuthCredential sse_decode_ssh_auth_credential(
     SseDeserializer deserializer,
   ) {
@@ -1887,6 +2014,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int sse_decode_u_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint32();
+  }
+
+  @protected
+  BigInt sse_decode_u_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getBigUint64();
   }
 
   @protected
@@ -2163,6 +2296,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_rust_mem_snapshot(
+    RustMemSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_64(self.currentRss, serializer);
+    sse_encode_u_64(self.peakRss, serializer);
+    sse_encode_u_64(self.currentCommit, serializer);
+    sse_encode_u_64(self.peakCommit, serializer);
+    sse_encode_u_64(self.pageFaults, serializer);
+    sse_encode_u_64(self.elapsedMs, serializer);
+    sse_encode_u_64(self.userMs, serializer);
+    sse_encode_u_64(self.systemMs, serializer);
+    sse_encode_u_64(self.sshSessions, serializer);
+    sse_encode_u_64(self.sshConnections, serializer);
+    sse_encode_u_64(self.sshClients, serializer);
+    sse_encode_u_64(self.localTerminals, serializer);
+    sse_encode_u_64(self.tunnelConfigs, serializer);
+    sse_encode_u_64(self.tunnelsRunning, serializer);
+    sse_encode_String(self.mimallocStatsText, serializer);
+  }
+
+  @protected
   void sse_encode_ssh_auth_credential(
     SshAuthCredential self,
     SseSerializer serializer,
@@ -2311,6 +2467,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_u_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint32(self);
+  }
+
+  @protected
+  void sse_encode_u_64(BigInt self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putBigUint64(self);
   }
 
   @protected
