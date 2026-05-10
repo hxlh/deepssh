@@ -50,6 +50,8 @@ Widget _hostTree({
         onOpenThemeConfig: () {},
         onDuplicateSshSession: (_) async {},
         themeConfigActive: false,
+        onOpenDiagnostics: () {},
+        diagnosticsActive: false,
         onReorderSessions: (_, __, ___) {},
         onReorderLocalTerminals: (_, __) {},
         sectionOrder: sectionOrder,

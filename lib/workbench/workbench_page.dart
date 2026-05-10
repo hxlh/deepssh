@@ -1418,6 +1418,12 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     });
   }
 
+  void _handleOpenDiagnostics() {
+    setState(() {
+      contentMode = WorkbenchContentMode.diagnostics;
+    });
+  }
+
   void _handleBackFromConfig() {
     setState(() {
       contentMode = WorkbenchContentMode.terminal;
@@ -1491,6 +1497,9 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               onOpenThemeConfig: _handleOpenThemeConfig,
               themeConfigActive:
                   contentMode == WorkbenchContentMode.themeConfig,
+              onOpenDiagnostics: _handleOpenDiagnostics,
+              diagnosticsActive:
+                  contentMode == WorkbenchContentMode.diagnostics,
               onReorderSessions: _handleReorderSessions,
               onReorderLocalTerminals: _handleReorderLocalTerminals,
               sectionOrder: explorerSectionOrder,

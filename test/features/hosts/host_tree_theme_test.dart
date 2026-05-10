@@ -41,6 +41,8 @@ void main() {
             onOpenThemeConfig: () {},
             onDuplicateSshSession: (_) async {},
             themeConfigActive: false,
+            onOpenDiagnostics: () {},
+            diagnosticsActive: false,
           ),
         ),
       ),

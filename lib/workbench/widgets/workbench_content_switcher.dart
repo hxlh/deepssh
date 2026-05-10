@@ -5,6 +5,7 @@ import '../../core/models/theme_settings.dart';
 import '../../core/models/tunnel_config_item.dart';
 import '../../features/local_terminal/local_terminal_bridge.dart';
 import '../../features/ssh/ssh_bridge.dart';
+import '../../features/diagnostics/diagnostics_page.dart';
 import '../../features/ssh_profiles/ssh_profile_form_page.dart';
 import '../../features/ssh_profiles/ssh_profiles_page.dart';
 import '../../features/terminal/terminal_tab_shell.dart';
@@ -21,6 +22,7 @@ enum WorkbenchContentMode {
   tunnelConfigs,
   tunnelConfigForm,
   themeConfig,
+  diagnostics,
 }
 
 class WorkbenchContentSwitcher extends StatelessWidget {
@@ -151,6 +153,8 @@ class WorkbenchContentSwitcher extends StatelessWidget {
           onTerminalSettingsChanged: onTerminalThemeChanged,
           onBack: onBackFromConfig,
         );
+      case WorkbenchContentMode.diagnostics:
+        return DiagnosticsPage(onBack: onBackFromConfig);
     }
   }
 }
