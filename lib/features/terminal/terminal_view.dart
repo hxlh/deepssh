@@ -527,7 +527,10 @@ class _TerminalViewState extends State<TerminalView> {
     _findSession!.setCaseSensitive(_effectiveFindCaseSensitive);
     _findSession!.setWholeWord(_effectiveFindWholeWord);
     _findSession!.setUseRegex(_effectiveFindUseRegex);
-    _findSession!.setQuery(query ?? _effectiveFindQuery);
+    final newQuery = query ?? _effectiveFindQuery;
+    if (_findSession!.query != newQuery) {
+      _findSession!.setQuery(newQuery);
+    }
   }
 
   void _syncFindSession() {
