@@ -747,6 +747,17 @@ pub(crate) fn count_running_runtimes() -> usize {
     RUNTIME_STORE.lock().unwrap().len()
 }
 
+pub(crate) fn shrink_stores_if_empty() {
+    let mut store = TUNNEL_STORE.lock().unwrap();
+    if store.configs.is_empty() {
+        store.configs.shrink_to_fit();
+    }
+    let mut store = RUNTIME_STORE.lock().unwrap();
+    if store.is_empty() {
+        store.shrink_to_fit();
+    }
+}
+
 #[cfg(test)]
 fn clear_tunnels_for_test() -> std::sync::MutexGuard<'static, ()> {
     let guard = crate::test_support::WORKSPACE_LOCK.lock().unwrap();

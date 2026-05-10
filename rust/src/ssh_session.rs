@@ -496,6 +496,25 @@ pub(crate) fn count_clients() -> usize {
     SSH_CLIENT_STORE.lock().unwrap().len()
 }
 
+pub(crate) fn shrink_stores_if_empty() {
+    let mut store = SESSION_STORE.lock().unwrap();
+    if store.is_empty() {
+        store.shrink_to_fit();
+    }
+    let mut store = CONNECTION_STORE.lock().unwrap();
+    if store.is_empty() {
+        store.shrink_to_fit();
+    }
+    let mut store = OUTPUT_SINK_STORE.lock().unwrap();
+    if store.is_empty() {
+        store.shrink_to_fit();
+    }
+    let mut store = SSH_CLIENT_STORE.lock().unwrap();
+    if store.is_empty() {
+        store.shrink_to_fit();
+    }
+}
+
 #[cfg(test)]
 fn register_session_for_test(profile_id: String, title: String, term_type: String) -> SshSession {
     let session_id = Uuid::new_v4().to_string();

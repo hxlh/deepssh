@@ -54,6 +54,9 @@ fn configure_mimalloc() {
     const MI_OPTION_PURGE_DECOMMITS: mi_option_t = 5;
     const MI_OPTION_PURGE_DELAY: mi_option_t = 15;
     const MI_OPTION_ARENA_RESERVE: mi_option_t = 23;
+    const MI_OPTION_ARENA_PURGE_MULT: mi_option_t = 24;
+    const MI_OPTION_GENERIC_COLLECT: mi_option_t = 34;
+    const MI_OPTION_PAGE_RECLAIM_ON_FREE: mi_option_t = 35;
     const MI_OPTION_PAGE_FULL_RETAIN: mi_option_t = 36;
     const MI_OPTION_PAGEMAP_COMMIT: mi_option_t = 39;
     const MI_OPTION_PAGE_MAX_RECLAIM: mi_option_t = 41;
@@ -73,6 +76,9 @@ fn configure_mimalloc() {
         // too lazy for an interactive UI; we want quick reclaim after a flood
         // of search output is consumed).
         mi_option_set(MI_OPTION_PURGE_DELAY, 100);
+        // Arenas use purge_delay * arena_purge_mult. Default 10 means arenas
+        // wait 1000 ms. Drop to 1 so arenas purge at the same rate as heaps.
+        mi_option_set(MI_OPTION_ARENA_PURGE_MULT, 1);
         // Decommit (truly release physical pages) instead of just MEM_RESET-ing.
         mi_option_set(MI_OPTION_PURGE_DECOMMITS, 1);
         // Don't retain any full pages per size class on free. Default is 2,
@@ -80,10 +86,18 @@ fn configure_mimalloc() {
         // We're an idle-most-of-the-time UI, not a hot-path allocator — give
         // the memory back instead.
         mi_option_set(MI_OPTION_PAGE_FULL_RETAIN, 0);
-        // Cap per-size-class page hoarding at 4 (default -1 = unlimited). When
-        // a tokio worker tears down, mimalloc may keep pages around forever
-        // "in case" the next worker uses the same size class.
-        mi_option_set(MI_OPTION_PAGE_MAX_RECLAIM, 4);
+        // Allow free() on any thread to reclaim abandoned pages from dead
+        // threads. Default 0 only allows reclaim if the page originated from
+        // the current thread, which leaves cross-thread allocations stranded.
+        mi_option_set(MI_OPTION_PAGE_RECLAIM_ON_FREE, 1);
+        // Unlimited reclaim of abandoned pages (-1). The old value 4 was a
+        // misreading of the option: it stops reclaiming once the current
+        // thread already owns 4 pages of a size class, which traps memory.
+        mi_option_set(MI_OPTION_PAGE_MAX_RECLAIM, -1);
+        // Collect idle heaps every 1000 allocations instead of the default
+        // 10000. More frequent background collection prevents abandoned
+        // segment accumulation in the tokio worker pool.
+        mi_option_set(MI_OPTION_GENERIC_COLLECT, 1000);
         // Skip the upfront pagemap commit on Windows (default 1 there). Saves
         // a chunk of committed RSS at startup; the pagemap commits on demand
         // once we touch the address.
@@ -117,6 +131,12 @@ pub(crate) fn collect_idle_pages_if_drained() {
         && ssh_session::count_clients() == 0
         && local_terminal::count_sessions() == 0
     {
+        // HashMaps don't shrink on remove(). Release excess capacity back to
+        // the allocator so commit actually drops after all sessions close.
+        ssh_session::shrink_stores_if_empty();
+        local_terminal::shrink_stores_if_empty();
+        tunnel::shrink_stores_if_empty();
+
         unsafe { libmimalloc_sys::mi_collect(true) };
         #[cfg(windows)]
         empty_working_set();

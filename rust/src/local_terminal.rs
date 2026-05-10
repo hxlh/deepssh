@@ -201,6 +201,17 @@ pub(crate) fn count_sessions() -> usize {
     SESSION_STORE.lock().unwrap().len()
 }
 
+pub(crate) fn shrink_stores_if_empty() {
+    let mut store = SESSION_STORE.lock().unwrap();
+    if store.is_empty() {
+        store.shrink_to_fit();
+    }
+    let mut store = OUTPUT_SINK_STORE.lock().unwrap();
+    if store.is_empty() {
+        store.shrink_to_fit();
+    }
+}
+
 fn run_output_loop(session_id: String, mut reader: Box<dyn Read + Send>) {
     let mut buffer = [0_u8; 8192];
     loop {
