@@ -244,4 +244,126 @@ void main() {
       expect(terminal.buffer.lines[2].toString(), '');
     });
   });
+
+  group('Buffer.scrollUp()', () {
+    test('does not detach anchors on moved lines', () {
+      final terminal = Terminal();
+      terminal.resize(10, 10);
+
+      for (var i = 0; i < 10; i++) {
+        terminal.write('line$i\r\n');
+      }
+
+      final anchorLine1 = terminal.buffer.lines[1].createAnchor(0);
+      final anchorLine2 = terminal.buffer.lines[2].createAnchor(0);
+      final anchorLine3 = terminal.buffer.lines[3].createAnchor(0);
+
+      expect(anchorLine1.attached, true);
+      expect(anchorLine2.attached, true);
+      expect(anchorLine3.attached, true);
+
+      terminal.setMargins(0, 9);
+      terminal.buffer.scrollUp(1);
+
+      expect(anchorLine1.attached, true);
+      expect(anchorLine2.attached, true);
+      expect(anchorLine3.attached, true);
+
+      expect(anchorLine1.y, 0);
+      expect(anchorLine2.y, 1);
+      expect(anchorLine3.y, 2);
+    });
+  });
+
+  group('Buffer.scrollDown()', () {
+    test('does not detach anchors on moved lines', () {
+      final terminal = Terminal();
+      terminal.resize(10, 10);
+
+      for (var i = 0; i < 10; i++) {
+        terminal.write('line$i\r\n');
+      }
+
+      final anchorLine6 = terminal.buffer.lines[6].createAnchor(0);
+      final anchorLine7 = terminal.buffer.lines[7].createAnchor(0);
+      final anchorLine8 = terminal.buffer.lines[8].createAnchor(0);
+
+      expect(anchorLine6.attached, true);
+      expect(anchorLine7.attached, true);
+      expect(anchorLine8.attached, true);
+
+      terminal.setMargins(0, 9);
+      terminal.buffer.scrollDown(1);
+
+      expect(anchorLine6.attached, true);
+      expect(anchorLine7.attached, true);
+      expect(anchorLine8.attached, true);
+
+      expect(anchorLine6.y, 7);
+      expect(anchorLine7.y, 8);
+      expect(anchorLine8.y, 9);
+    });
+  });
+
+  group('Buffer.deleteLines()', () {
+    test('does not detach anchors on moved lines', () {
+      final terminal = Terminal();
+      terminal.resize(10, 10);
+
+      for (var i = 0; i < 10; i++) {
+        terminal.write('line$i\r\n');
+      }
+
+      final anchorLine5 = terminal.buffer.lines[5].createAnchor(0);
+      final anchorLine6 = terminal.buffer.lines[6].createAnchor(0);
+      final anchorLine7 = terminal.buffer.lines[7].createAnchor(0);
+
+      expect(anchorLine5.attached, true);
+      expect(anchorLine6.attached, true);
+      expect(anchorLine7.attached, true);
+
+      terminal.setMargins(3, 8);
+      terminal.setCursor(0, 5);
+      terminal.buffer.deleteLines(2);
+
+      expect(anchorLine5.attached, true);
+      expect(anchorLine6.attached, true);
+      expect(anchorLine7.attached, true);
+
+      expect(anchorLine5.y, 5);
+      expect(anchorLine6.y, 6);
+      expect(anchorLine7.y, 6); // line7 moved up to fill deleted gap
+    });
+  });
+
+  group('Buffer.insertLines()', () {
+    test('does not detach anchors on moved lines', () {
+      final terminal = Terminal();
+      terminal.resize(10, 10);
+
+      for (var i = 0; i < 10; i++) {
+        terminal.write('line$i\r\n');
+      }
+
+      final anchorLine5 = terminal.buffer.lines[5].createAnchor(0);
+      final anchorLine6 = terminal.buffer.lines[6].createAnchor(0);
+      final anchorLine7 = terminal.buffer.lines[7].createAnchor(0);
+
+      expect(anchorLine5.attached, true);
+      expect(anchorLine6.attached, true);
+      expect(anchorLine7.attached, true);
+
+      terminal.setMargins(3, 8);
+      terminal.setCursor(0, 5);
+      terminal.buffer.insertLines(2);
+
+      expect(anchorLine5.attached, true);
+      expect(anchorLine6.attached, true);
+      expect(anchorLine7.attached, true);
+
+      expect(anchorLine5.y, 7);
+      expect(anchorLine6.y, 8);
+      expect(anchorLine7.y, 9);
+    });
+  });
 }

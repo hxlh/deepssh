@@ -253,6 +253,40 @@ class IndexAwareCircularBuffer<T extends IndexedItem> {
     _length = copyLength;
   }
 
+  /// Shifts elements in the range [start, end] left by [count] positions.
+  /// Elements shifted out of the range are dropped. Vacated positions at the
+  /// end are filled with [newItem]. Zero-allocation: existing items are moved,
+  /// not copied.
+  void shiftLeft(int start, int end, int count, T Function() newItem) {
+    assert(start >= 0 && end < _length && start <= end);
+    count = count.clamp(0, end - start + 1);
+    if (count == 0) return;
+    for (int i = start; i <= end - count; i++) {
+      _moveChild(i + count, i);
+    }
+    for (int i = end - count + 1; i <= end; i++) {
+      _dropChild(i);
+      _adoptChild(i, newItem());
+    }
+  }
+
+  /// Shifts elements in the range [start, end] right by [count] positions.
+  /// Elements shifted out of the range are dropped. Vacated positions at the
+  /// start are filled with [newItem]. Zero-allocation: existing items are moved,
+  /// not copied.
+  void shiftRight(int start, int end, int count, T Function() newItem) {
+    assert(start >= 0 && end < _length && start <= end);
+    count = count.clamp(0, end - start + 1);
+    if (count == 0) return;
+    for (int i = end; i >= start + count; i--) {
+      _moveChild(i - count, i);
+    }
+    for (int i = start; i < start + count; i++) {
+      _dropChild(i);
+      _adoptChild(i, newItem());
+    }
+  }
+
   /// Replaces the element at [index] with [value] and returns the replaced
   /// item.
   T swap(int index, T value) {

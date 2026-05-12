@@ -367,5 +367,95 @@ void main() {
       expect(item2.attached, false);
       expect(item3.index, 0);
     });
+
+    test("shiftLeft moves elements and preserves anchors", () {
+      final cl = IndexAwareCircularBuffer<IndexedValue<int>>(10);
+      cl.pushAll(
+        List<int>.generate(5, (index) => index).map(IndexedValue.new),
+      );
+
+      final item0 = cl[0];
+      final item1 = cl[1];
+      final item2 = cl[2];
+      final item3 = cl[3];
+      final item4 = cl[4];
+
+      cl.shiftLeft(0, 4, 2, () => IndexedValue(99));
+
+      expect(item2.index, 0);
+      expect(item3.index, 1);
+      expect(item4.index, 2);
+      expect(cl[0], item2);
+      expect(cl[1], item3);
+      expect(cl[2], item4);
+
+      expect(cl[3], 99.indexed);
+      expect(cl[4], 99.indexed);
+
+      expect(item0.attached, false);
+      expect(item1.attached, false);
+    });
+
+    test("shiftRight moves elements and preserves anchors", () {
+      final cl = IndexAwareCircularBuffer<IndexedValue<int>>(10);
+      cl.pushAll(
+        List<int>.generate(5, (index) => index).map(IndexedValue.new),
+      );
+
+      final item0 = cl[0];
+      final item1 = cl[1];
+      final item2 = cl[2];
+      final item3 = cl[3];
+      final item4 = cl[4];
+
+      cl.shiftRight(0, 4, 2, () => IndexedValue(99));
+
+      expect(item0.index, 2);
+      expect(item1.index, 3);
+      expect(item2.index, 4);
+      expect(cl[2], item0);
+      expect(cl[3], item1);
+      expect(cl[4], item2);
+
+      expect(cl[0], 99.indexed);
+      expect(cl[1], 99.indexed);
+
+      expect(item3.attached, false);
+      expect(item4.attached, false);
+    });
+
+    test("shiftLeft with count=0 is a no-op", () {
+      final cl = IndexAwareCircularBuffer<IndexedValue<int>>(10);
+      cl.pushAll(
+        List<int>.generate(5, (index) => index).map(IndexedValue.new),
+      );
+
+      final item0 = cl[0];
+      final item1 = cl[1];
+
+      cl.shiftLeft(0, 4, 0, () => IndexedValue(99));
+
+      expect(cl[0], item0);
+      expect(cl[1], item1);
+      expect(item0.attached, true);
+      expect(item1.attached, true);
+    });
+
+    test("shiftRight with count=0 is a no-op", () {
+      final cl = IndexAwareCircularBuffer<IndexedValue<int>>(10);
+      cl.pushAll(
+        List<int>.generate(5, (index) => index).map(IndexedValue.new),
+      );
+
+      final item0 = cl[0];
+      final item1 = cl[1];
+
+      cl.shiftRight(0, 4, 0, () => IndexedValue(99));
+
+      expect(cl[0], item0);
+      expect(cl[1], item1);
+      expect(item0.attached, true);
+      expect(item1.attached, true);
+    });
   });
 }

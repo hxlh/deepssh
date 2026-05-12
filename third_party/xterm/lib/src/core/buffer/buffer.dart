@@ -206,23 +206,21 @@ class Buffer {
   }
 
   void scrollDown(int lines) {
-    for (var i = absoluteMarginBottom; i >= absoluteMarginTop; i--) {
-      if (i >= absoluteMarginTop + lines) {
-        this.lines[i] = this.lines[i - lines];
-      } else {
-        this.lines[i] = _newEmptyLine();
-      }
-    }
+    this.lines.shiftRight(
+      absoluteMarginTop,
+      absoluteMarginBottom,
+      lines,
+      _newEmptyLine,
+    );
   }
 
   void scrollUp(int lines) {
-    for (var i = absoluteMarginTop; i <= absoluteMarginBottom; i++) {
-      if (i <= absoluteMarginBottom - lines) {
-        this.lines[i] = this.lines[i + lines];
-      } else {
-        this.lines[i] = _newEmptyLine();
-      }
-    }
+    this.lines.shiftLeft(
+      absoluteMarginTop,
+      absoluteMarginBottom,
+      lines,
+      _newEmptyLine,
+    );
   }
 
   /// https://vt100.net/docs/vt100-ug/chapter3.html#IND IND – Index
@@ -390,24 +388,15 @@ class Buffer {
 
     setCursorX(0);
 
-    // Number of lines from the cursor to the bottom of the scrollable region
-    // including the cursor itself.
     final linesBelow = absoluteMarginBottom - absoluteCursorY + 1;
-
-    // Number of empty lines to insert.
     final linesToInsert = min(count, linesBelow);
 
-    // Number of lines to move up.
-    final linesToMove = linesBelow - linesToInsert;
-
-    for (var i = 0; i < linesToMove; i++) {
-      final index = absoluteMarginBottom - i;
-      lines[index] = lines.swap(index - linesToInsert, _newEmptyLine());
-    }
-
-    for (var i = linesToMove; i < linesToInsert; i++) {
-      lines[absoluteCursorY + i] = _newEmptyLine();
-    }
+    lines.shiftRight(
+      absoluteCursorY,
+      absoluteMarginBottom,
+      linesToInsert,
+      _newEmptyLine,
+    );
   }
 
   /// Remove [count] lines starting at the current cursor position. Lines below
@@ -422,16 +411,12 @@ class Buffer {
 
     count = min(count, absoluteMarginBottom - absoluteCursorY + 1);
 
-    final linesToMove = absoluteMarginBottom - absoluteCursorY + 1 - count;
-
-    for (var i = 0; i < linesToMove; i++) {
-      final index = absoluteCursorY + i;
-      lines[index] = lines[index + count];
-    }
-
-    for (var i = 0; i < count; i++) {
-      lines[absoluteMarginBottom - i] = _newEmptyLine();
-    }
+    lines.shiftLeft(
+      absoluteCursorY,
+      absoluteMarginBottom,
+      count,
+      _newEmptyLine,
+    );
   }
 
   void resize(int oldWidth, int oldHeight, int newWidth, int newHeight) {
