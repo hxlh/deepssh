@@ -672,7 +672,7 @@ class _TerminalViewState extends State<TerminalView> {
     final settings = widget.terminalThemeSettings;
     return Container(
       color: AppColors.panel,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 17),
       child: Stack(
         key: _terminalStackKey,
         children: [

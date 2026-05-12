@@ -180,6 +180,40 @@ void main() {
     expect(view.textStyle.boldFontWeight, FontWeight.w800);
   });
 
+  testWidgets('adds extra bottom padding around terminal content', (
+    tester,
+  ) async {
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: xterm.Terminal(maxLines: 3000),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            terminalThemeSettings: _defaultTerminalTheme,
+          ),
+        ),
+      ),
+    );
+
+    final padding = tester.widget<Padding>(
+      find.ancestor(
+        of: find.byType(xterm.TerminalView),
+        matching: find.byType(Padding),
+      ),
+    );
+
+    expect(padding.padding, const EdgeInsets.fromLTRB(12, 12, 12, 17));
+  });
+
   testWidgets('seeds full multi-line find query from terminal selection', (
     tester,
   ) async {
