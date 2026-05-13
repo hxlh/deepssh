@@ -518,14 +518,6 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     final effectFirstLine = firstLine.clamp(0, lines.length - 1);
     final effectLastLine = lastLine.clamp(0, lines.length - 1);
 
-    _paintHighlightBackgrounds(
-      canvas,
-      offset,
-      _controller.highlights,
-      effectFirstLine,
-      effectLastLine,
-    );
-
     final foregroundColors = createForegroundHighlightMap(
       _controller.highlights,
       firstLine: effectFirstLine,
@@ -569,6 +561,14 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         );
       }
     }
+
+    _paintHighlightBackgrounds(
+      canvas,
+      offset,
+      _controller.highlights,
+      effectFirstLine,
+      effectLastLine,
+    );
 
     if (_controller.selection != null) {
       _paintSelection(

@@ -109,6 +109,10 @@ class TerminalFindSession {
       final searchBuffer = _buildSearchBuffer();
       for (final match in regex.allMatches(searchBuffer.text)) {
         if (match.start == match.end) continue;
+        if (match.start >= searchBuffer.positions.length ||
+            match.end - 1 >= searchBuffer.positions.length) {
+          continue;
+        }
         final start = searchBuffer.positions[match.start];
         final end = searchBuffer.positions[match.end - 1];
         _matches.add(
@@ -135,28 +139,75 @@ class TerminalFindSession {
     final positions = <_SearchPosition>[];
     final lines = terminal.buffer.lines;
     for (var row = 0; row < lines.length; row++) {
-      if (row > 0) {
-        text.write('\n');
-        positions.add(
+      final line = lines[row];
+      if (row > 0 && !line.isWrapped) {
+        final previousLine = lines[row - 1];
+        final previousEnd = previousLine.getTrimmedLength();
+        _writeSearchChar(
+          text,
+          positions,
+          '\n',
           _SearchPosition(
             row: row - 1,
-            column: lines[row - 1].length,
-            endColumn: lines[row - 1].length,
+            column: previousEnd,
+            endColumn: previousEnd,
           ),
         );
       }
-      final line = lines[row];
-      for (var column = 0; column < line.length; column++) {
+
+      final trimmedLength = line.getTrimmedLength();
+      for (var column = 0; column < trimmedLength; column++) {
         final codePoint = line.getCodePoint(column);
         final width = line.getWidth(column);
-        if (codePoint == 0) continue;
-        text.writeCharCode(codePoint);
-        positions.add(
-          _SearchPosition(row: row, column: column, endColumn: column + width),
+
+        if (codePoint == 0) {
+          // Skip the second cell of a wide character. Other empty cells before
+          // the trimmed line end are visible spaces, matching BufferLine.getText().
+          if (column > 0 && line.getWidth(column - 1) == 2) {
+            continue;
+          }
+          _writeSearchChar(
+            text,
+            positions,
+            ' ',
+            _SearchPosition(
+              row: row,
+              column: column,
+              endColumn: column + 1,
+            ),
+          );
+          continue;
+        }
+
+        final char = String.fromCharCode(codePoint);
+        _writeSearchChar(
+          text,
+          positions,
+          char,
+          _SearchPosition(
+            row: row,
+            column: column,
+            endColumn: column + width,
+          ),
         );
       }
     }
     return _SearchBuffer(text: text.toString(), positions: positions);
+  }
+
+  void _writeSearchChar(
+    StringBuffer text,
+    List<_SearchPosition> positions,
+    String char,
+    _SearchPosition position,
+  ) {
+    text.write(char);
+    // Dart RegExp match offsets are UTF-16 code-unit based. Keep one position
+    // entry per code unit so match.start / match.end map back to cells even
+    // after non-BMP characters such as emoji.
+    for (var i = 0; i < char.length; i++) {
+      positions.add(position);
+    }
   }
 
   void nextMatch() {
