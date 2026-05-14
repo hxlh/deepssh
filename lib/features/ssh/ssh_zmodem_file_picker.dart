@@ -6,11 +6,26 @@ import 'package:path/path.dart' as path;
 
 import 'ssh_zmodem_session.dart';
 
-Future<String?> selectZModemDownloadDirectory() {
+bool _entitlementsSkipped = false;
+
+/// On macOS, file_picker checks for User Selected File entitlements even when
+/// App Sandbox is disabled. Calling [FilePicker.skipEntitlementsChecks] tells
+/// the plugin to skip that check so the native file/folder picker can open.
+Future<void> _ensureEntitlementsSkipped() async {
+  if (_entitlementsSkipped) return;
+  if (Platform.isMacOS) {
+    await FilePicker.skipEntitlementsChecks();
+  }
+  _entitlementsSkipped = true;
+}
+
+Future<String?> selectZModemDownloadDirectory() async {
+  await _ensureEntitlementsSkipped();
   return FilePicker.getDirectoryPath();
 }
 
 Future<List<ZModemUploadFile>?> selectZModemUploadFiles() async {
+  await _ensureEntitlementsSkipped();
   final result = await FilePicker.pickFiles(
     allowMultiple: true,
     withReadStream: true,
