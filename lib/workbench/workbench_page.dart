@@ -349,7 +349,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   final localOutputFlushTimers = <String, Timer>{};
   final closingLocalTerminalIds = <String>{};
   final removedPendingLocalTerminalIds = <String>{};
-  final _sshCommandBuffers = <String, String>{};
+  // _sshCommandBuffers removed — see _handleSshInput comment below.
   SshProfileItem? editingSshProfile;
   String? sshErrorMessage;
   List<TunnelConfigItem> tunnelConfigs = const [];
@@ -554,22 +554,10 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     }
     if (currentTerminal == null) return;
 
+    // Write directly to the xterm Terminal object. Same reasoning as
+    // _flushSshOutput: the terminal drives its own repaint, so setState()
+    // here would rebuild the entire WorkbenchPage tree every 16 ms for free.
     currentTerminal.terminal?.write(text);
-
-    LocalTerminalItem? latestTerminal;
-    for (final item in localTerminals) {
-      if (item.id == terminal.id) {
-        latestTerminal = item;
-        break;
-      }
-    }
-    if (latestTerminal == null) return;
-
-    setState(() {
-      terminalState = terminalState.update(
-        _localTabFromTerminal(latestTerminal!),
-      );
-    });
   }
 
   void _startLocalOutputSubscription(LocalTerminalItem terminal) {
@@ -1094,22 +1082,17 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
           item,
     ];
     if (currentSession == null) return;
-    final terminal = currentSession!.terminal;
+    final terminal = currentSession.terminal;
     if (terminal != null) {
+      // Write directly to the xterm Terminal object. It notifies its own
+      // listeners and drives its own repaint — no setState() needed here.
+      // Calling setState() would rebuild the entire WorkbenchPage tree
+      // (sidebar + content) every 16 ms for no visible change.
       terminal.write(text);
-      SshSessionItem? latestSession;
-      for (final item in sshSessionsByProfileId[session.profileId] ?? const <SshSessionItem>[]) {
-        if (item.id == session.id) {
-          latestSession = item;
-          break;
-        }
-      }
-      if (latestSession == null) return;
-      setState(() {
-        terminalState = terminalState.update(_sshTabFromSession(latestSession!));
-      });
       return;
     }
+    // No live terminal object: persist output in history and update the tab
+    // so TerminalView can replay it when the tab is next opened.
     setState(() {
       sshSessionsByProfileId = {
         ...sshSessionsByProfileId,
@@ -1212,51 +1195,15 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     widget.sshBridge.writeToSession(sessionId, utf8.encode(data));
   }
 
-  void _handleSshInput(String data) {
-    final sessionId = terminalState.activeTab?.sessionId;
-    if (sessionId == null) return;
-
-    var buffer = _sshCommandBuffers[sessionId] ?? '';
-
-    for (final rune in data.runes) {
-      if (rune == 0x0D || rune == 0x0A) {
-        _commitSshCommand(sessionId, buffer);
-        buffer = '';
-        break;
-      } else if (rune == 0x7F) {
-        if (buffer.isNotEmpty) {
-          final runes = buffer.runes.toList();
-          runes.removeLast();
-          buffer = String.fromCharCodes(runes);
-        }
-      } else if (rune == 0x03) {
-        buffer = '';
-        break;
-      } else if (rune == 0x1B) {
-        break;
-      } else if (rune == 0x09) {
-        // Ignore tab for command inference.
-      } else if (rune >= 0x20) {
-        buffer += String.fromCharCode(rune);
-      }
-    }
-
-    _sshCommandBuffers[sessionId] = buffer;
-  }
-
-  void _commitSshCommand(String sessionId, String command) {
-    final trimmed = command.trim();
-    if (trimmed.isEmpty) return;
-
-    for (final sessions in sshSessionsByProfileId.values) {
-      for (final session in sessions) {
-        if (session.sessionId == sessionId) {
-          _replaceSshSession(session.copyWith(currentCommand: trimmed));
-          return;
-        }
-      }
-    }
-  }
+  // _handleSshInput and _commitSshCommand previously tracked keystrokes to
+  // store currentCommand on SshSessionItem, but currentCommand was never read
+  // by any widget. Every Enter key triggered _replaceSshSession() -> setState()
+  // rebuilding the entire WorkbenchPage tree for nothing. Both methods and the
+  // _sshCommandBuffers map have been removed.
+  //
+  // If command tracking is needed in the future, store it in a plain Map
+  // without calling setState(), or use a separate ChangeNotifier scoped to
+  // only the widgets that actually display it.
 
   void _removeSshSession(SshSessionItem session) {
     final sessions =
@@ -1266,9 +1213,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         .toList();
     sshOutputFlushTimers.remove(session.id)?.cancel();
     sshOutputBuffers.remove(session.id);
-    if (session.sessionId != null) {
-      _sshCommandBuffers.remove(session.sessionId);
-    }
+    // _sshCommandBuffers.remove removed — field no longer exists.
     final binding = sshZModemSessions.remove(session.id);
     if (binding != null) {
       unawaited(binding.dispose());
@@ -1654,7 +1599,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               onBackFromConfig: _handleBackFromConfig,
               sshBridge: widget.sshBridge,
               localTerminalBridge: widget.localTerminalBridge,
-              onSshInput: _handleSshInput,
+              onSshInput: null, // command tracking removed; was causing setState on every Enter
               onSshTerminalInput: _writeSshTerminalInput,
               onPreviewLabelChanged: _handleActiveTabPreviewLabelChanged,
             ),
