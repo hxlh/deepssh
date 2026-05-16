@@ -469,7 +469,11 @@ class _TerminalViewState extends State<TerminalView> {
     if (selection == null) return false;
     final text = terminal.buffer.getText(selection);
     if (text.isEmpty) return false;
-    Clipboard.setData(ClipboardData(text: text));
+    // Trim trailing spaces from each line, consistent with most terminal emulators.
+    // buffer.getText() preserves actual space chars (codePoint == 32) used for
+    // padding by terminal programs; we strip them here at copy time only.
+    final trimmed = text.split('\n').map((l) => l.trimRight()).join('\n');
+    Clipboard.setData(ClipboardData(text: trimmed));
     return true;
   }
 
