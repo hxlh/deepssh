@@ -178,10 +178,21 @@ class _TerminalViewState extends State<TerminalView> {
     });
   }
 
+  // Debounce timer for preview label extraction — avoids running the
+  // characters.take() Unicode scan on every single keystroke.
+  Timer? _previewLabelDebounce;
+
   void _handleTerminalChanged() {
     _resetCursorBlinkIdle();
     _scheduleProxyInputOffsetUpdate();
-    _emitPreviewLabelIfNeeded();
+    _schedulePreviewLabelEmit();
+  }
+
+  void _schedulePreviewLabelEmit() {
+    _previewLabelDebounce?.cancel();
+    _previewLabelDebounce = Timer(const Duration(milliseconds: 80), () {
+      if (mounted) _emitPreviewLabelIfNeeded();
+    });
   }
 
   String _extractPreviewLabel() {
@@ -639,6 +650,7 @@ class _TerminalViewState extends State<TerminalView> {
     _resizeDebounce?.cancel();
     _cursorIdleTimer?.cancel();
     _cursorBlinkTimer?.cancel();
+    _previewLabelDebounce?.cancel();
     _findSession?.dispose();
     _findScrollController.dispose();
     terminalController.dispose();
@@ -693,7 +705,10 @@ class _TerminalViewState extends State<TerminalView> {
 
   @override
   Widget build(BuildContext context) {
-    _scheduleProxyInputOffsetUpdate();
+    // Do NOT call _scheduleProxyInputOffsetUpdate() here — it is already
+    // triggered by _handleTerminalChanged() on every terminal update.
+    // Calling it in build() creates a rebuild loop: terminal change →
+    // setState (offset) → rebuild → scheduleUpdate → setState → rebuild…
     final settings = widget.terminalThemeSettings;
     return Container(
       color: AppColors.panel,
