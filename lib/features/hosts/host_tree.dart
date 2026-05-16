@@ -269,7 +269,10 @@ class HostTree extends StatelessWidget {
             Icon(Icons.terminal, size: 16, color: AppColors.textMuted),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(terminal.title, overflow: TextOverflow.ellipsis),
+              child: Text(
+                terminal.displayTitle,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),

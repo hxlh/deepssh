@@ -21,6 +21,7 @@ class TerminalTabShell extends StatefulWidget {
     required this.terminalThemeSettings,
     this.onSshInput,
     this.onSshTerminalInput,
+    this.onPreviewLabelChanged,
   });
 
   final TerminalState state;
@@ -32,6 +33,7 @@ class TerminalTabShell extends StatefulWidget {
   final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String>? onSshInput;
   final SshTerminalInputWriter? onSshTerminalInput;
+  final ValueChanged<String>? onPreviewLabelChanged;
 
   @override
   State<TerminalTabShell> createState() => _TerminalTabShellState();
@@ -87,6 +89,7 @@ class _TerminalTabShellState extends State<TerminalTabShell> {
               terminalThemeSettings: widget.terminalThemeSettings,
               onSshInput: widget.onSshInput,
               onSshTerminalInput: widget.onSshTerminalInput,
+              onPreviewLabelChanged: widget.onPreviewLabelChanged,
               findVisible: _findVisible,
               findQuery: _findQuery,
               findCaseSensitive: _findCaseSensitive,

@@ -12,6 +12,7 @@ class OpenTerminalTab {
     required this.hostName,
     required this.title,
     required this.sourceType,
+    this.displayLabel,
     this.sessionId,
     this.history = '',
     this.terminal,
@@ -30,6 +31,7 @@ class OpenTerminalTab {
   factory OpenTerminalTab.local({
     required String id,
     required String title,
+    String? displayLabel,
     String? sessionId,
     xterm.Terminal? terminal,
   }) {
@@ -39,6 +41,7 @@ class OpenTerminalTab {
       hostName: 'local',
       title: title,
       sourceType: TerminalSourceType.local,
+      displayLabel: displayLabel,
       sessionId: sessionId,
       terminal: terminal,
     );
@@ -48,6 +51,7 @@ class OpenTerminalTab {
     required String id,
     required String hostName,
     required String title,
+    String? displayLabel,
     String? sessionId,
     String history = '',
     xterm.Terminal? terminal,
@@ -58,6 +62,7 @@ class OpenTerminalTab {
       hostName: hostName,
       title: title,
       sourceType: TerminalSourceType.ssh,
+      displayLabel: displayLabel,
       sessionId: sessionId,
       history: history,
       terminal: terminal,
@@ -69,11 +74,13 @@ class OpenTerminalTab {
   final String hostName;
   final String title;
   final TerminalSourceType sourceType;
+  final String? displayLabel;
   final String? sessionId;
   final String history;
   final xterm.Terminal? terminal;
 
   OpenTerminalTab copyWith({
+    String? displayLabel,
     String? sessionId,
     String? history,
     xterm.Terminal? terminal,
@@ -84,13 +91,26 @@ class OpenTerminalTab {
       hostName: hostName,
       title: title,
       sourceType: sourceType,
+      displayLabel: displayLabel ?? this.displayLabel,
       sessionId: sessionId ?? this.sessionId,
       history: history ?? this.history,
       terminal: terminal ?? this.terminal,
     );
   }
 
-  String get label => '$hostName · $title';
+  String get label {
+    switch (sourceType) {
+      case TerminalSourceType.local:
+      case TerminalSourceType.ssh:
+        final resolved = displayLabel?.trim();
+        if (resolved != null && resolved.isNotEmpty) {
+          return resolved;
+        }
+        return title;
+      case TerminalSourceType.remote:
+        return '$hostName · $title';
+    }
+  }
 
   String get welcomeTarget {
     switch (sourceType) {

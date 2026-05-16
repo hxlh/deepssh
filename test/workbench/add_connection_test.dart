@@ -43,7 +43,7 @@ void main() {
 
     expect(find.text('Local'), findsOneWidget);
     expect(find.text('terminal1'), findsWidgets);
-    expect(find.text('local · terminal1'), findsOneWidget);
+    expect(find.text('local · terminal1'), findsNothing);
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
@@ -51,7 +51,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('terminal2'), findsWidgets);
-    expect(find.text('local · terminal2'), findsOneWidget);
+    expect(find.text('local · terminal2'), findsNothing);
   });
 
   testWidgets(
@@ -66,7 +66,7 @@ void main() {
 
       expect(find.text('Local'), findsOneWidget);
       expect(find.text('terminal1'), findsWidgets);
-      expect(find.text('local · terminal1'), findsOneWidget);
+      expect(find.text('local · terminal1'), findsNothing);
 
       await tester.tap(
         find.text('terminal1').first,
@@ -100,7 +100,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('SSH Configurations'), findsNothing);
-      expect(find.text('local · terminal1'), findsOneWidget);
+      expect(find.text('local · terminal1'), findsNothing);
+      expect(find.text('terminal1'), findsWidgets);
     },
   );
 

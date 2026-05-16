@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+
+import 'package:characters/characters.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +27,7 @@ class TerminalView extends StatefulWidget {
     this.onSshInput,
     this.onSshTerminalInput,
     this.onLocalInput,
+    this.onPreviewLabelChanged,
     this.findVisible = false,
     this.findQuery = '',
     this.findCaseSensitive = false,
@@ -45,6 +48,7 @@ class TerminalView extends StatefulWidget {
   final ValueChanged<String>? onSshInput;
   final SshTerminalInputWriter? onSshTerminalInput;
   final ValueChanged<String>? onLocalInput;
+  final ValueChanged<String>? onPreviewLabelChanged;
   final bool findVisible;
   final String findQuery;
   final bool findCaseSensitive;
@@ -73,6 +77,7 @@ class _TerminalViewState extends State<TerminalView> {
   Timer? _cursorIdleTimer;
   Timer? _cursorBlinkTimer;
   bool _cursorVisible = true;
+  String _lastPreviewLabel = '';
   final _findScrollController = ScrollController();
   TerminalFindSession? _findSession;
   bool _localFindVisible = false;
@@ -176,6 +181,22 @@ class _TerminalViewState extends State<TerminalView> {
   void _handleTerminalChanged() {
     _resetCursorBlinkIdle();
     _scheduleProxyInputOffsetUpdate();
+    _emitPreviewLabelIfNeeded();
+  }
+
+  String _extractPreviewLabel() {
+    final text = terminal.buffer.currentLine.getText().trim();
+    if (text.isEmpty) return '';
+    return text.characters.take(100).toString();
+  }
+
+  void _emitPreviewLabelIfNeeded() {
+    final preview = _extractPreviewLabel();
+    if (preview.isEmpty || preview == _lastPreviewLabel) {
+      return;
+    }
+    _lastPreviewLabel = preview;
+    widget.onPreviewLabelChanged?.call(preview);
   }
 
   List<_CompiledRegexHighlight> _compileRegexHighlightRules() {

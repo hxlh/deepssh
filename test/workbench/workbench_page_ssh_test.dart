@@ -389,8 +389,7 @@ void main() {
       await tester.pump();
 
       expect(bridge.connectCount, 1);
-      expect(find.text('example.com · terminal1'), findsOneWidget);
-      expect(find.text('terminal1'), findsOneWidget);
+      expect(find.text('terminal1'), findsWidgets);
       expect(bridge.outputStreamListenCount, 0);
 
       await tester.tap(find.text('新增连接'));
@@ -401,9 +400,8 @@ void main() {
       await tester.pump();
 
       expect(bridge.connectCount, 2);
-      expect(find.text('terminal1'), findsOneWidget);
-      expect(find.text('terminal2'), findsOneWidget);
-      expect(find.text('example.com · terminal2'), findsOneWidget);
+      expect(find.text('terminal1'), findsWidgets);
+      expect(find.text('terminal2'), findsWidgets);
 
       firstConnect.complete(
         const SshConnectionResult(sessionId: 'session-1', title: 'Prod'),
@@ -479,17 +477,17 @@ void main() {
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
 
-    expect(find.text('example.com · terminal1'), findsOneWidget);
+    expect(find.text('terminal1'), findsWidgets);
     await tester.tap(find.byIcon(Icons.close).first);
     await tester.pumpAndSettle();
 
     expect(bridge.closeSessionCount, 0);
     expect(find.text('terminal1'), findsOneWidget);
 
-    await tester.tap(find.text('terminal1'));
+    await tester.tap(find.text('terminal1').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('example.com · terminal1'), findsOneWidget);
+    expect(find.text('terminal1'), findsWidgets);
   });
 
   testWidgets(
@@ -519,10 +517,12 @@ void main() {
       await tester.tap(find.text('连接'));
       await tester.pumpAndSettle();
 
-      expect(find.text('terminal1'), findsOneWidget);
-      expect(find.text('example.com · terminal1'), findsOneWidget);
+      expect(find.text('terminal1'), findsWidgets);
 
-      await tester.tap(find.text('terminal1'), buttons: kSecondaryMouseButton);
+      await tester.tap(
+        find.text('terminal1').first,
+        buttons: kSecondaryMouseButton,
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('关闭 SSH 会话'));
@@ -531,12 +531,11 @@ void main() {
       expect(bridge.closeSessionCount, 1);
       expect(bridge.closedSessionIds, ['session-1']);
       expect(find.text('terminal1'), findsNothing);
-      expect(find.text('example.com · terminal1'), findsNothing);
     },
   );
 
   testWidgets(
-    'SSH session label prefers note then current command then title',
+    'SSH session label prefers note then preview then title',
     (tester) async {
       final bridge = FakeSshBridgeClient();
       bridge.profiles.add(
@@ -562,9 +561,16 @@ void main() {
       await tester.tap(find.text('连接'));
       await tester.pumpAndSettle();
 
-      expect(find.text('terminal1'), findsOneWidget);
+      final terminalWidget = tester.widget<app_terminal.TerminalView>(
+        find.byType(app_terminal.TerminalView),
+      );
+      terminalWidget.tab.terminal!.write('npm run dev');
+      await tester.pump();
 
-      await tester.tap(find.text('terminal1'), buttons: kSecondaryMouseButton);
+      expect(find.text('npm run dev'), findsWidgets);
+      expect(find.text('terminal1'), findsNothing);
+
+      await tester.tap(find.text('npm run dev').first, buttons: kSecondaryMouseButton);
       await tester.pumpAndSettle();
       await tester.tap(find.text('编辑备注'));
       await tester.pumpAndSettle();
@@ -573,10 +579,10 @@ void main() {
       await tester.tap(find.text('保存'));
       await tester.pumpAndSettle();
 
-      expect(find.text('生产发布'), findsOneWidget);
-      expect(find.text('terminal1'), findsNothing);
+      expect(find.text('生产发布'), findsWidgets);
+      expect(find.text('npm run dev'), findsNothing);
 
-      await tester.tap(find.text('生产发布'), buttons: kSecondaryMouseButton);
+      await tester.tap(find.text('生产发布').first, buttons: kSecondaryMouseButton);
       await tester.pumpAndSettle();
       await tester.tap(find.text('编辑备注'));
       await tester.pumpAndSettle();
@@ -585,8 +591,9 @@ void main() {
       await tester.tap(find.text('保存'));
       await tester.pumpAndSettle();
 
-      expect(find.text('terminal1'), findsOneWidget);
+      expect(find.text('npm run dev'), findsWidgets);
       expect(find.text('生产发布'), findsNothing);
+      expect(find.text('terminal1'), findsNothing);
     },
   );
 
@@ -619,9 +626,9 @@ void main() {
       await tester.tap(find.text('连接'));
       await tester.pump();
 
-      expect(find.text('terminal1'), findsOneWidget);
+      expect(find.text('terminal1'), findsWidgets);
 
-      await tester.tap(find.text('terminal1'), buttons: kSecondaryMouseButton);
+      await tester.tap(find.text('terminal1').first, buttons: kSecondaryMouseButton);
       await tester.pumpAndSettle();
       await tester.tap(find.text('编辑备注'));
       await tester.pumpAndSettle();
@@ -630,7 +637,7 @@ void main() {
       await tester.tap(find.text('保存'));
       await tester.pumpAndSettle();
 
-      expect(find.text('生产发布'), findsOneWidget);
+      expect(find.text('生产发布'), findsWidgets);
       expect(find.text('terminal1'), findsNothing);
 
       connect.complete(
@@ -639,7 +646,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(bridge.outputStreamListenCount, 1);
-      expect(find.text('生产发布'), findsOneWidget);
+      expect(find.text('生产发布'), findsWidgets);
       expect(find.text('terminal1'), findsNothing);
     },
   );
@@ -673,17 +680,15 @@ void main() {
       await tester.tap(find.text('连接'));
       await tester.pump();
 
-      expect(find.text('terminal1'), findsOneWidget);
-      expect(find.text('example.com · terminal1'), findsOneWidget);
+      expect(find.text('terminal1'), findsWidgets);
 
-      await tester.tap(find.text('terminal1'), buttons: kSecondaryMouseButton);
+      await tester.tap(find.text('terminal1').first, buttons: kSecondaryMouseButton);
       await tester.pumpAndSettle();
       await tester.tap(find.text('关闭 SSH 会话'));
       await tester.pumpAndSettle();
 
       expect(bridge.closeSessionCount, 0);
       expect(find.text('terminal1'), findsNothing);
-      expect(find.text('example.com · terminal1'), findsNothing);
 
       connect.complete(
         const SshConnectionResult(sessionId: 'session-1', title: 'Prod'),
@@ -694,7 +699,6 @@ void main() {
       expect(bridge.closedSessionIds, ['session-1']);
       expect(bridge.outputStreamListenCount, 0);
       expect(find.text('terminal1'), findsNothing);
-      expect(find.text('example.com · terminal1'), findsNothing);
     },
   );
 
@@ -726,14 +730,13 @@ void main() {
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('terminal1'), buttons: kSecondaryMouseButton);
+    await tester.tap(find.text('terminal1').first, buttons: kSecondaryMouseButton);
     await tester.pumpAndSettle();
     await tester.tap(find.text('关闭 SSH 会话'));
     await tester.pumpAndSettle();
 
     expect(bridge.closeSessionCount, 1);
-    expect(find.text('terminal1'), findsOneWidget);
-    expect(find.text('example.com · terminal1'), findsOneWidget);
+    expect(find.text('terminal1'), findsWidgets);
   });
 
   testWidgets('cancel output subscription failure still removes SSH UI', (
@@ -764,14 +767,13 @@ void main() {
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('terminal1'), buttons: kSecondaryMouseButton);
+    await tester.tap(find.text('terminal1').first, buttons: kSecondaryMouseButton);
     await tester.pumpAndSettle();
     await tester.tap(find.text('关闭 SSH 会话'));
     await tester.pumpAndSettle();
 
     expect(bridge.closeSessionCount, 1);
     expect(find.text('terminal1'), findsNothing);
-    expect(find.text('example.com · terminal1'), findsNothing);
   });
 
   testWidgets('batches rapid SSH output before updating terminal state', (
@@ -915,7 +917,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(bridge.connectCount, 1);
-      expect(find.text('example.com · terminal1'), findsOneWidget);
+      expect(find.text('terminal1'), findsWidgets);
       expect(find.text('SSH Configurations'), findsNothing);
 
       await tester.pump(const Duration(milliseconds: 250));
@@ -933,7 +935,7 @@ void main() {
     },
   );
 
-  testWidgets('SSH session shows last submitted command after Enter', (
+  testWidgets('SSH session preview updates explorer row and tab title', (
     tester,
   ) async {
     final bridge = FakeSshBridgeClient();
@@ -961,71 +963,17 @@ void main() {
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
 
-    final terminalWidget = tester.widget<app_terminal.TerminalView>(
-      find.byType(app_terminal.TerminalView),
+    bridge.outputControllers['session-1']!.add(
+      r'ubuntu@example:~/src$ npm run dev'.codeUnits,
     );
+    await tester.pump(const Duration(milliseconds: 40));
 
-    terminalWidget.onSshInput?.call('ls -la');
-    await tester.pump();
-    expect(find.text('ls -la'), findsNothing);
-
-    terminalWidget.onSshInput?.call('\r');
-    await tester.pump();
-
-    expect(find.text('ls -la'), findsOneWidget);
+    expect(find.text(r'ubuntu@example:~/src$ npm run dev'), findsWidgets);
+    expect(find.text('terminal1'), findsNothing);
+    expect(find.text('example.com · terminal1'), findsNothing);
   });
 
-  testWidgets(
-    'Ctrl+C clears pending command without replacing displayed command',
-    (tester) async {
-      final bridge = FakeSshBridgeClient();
-      bridge.profiles.add(
-        const SshProfileItem(
-          id: 'profile-1',
-          name: 'Prod',
-          host: 'example.com',
-          port: 22,
-          username: 'root',
-          password: 'secret',
-        ),
-      );
-      bridge.outputControllers['session-1'] = StreamController<List<int>>();
-
-      await tester.pumpWidget(
-        MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('新增连接'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('SSH'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('连接'));
-      await tester.pumpAndSettle();
-
-      final terminalWidget = tester.widget<app_terminal.TerminalView>(
-        find.byType(app_terminal.TerminalView),
-      );
-
-      terminalWidget.onSshInput?.call('ls -la\r');
-      await tester.pump();
-      expect(find.text('ls -la'), findsOneWidget);
-
-      terminalWidget.onSshInput?.call('pwd');
-      await tester.pump();
-      expect(find.text('pwd'), findsNothing);
-
-      terminalWidget.onSshInput?.call('\x03');
-      await tester.pump();
-
-      expect(find.text('ls -la'), findsOneWidget);
-      expect(find.text('pwd'), findsNothing);
-    },
-  );
-
-  testWidgets('Backspace removes last character from pending command', (
-    tester,
-  ) async {
+  testWidgets('SSH note still overrides captured preview label', (tester) async {
     final bridge = FakeSshBridgeClient();
     bridge.profiles.add(
       const SshProfileItem(
@@ -1037,7 +985,6 @@ void main() {
         password: 'secret',
       ),
     );
-    bridge.outputControllers['session-1'] = StreamController<List<int>>();
 
     await tester.pumpWidget(
       MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
@@ -1054,13 +1001,72 @@ void main() {
     final terminalWidget = tester.widget<app_terminal.TerminalView>(
       find.byType(app_terminal.TerminalView),
     );
-
-    terminalWidget.onSshInput?.call('ls -l');
-    terminalWidget.onSshInput?.call('\x7F');
-    terminalWidget.onSshInput?.call('\r');
+    terminalWidget.tab.terminal!.write('npm run dev');
     await tester.pump();
 
-    expect(find.text('ls -'), findsOneWidget);
+    await tester.tap(find.text('npm run dev').first, buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('编辑备注'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.bySemanticsLabel('会话备注'), '生产发布');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('生产发布'), findsWidgets);
+    expect(find.text('npm run dev'), findsNothing);
+  });
+
+  testWidgets('clearing SSH note falls back to stored preview before title', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
+
+    final terminalWidget = tester.widget<app_terminal.TerminalView>(
+      find.byType(app_terminal.TerminalView),
+    );
+    terminalWidget.tab.terminal!.write('npm run dev');
+    await tester.pump();
+
+    await tester.tap(find.text('npm run dev').first, buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('编辑备注'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.bySemanticsLabel('会话备注'), '生产发布');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('生产发布').first, buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('编辑备注'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.bySemanticsLabel('会话备注'), '');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('npm run dev'), findsWidgets);
+    expect(find.text('terminal1'), findsNothing);
   });
 
   testWidgets('remote terminal input uses injected SSH input writer', (

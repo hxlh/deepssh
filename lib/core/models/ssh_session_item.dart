@@ -8,6 +8,7 @@ class SshSessionItem {
     required this.title,
     this.note = '',
     this.currentCommand = '',
+    this.previewLabel = '',
     this.sessionId,
     this.history = '',
     this.terminal,
@@ -20,6 +21,7 @@ class SshSessionItem {
   final String title;
   final String note;
   final String currentCommand;
+  final String previewLabel;
   final String? sessionId;
   final String history;
   final xterm.Terminal? terminal;
@@ -28,14 +30,15 @@ class SshSessionItem {
   String get displayTitle {
     final trimmedNote = note.trim();
     if (trimmedNote.isNotEmpty) return trimmedNote;
-    final trimmedCurrentCommand = currentCommand.trim();
-    if (trimmedCurrentCommand.isNotEmpty) return trimmedCurrentCommand;
+    final trimmedPreview = previewLabel.trim();
+    if (trimmedPreview.isNotEmpty) return trimmedPreview;
     return title;
   }
 
   SshSessionItem copyWith({
     String? note,
     String? currentCommand,
+    String? previewLabel,
     String? sessionId,
     String? history,
     xterm.Terminal? terminal,
@@ -48,6 +51,7 @@ class SshSessionItem {
       title: title,
       note: note ?? this.note,
       currentCommand: currentCommand ?? this.currentCommand,
+      previewLabel: previewLabel ?? this.previewLabel,
       sessionId: sessionId ?? this.sessionId,
       history: history ?? this.history,
       terminal: terminal ?? this.terminal,

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:characters/characters.dart';
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/models/theme_settings.dart';
 import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
@@ -2044,6 +2045,111 @@ void main() {
       terminal.buffer.lines[firstNewLine].getForeground(6),
       isNot(terminalRgbColor(const Color(0xFFF14C4C))),
     );
+  });
+
+  testWidgets('emits plain current-line preview after terminal changes', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final previews = <String>[];
+    final tab = OpenTerminalTab.local(
+      id: 'local-tab-1',
+      title: 'terminal1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            terminalThemeSettings: _defaultTerminalTheme,
+            onPreviewLabelChanged: previews.add,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    terminal.write(r'PS C:\src> npm run dev');
+    await tester.pump();
+
+    expect(previews, [r'PS C:\src> npm run dev']);
+  });
+
+  testWidgets('does not emit preview for whitespace-only current lines', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final previews = <String>[];
+    final tab = OpenTerminalTab.local(
+      id: 'local-tab-1',
+      title: 'terminal1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            terminalThemeSettings: _defaultTerminalTheme,
+            onPreviewLabelChanged: previews.add,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    terminal.write('ready');
+    await tester.pump();
+    terminal.write('\r\n   ');
+    await tester.pump();
+
+    expect(previews, ['ready']);
+  });
+
+  testWidgets('truncates preview labels to 100 characters by character count', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    final previews = <String>[];
+    final longLine = '终' * 120;
+    final tab = OpenTerminalTab.local(
+      id: 'local-tab-1',
+      title: 'terminal1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 3600,
+            height: 600,
+            child: TerminalView(
+              tab: tab,
+              sshBridge: RecordingSshBridgeClient(),
+              localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+              terminalThemeSettings: _defaultTerminalTheme,
+              onPreviewLabelChanged: previews.add,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    terminal.resize(300, 24);
+    terminal.write(longLine);
+    await tester.pump();
+
+    expect(previews.single.characters.length, 100);
+    expect(previews.single, '终' * 100);
   });
 
   testWidgets('coalesces rapid SSH terminal viewport resize events', (

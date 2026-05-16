@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
+import 'package:deepssh/features/terminal/terminal_view.dart' as app_terminal;
 import 'package:deepssh/features/theme/theme_bridge.dart';
 import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
@@ -14,6 +15,7 @@ class FakeLocalTerminalBridge implements LocalTerminalBridgeClient {
   final Object? spawnError;
   final spawnCompleter = Completer<LocalTerminalConnectionResult>();
   final closedSessionIds = <String>[];
+  final outputControllers = <String, StreamController<List<int>>>{};
   var spawnCalls = 0;
 
   @override
@@ -30,6 +32,10 @@ class FakeLocalTerminalBridge implements LocalTerminalBridgeClient {
 
   @override
   Stream<List<int>> outputStream(String sessionId) {
+    final controller = outputControllers[sessionId];
+    if (controller != null) {
+      return controller.stream;
+    }
     return Stream<List<int>>.value(const <int>[]);
   }
 
@@ -86,6 +92,69 @@ void main() {
     expect(bridge.spawnCalls, 1);
   });
 
+  testWidgets('local terminal keeps title until active preview is captured', (
+    tester,
+  ) async {
+    final bridge = FakeLocalTerminalBridge();
+    await pumpWorkbench(tester, bridge);
+
+    await createLocalTerminal(tester);
+
+    expect(find.text('terminal1'), findsWidgets);
+  });
+
+  testWidgets('local terminal preview updates explorer row and tab title', (
+    tester,
+  ) async {
+    final bridge = FakeLocalTerminalBridge();
+    bridge.outputControllers['local-session-1'] = StreamController<List<int>>();
+    await pumpWorkbench(tester, bridge);
+
+    await createLocalTerminal(tester);
+    bridge.spawnCompleter.complete(
+      const LocalTerminalConnectionResult(
+        sessionId: 'local-session-1',
+        title: 'terminal',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    bridge.outputControllers['local-session-1']!.add(
+      r'PS C:\src> npm run dev'.codeUnits,
+    );
+    await tester.pump(const Duration(milliseconds: 40));
+
+    expect(find.text(r'PS C:\src> npm run dev'), findsWidgets);
+    expect(find.text('terminal1'), findsNothing);
+  });
+
+  testWidgets('empty active local cursor line keeps last non-empty preview', (
+    tester,
+  ) async {
+    final bridge = FakeLocalTerminalBridge();
+    await pumpWorkbench(tester, bridge);
+
+    await createLocalTerminal(tester);
+    bridge.spawnCompleter.complete(
+      const LocalTerminalConnectionResult(
+        sessionId: 'local-session-1',
+        title: 'terminal',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final terminalWidget = tester.widget<app_terminal.TerminalView>(
+      find.byType(app_terminal.TerminalView),
+    );
+    terminalWidget.tab.terminal!.write('ready');
+    await tester.pump();
+    terminalWidget.tab.terminal!.write('\r\n   ');
+    await tester.pump();
+
+    expect(find.text('ready'), findsWidgets);
+    expect(find.text('terminal1'), findsNothing);
+  });
+
   testWidgets('spawn success keeps local terminal row open', (tester) async {
     final bridge = FakeLocalTerminalBridge();
     await pumpWorkbench(tester, bridge);
@@ -116,7 +185,7 @@ void main() {
     expect(find.textContaining('Local terminal failed'), findsOneWidget);
   });
 
-  testWidgets('closing local terminal tab closes backend session', (
+  testWidgets('closing local terminal tab keeps backend session alive', (
     tester,
   ) async {
     final bridge = FakeLocalTerminalBridge();
@@ -135,7 +204,7 @@ void main() {
     await tester.tap(closeButton);
     await tester.pumpAndSettle();
 
-    expect(bridge.closedSessionIds, contains('local-session-1'));
-    expect(find.text('terminal1'), findsNothing);
+    expect(bridge.closedSessionIds, isEmpty);
+    expect(find.text('terminal1'), findsOneWidget);
   });
 }

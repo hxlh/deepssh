@@ -4,11 +4,19 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-OpenTerminalTab _tab(String id) => OpenTerminalTab.local(id: id, title: id);
+OpenTerminalTab _tab(String id, {String? displayLabel}) => OpenTerminalTab.local(
+  id: id,
+  title: id,
+  displayLabel: displayLabel,
+);
 
 void main() {
-  testWidgets('TabStrip renders tabs', (tester) async {
-    final tabs = [_tab('a'), _tab('b'), _tab('c')];
+  testWidgets('TabStrip renders resolved tab labels', (tester) async {
+    final tabs = [
+      _tab('a', displayLabel: 'npm run dev'),
+      _tab('b'),
+      _tab('c', displayLabel: 'top'),
+    ];
     await tester.pumpWidget(
       MaterialApp(
         home: TabStrip(
@@ -21,9 +29,10 @@ void main() {
       ),
     );
 
-    expect(find.text('local · a'), findsOneWidget);
-    expect(find.text('local · b'), findsOneWidget);
-    expect(find.text('local · c'), findsOneWidget);
+    expect(find.text('npm run dev'), findsOneWidget);
+    expect(find.text('b'), findsOneWidget);
+    expect(find.text('top'), findsOneWidget);
+    expect(find.text('local · a'), findsNothing);
   });
 
   testWidgets('scrolls tabs horizontally with normal mouse wheel', (

@@ -37,6 +37,7 @@ dependencies:
   file_picker: ^11.0.2
   path: ^1.9.1
   vm_service: ^15.0.0
+  characters: ^1.4.0
 
 dev_dependencies:
   flutter_test:

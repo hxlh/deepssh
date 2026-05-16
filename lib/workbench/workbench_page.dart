@@ -479,6 +479,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     return OpenTerminalTab.local(
       id: terminal.id,
       title: terminal.title,
+      displayLabel: terminal.displayTitle,
       sessionId: terminal.sessionId,
       terminal: terminal.terminal,
     );
@@ -544,18 +545,29 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     final text = buffer.toString();
     if (text.isEmpty) return;
 
-    LocalTerminalItem? updatedTerminal;
+    LocalTerminalItem? currentTerminal;
     for (final item in localTerminals) {
       if (item.id == terminal.id) {
-        updatedTerminal = item;
+        currentTerminal = item;
         break;
       }
     }
-    if (updatedTerminal == null) return;
-    updatedTerminal.terminal?.write(text);
+    if (currentTerminal == null) return;
+
+    currentTerminal.terminal?.write(text);
+
+    LocalTerminalItem? latestTerminal;
+    for (final item in localTerminals) {
+      if (item.id == terminal.id) {
+        latestTerminal = item;
+        break;
+      }
+    }
+    if (latestTerminal == null) return;
+
     setState(() {
       terminalState = terminalState.update(
-        _localTabFromTerminal(updatedTerminal!),
+        _localTabFromTerminal(latestTerminal!),
       );
     });
   }
@@ -636,6 +648,36 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       terminalState = terminalState.activate(tabId);
       contentMode = WorkbenchContentMode.terminal;
     });
+  }
+
+  void _handleActiveTabPreviewLabelChanged(String previewLabel) {
+    final activeTab = terminalState.activeTab;
+    if (activeTab == null) return;
+
+    switch (activeTab.sourceType) {
+      case TerminalSourceType.local:
+        for (final terminal in localTerminals) {
+          if (terminal.id == activeTab.id) {
+            if (terminal.previewLabel == previewLabel) return;
+            _replaceLocalTerminal(terminal.copyWith(previewLabel: previewLabel));
+            return;
+          }
+        }
+        return;
+      case TerminalSourceType.ssh:
+        for (final sessions in sshSessionsByProfileId.values) {
+          for (final session in sessions) {
+            if (session.id == activeTab.id) {
+              if (session.previewLabel == previewLabel) return;
+              _replaceSshSession(session.copyWith(previewLabel: previewLabel));
+              return;
+            }
+          }
+        }
+        return;
+      case TerminalSourceType.remote:
+        return;
+    }
   }
 
   void _handleTabClose(String tabId) {
@@ -976,6 +1018,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       id: session.id,
       hostName: session.hostName,
       title: session.title,
+      displayLabel: session.displayTitle,
       sessionId: session.sessionId,
       history: session.history,
       terminal: session.terminal,
@@ -1038,11 +1081,11 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
 
     final sessions =
         sshSessionsByProfileId[session.profileId] ?? const <SshSessionItem>[];
-    SshSessionItem? updatedSession;
+    SshSessionItem? currentSession;
     final nextSessions = [
       for (final item in sessions)
         if (item.id == session.id)
-          updatedSession = item.copyWith(
+          currentSession = item.copyWith(
             history: item.terminal == null
                 ? _appendSshHistory(item.history, text)
                 : item.history,
@@ -1050,17 +1093,29 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         else
           item,
     ];
-    if (updatedSession == null) return;
-    final terminal = updatedSession.terminal;
+    if (currentSession == null) return;
+    final terminal = currentSession!.terminal;
     if (terminal != null) {
       terminal.write(text);
+      SshSessionItem? latestSession;
+      for (final item in sshSessionsByProfileId[session.profileId] ?? const <SshSessionItem>[]) {
+        if (item.id == session.id) {
+          latestSession = item;
+          break;
+        }
+      }
+      if (latestSession == null) return;
+      setState(() {
+        terminalState = terminalState.update(_sshTabFromSession(latestSession!));
+      });
+      return;
     }
     setState(() {
       sshSessionsByProfileId = {
         ...sshSessionsByProfileId,
         session.profileId: nextSessions,
       };
-      terminalState = terminalState.update(_sshTabFromSession(updatedSession!));
+      terminalState = terminalState.update(_sshTabFromSession(currentSession!));
     });
   }
 
@@ -1601,6 +1656,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
               localTerminalBridge: widget.localTerminalBridge,
               onSshInput: _handleSshInput,
               onSshTerminalInput: _writeSshTerminalInput,
+              onPreviewLabelChanged: _handleActiveTabPreviewLabelChanged,
             ),
           ),
         ],
