@@ -777,6 +777,16 @@ class _TerminalViewState extends State<TerminalView> {
                 autofocus: _isMacOS,
                 hardwareKeyboardOnly: !_isMacOS,
                 onKeyEvent: _handleTerminalKeyEvent,
+                // Route copy through _copySelectionIfNotEmpty so trailing
+                // spaces are trimmed on all platforms, including macOS where
+                // Cmd+C goes through xterm's TerminalActions.
+                onCopy: (text) {
+                  final trimmed =
+                      text.split('\n').map((l) => l.trimRight()).join('\n');
+                  if (trimmed.isNotEmpty) {
+                    Clipboard.setData(ClipboardData(text: trimmed));
+                  }
+                },
                 cursorType: _xtermCursorType(settings.cursorStyle),
                 alwaysShowCursor: false,
                 cursorBlinkVisible: _cursorVisible,

@@ -51,6 +51,7 @@ class TerminalView extends StatefulWidget {
     this.readOnly = false,
     this.hardwareKeyboardOnly = false,
     this.simulateScroll = true,
+    this.onCopy,
   });
 
   /// The underlying terminal that this widget renders.
@@ -149,6 +150,12 @@ class TerminalView extends StatefulWidget {
   /// keys to the application. This is standard behavior for most terminal
   /// emulators. True by default.
   final bool simulateScroll;
+
+  /// Optional callback invoked when the user copies selected text.
+  /// Receives the raw text from [buffer.getText]; the callback is responsible
+  /// for any post-processing (e.g. trimming trailing spaces) before writing
+  /// to the clipboard. When null the default behaviour writes the raw text.
+  final void Function(String text)? onCopy;
 
   @override
   State<TerminalView> createState() => TerminalViewState();
@@ -298,6 +305,7 @@ class TerminalViewState extends State<TerminalView> {
     child = TerminalActions(
       terminal: widget.terminal,
       controller: _controller,
+      onCopy: widget.onCopy,
       child: child,
     );
 

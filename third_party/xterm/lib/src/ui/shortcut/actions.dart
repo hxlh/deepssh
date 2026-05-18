@@ -10,6 +10,7 @@ class TerminalActions extends StatelessWidget {
     required this.terminal,
     required this.controller,
     required this.child,
+    this.onCopy,
   });
 
   final Terminal terminal;
@@ -17,6 +18,11 @@ class TerminalActions extends StatelessWidget {
   final TerminalController controller;
 
   final Widget child;
+
+  /// Optional override for the copy action. When provided, this is called
+  /// instead of the default [terminal.buffer.getText] + [Clipboard.setData]
+  /// so callers can apply post-processing (e.g. trimming trailing spaces).
+  final void Function(String text)? onCopy;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +49,11 @@ class TerminalActions extends StatelessWidget {
 
             final text = terminal.buffer.getText(selection);
 
-            await Clipboard.setData(ClipboardData(text: text));
+            if (onCopy != null) {
+              onCopy!(text);
+            } else {
+              await Clipboard.setData(ClipboardData(text: text));
+            }
 
             return null;
           },
