@@ -86,6 +86,16 @@ class _TerminalViewState extends State<TerminalView> {
 
   bool get _isMacOS => defaultTargetPlatform == TargetPlatform.macOS;
 
+  // When Windows pastes multi-line text, it fires an Enter key event for the
+  // \n after injecting the first line into the proxy TextField. We suppress
+  // that Enter so the pasted line is not immediately executed.
+  bool _suppressNextEnter = false;
+
+  // Tracks whether the proxy TextField was in IME composition on the previous
+  // change. Used to distinguish a paste (length > 1, not composing) from an
+  // IME commit (length > 1, but was composing).
+  bool _wasComposing = false;
+
   @override
   void initState() {
     super.initState();
@@ -351,17 +361,46 @@ class _TerminalViewState extends State<TerminalView> {
 
   void _handleTextEditingChanged() {
     final value = _textController!.value;
-    if (value.text.isEmpty) return;
+    if (value.text.isEmpty) {
+      _wasComposing = false;
+      return;
+    }
     if (value.composing.isValid && !value.composing.isCollapsed) {
+      _wasComposing = true;
       return;
     }
     _resetCursorBlinkIdle();
+    // Distinguish paste from IME commit:
+    // - IME commit: _wasComposing was true before this change, so even if
+    //   multiple chars are committed (e.g. "你好"), we send them as normal input.
+    // - Paste: length > 1 with no prior composition means the platform injected
+    //   clipboard text. Discard it, read the full clipboard ourselves, and use
+    //   terminal.paste() so bracketed paste mode is respected. Also arm
+    //   _suppressNextEnter for the \n Windows fires after the first line.
+    if (value.text.length > 1 && !_wasComposing) {
+      _suppressNextEnter = true;
+      _wasComposing = false;
+      _textController!.clear();
+      _pasteFromClipboard();
+      return;
+    }
+    _wasComposing = false;
     terminal.textInput(value.text);
     _textController!.clear();
   }
 
   KeyEventResult _handleProxyKeyEvent(FocusNode focusNode, KeyEvent event) {
     if (event is KeyUpEvent) return KeyEventResult.ignored;
+
+    // Suppress the Enter key event that Windows fires for the \n in pasted
+    // multi-line text. _handleTextEditingChanged arms this flag when it detects
+    // a paste (text length > 1 with no IME composition).
+    if (_suppressNextEnter &&
+        event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.enter) {
+      _suppressNextEnter = false;
+      return KeyEventResult.handled;
+    }
 
     if (HardwareKeyboard.instance.isControlPressed) {
       final character = event.character;
@@ -496,7 +535,10 @@ class _TerminalViewState extends State<TerminalView> {
     Clipboard.getData(Clipboard.kTextPlain).then((data) {
       if (!mounted) return;
       if (data != null && data.text != null && data.text!.isNotEmpty) {
-        terminal.textInput(data.text!);
+        // Use paste() instead of textInput() so that bracketed paste mode is
+        // respected. Modern shells (bash, zsh, fish) use bracketed paste to
+        // prevent multi-line text from being executed immediately.
+        terminal.paste(data.text!);
       }
       _focusTerminalInput();
     });
