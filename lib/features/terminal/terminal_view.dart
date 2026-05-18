@@ -768,22 +768,7 @@ class _TerminalViewState extends State<TerminalView> {
                   _focusTerminalInput();
                 }
               },
-              // Override xterm's CopySelectionTextIntent so trailing spaces
-              // are trimmed on all platforms. On macOS, Cmd+C dispatches
-              // CopySelectionTextIntent through xterm's TerminalActions, which
-              // calls buffer.getText() directly and skips our trimming logic.
-              // Wrapping here intercepts that intent before it reaches xterm.
-              child: Actions(
-                actions: {
-                  CopySelectionTextIntent:
-                      CallbackAction<CopySelectionTextIntent>(
-                    onInvoke: (_) {
-                      _copySelectionIfNotEmpty();
-                      return null;
-                    },
-                  ),
-                },
-                child: xterm.TerminalView(
+              child: xterm.TerminalView(
                 terminal,
                 key: _xtermTerminalViewKey,
                 controller: terminalController,
@@ -792,6 +777,16 @@ class _TerminalViewState extends State<TerminalView> {
                 autofocus: _isMacOS,
                 hardwareKeyboardOnly: !_isMacOS,
                 onKeyEvent: _handleTerminalKeyEvent,
+                // Route copy through _copySelectionIfNotEmpty so trailing
+                // spaces are trimmed on all platforms, including macOS where
+                // Cmd+C goes through xterm's TerminalActions.
+                onCopy: (text) {
+                  final trimmed =
+                      text.split('\n').map((l) => l.trimRight()).join('\n');
+                  if (trimmed.isNotEmpty) {
+                    Clipboard.setData(ClipboardData(text: trimmed));
+                  }
+                },
                 cursorType: _xtermCursorType(settings.cursorStyle),
                 alwaysShowCursor: false,
                 cursorBlinkVisible: _cursorVisible,
@@ -834,7 +829,6 @@ class _TerminalViewState extends State<TerminalView> {
                   searchHitForeground: settings.foreground,
                 ),
               ),
-            ),
             ),
           ),
           if (!_isMacOS)
