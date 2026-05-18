@@ -768,7 +768,22 @@ class _TerminalViewState extends State<TerminalView> {
                   _focusTerminalInput();
                 }
               },
-              child: xterm.TerminalView(
+              // Override xterm's CopySelectionTextIntent so trailing spaces
+              // are trimmed on all platforms. On macOS, Cmd+C dispatches
+              // CopySelectionTextIntent through xterm's TerminalActions, which
+              // calls buffer.getText() directly and skips our trimming logic.
+              // Wrapping here intercepts that intent before it reaches xterm.
+              child: Actions(
+                actions: {
+                  CopySelectionTextIntent:
+                      CallbackAction<CopySelectionTextIntent>(
+                    onInvoke: (_) {
+                      _copySelectionIfNotEmpty();
+                      return null;
+                    },
+                  ),
+                },
+                child: xterm.TerminalView(
                 terminal,
                 key: _xtermTerminalViewKey,
                 controller: terminalController,
@@ -819,6 +834,7 @@ class _TerminalViewState extends State<TerminalView> {
                   searchHitForeground: settings.foreground,
                 ),
               ),
+            ),
             ),
           ),
           if (!_isMacOS)
