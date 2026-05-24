@@ -535,10 +535,14 @@ class _TerminalViewState extends State<TerminalView> {
     Clipboard.getData(Clipboard.kTextPlain).then((data) {
       if (!mounted) return;
       if (data != null && data.text != null && data.text!.isNotEmpty) {
+        // Normalize line endings: Windows/VSCode clipboard uses \r\n (CRLF),
+        // which causes each line break to appear as two newlines in the
+        // terminal. Convert \r\n → \n, then lone \r → \n for safety.
+        final text = data.text!.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
         // Use paste() instead of textInput() so that bracketed paste mode is
         // respected. Modern shells (bash, zsh, fish) use bracketed paste to
         // prevent multi-line text from being executed immediately.
-        terminal.paste(data.text!);
+        terminal.paste(text);
       }
       _focusTerminalInput();
     });
