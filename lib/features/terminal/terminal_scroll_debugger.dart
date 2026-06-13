@@ -134,6 +134,13 @@ class TerminalScrollDebugger {
     buffer.writeln(
       '  Wheel Routing: ${routeWheelToApp ? "to APP (vim/Claude Code style)" : "NATIVE scrollback"}',
     );
+    buffer.writeln('');
+    buffer.writeln('Mouse Passthrough (scroll the wheel a few times first):');
+    buffer.writeln('  mouseInput calls: ${terminal.debugMouseInputCalls}');
+    buffer.writeln(
+      '  sent to SSH: ${terminal.debugMouseInputHandled}  (calls that produced output)',
+    );
+    buffer.writeln('  last mouse cell: ${terminal.debugLastMouseCell}');
 
     if (!canScroll) {
       buffer.writeln('');

@@ -1,18 +1,25 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:xterm/core.dart';
-import 'package:xterm/src/ui/infinite_scroll_view.dart';
 
 /// Routes mouse-wheel scrolling for the terminal.
 ///
 /// Behavior:
 ///  - Main buffer, or alternate buffer that has accumulated scrollback
-///    (streaming apps, e.g. `seq`, `cat`, Claude Code's streaming output):
-///    the terminal's native Scrollable scrolls the real history directly.
+///    (streaming apps, e.g. `seq`, `cat`): the terminal's native Scrollable
+///    scrolls the real history directly.
 ///  - Alternate buffer with NO scrollback (full-screen redraw TUIs that paint
 ///    the screen in place, e.g. vim, less, Claude Code's UI): wheel events are
-///    converted to mouse / arrow-key events and sent to the application, which
-///    then scrolls its own view. This is the only way to scroll such apps,
-///    since the terminal buffer holds only the current screen.
+///    captured directly and converted to mouse / arrow-key events sent to the
+///    application, which then scrolls its own view. This is the only way to
+///    scroll such apps, since the terminal buffer holds only the current
+///    screen.
+///
+/// The app-routing path uses a raw [Listener.onPointerSignal] rather than a
+/// nested infinite [Scrollable], because a nested Scrollable whose inner
+/// viewport has maxScrollExtent == 0 absorbs the wheel event and the outer
+/// scrollable never sees it — which silently broke wheel forwarding for
+/// full-screen TUIs.
 class TerminalScrollGestureHandler extends StatefulWidget {
   const TerminalScrollGestureHandler({
     super.key,
@@ -52,10 +59,6 @@ class _TerminalScrollGestureHandlerState
   /// Scrollable can scroll through.
   var hasScrollback = false;
 
-  /// The line offset tracked across scroll events, used to compute how many
-  /// scroll events to send to the terminal.
-  var lastLineOffset = 0;
-
   /// The last pointer position where a scroll gesture happened, used to
   /// compute the cell offset of the terminal mouse event.
   var lastPointerPosition = Offset.zero;
@@ -94,8 +97,6 @@ class _TerminalScrollGestureHandlerState
     _refreshState();
     final routeToApp = isAltBuffer && !hasScrollback;
     if (wasRoutingToApp != routeToApp) {
-      // Only the widget tree shape changed (native scroll <-> app routing),
-      // so rebuild when the routing decision flips.
       setState(() {});
     }
   }
@@ -123,38 +124,41 @@ class _TerminalScrollGestureHandlerState
     }
   }
 
-  void _onScroll(double offset) {
-    final currentLineOffset = offset ~/ widget.getLineHeight();
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    if (event.kind != PointerDeviceKind.mouse) return;
 
-    final delta = currentLineOffset - lastLineOffset;
+    lastPointerPosition = event.position;
 
-    for (var i = 0; i < delta.abs(); i++) {
-      _sendScrollEvent(delta < 0);
+    final lineHeight = widget.getLineHeight();
+    // scrollDelta.dy > 0 => wheel scrolled down (content moves up) => scroll
+    // down in the app. Negate so a positive delta means "scroll down".
+    final deltaLines = (-event.scrollDelta.dy / lineHeight).round();
+    if (deltaLines == 0) return;
+
+    final up = deltaLines < 0;
+    final count = deltaLines.abs();
+    for (var i = 0; i < count; i++) {
+      _sendScrollEvent(up);
     }
-
-    lastLineOffset = currentLineOffset;
   }
 
   @override
   Widget build(BuildContext context) {
-    // Full-screen redraw TUI with no scrollback: route wheel to the app so it
-    // can scroll its own view. Everything else (main buffer, or alt buffer
-    // that has accumulated scrollback) uses the native Scrollable.
+    // Full-screen redraw TUI with no scrollback: capture the wheel directly
+    // and forward mouse/arrow events to the app so it can scroll its own view.
+    // Everything else (main buffer, or alt buffer that has scrollback) uses
+    // the native Scrollable.
     if (!_routeWheelToApp) {
       return widget.child;
     }
 
     return Listener(
-      onPointerSignal: (event) {
-        lastPointerPosition = event.position;
-      },
+      onPointerSignal: _onPointerSignal,
       onPointerDown: (event) {
         lastPointerPosition = event.position;
       },
-      child: InfiniteScrollView(
-        onScroll: _onScroll,
-        child: widget.child,
-      ),
+      child: widget.child,
     );
   }
 }

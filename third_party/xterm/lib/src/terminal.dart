@@ -135,6 +135,12 @@ class Terminal with Observable implements TerminalState, EscapeHandler {
 
   MouseReportMode _mouseReportMode = MouseReportMode.normal;
 
+  // Debug counters for diagnosing mouse/scroll passthrough. Incremented in
+  // mouseInput() and read by the scroll diagnostic (Ctrl+Shift+D).
+  int debugMouseInputCalls = 0;
+  int debugMouseInputHandled = 0;
+  CellOffset? debugLastMouseCell;
+
   bool _cursorBlinkMode = false;
 
   bool _cursorVisibleMode = true;
@@ -332,6 +338,8 @@ class Terminal with Observable implements TerminalState, EscapeHandler {
     TerminalMouseButtonState buttonState,
     CellOffset position,
   ) {
+    debugMouseInputCalls++;
+    debugLastMouseCell = position;
     final output = mouseHandler?.call(TerminalMouseEvent(
       button: button,
       buttonState: buttonState,
@@ -340,6 +348,7 @@ class Terminal with Observable implements TerminalState, EscapeHandler {
       platform: platform,
     ));
     if (output != null) {
+      debugMouseInputHandled++;
       onOutput?.call(output);
       return true;
     }
