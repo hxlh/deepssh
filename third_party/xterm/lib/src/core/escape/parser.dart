@@ -1075,7 +1075,8 @@ class EscapeParser {
         if (enabled) {
           handler.useAltBuffer();
         } else {
-          handler.clearAltBuffer();
+          // Don't clear alt buffer to preserve scrollback for applications
+          // like Claude Code that output streaming text in alt buffer mode
           handler.useMainBuffer();
         }
         return;
@@ -1088,7 +1089,10 @@ class EscapeParser {
       case 1049:
         if (enabled) {
           handler.saveCursor();
-          handler.clearAltBuffer();
+          // Don't clear alt buffer to preserve scrollback.
+          // Traditional TUI apps (vim, less) clear the screen themselves,
+          // so this doesn't affect them. But it allows streaming apps like
+          // Claude Code to maintain scrollback history.
           handler.useAltBuffer();
         } else {
           handler.useMainBuffer();

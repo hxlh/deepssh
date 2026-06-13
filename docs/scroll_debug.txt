@@ -1,0 +1,26 @@
+➜  ~
+=== Scroll Debug Report ===
+DeepSSH Scroll Diagnostic Report
+================================
+
+Scroll Position:
+  Current: 33467.67
+  Min: 0.00
+  Max: 33467.67
+  Viewport: 736.33
+
+Can Scroll: YES ✓
+
+Terminal Mode:
+  Using Alt Buffer: NO
+  Lines in buffer: 2012
+  View size: 96x43
+  Cursor: (5, 42)
+
+Terminal Info:
+  Lines: 2012
+  View: 96x43
+  Alt Buffer: false
+  Scrollback: 1969
+===========================
+

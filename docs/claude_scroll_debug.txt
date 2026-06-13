@@ -1,0 +1,33 @@
+❯
+=== Scroll Debug Report ===───────────────────────────────────────────────────────────────────────
+DeepSSH Scroll Diagnostic Report🌿 fix-claude-code-scrolling ● ↑2 | ⚡ 23.3% · 232.8k tokens
+================================
+
+Scroll Position:
+  Current: 0.00
+  Min: 0.00
+  Max: 0.00
+  Viewport: 867.00
+
+Can Scroll: NO ✗
+
+Terminal Mode:
+  Using Alt Buffer: YES
+  Lines in buffer: 51
+  View size: 98x51
+  Cursor: (2, 47)
+
+DIAGNOSIS:
+  ❌ Zero scroll extent!
+  Content lines: 51
+  Viewport height: 51
+  Note: Alt buffer apps fill the screen,
+        so maxScrollExtent=0 is expected.
+
+Terminal Info:
+  Lines: 51
+  View: 98x51
+  Alt Buffer: true
+  Scrollback: 0
+===========================
+

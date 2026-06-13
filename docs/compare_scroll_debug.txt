@@ -1,0 +1,50 @@
+tproxy          8081/tcp                        # Transparent Proxy
+omniorb         8088/tcp                        # OmniORB
+clc-build-daemon 8990/tcp                       # Common lisp build daemon
+xinetd          9098/tcp
+git             9418/tcp                        # Git Version Control System
+zope            9673/tcp                        # zope server
+webmin          10000/tcp
+kamanda         10081/tcp                       # amanda backup services (Kerberos)
+amandaidx       10082/tcp                       # amanda backup services
+amidxtape       10083/tcp                       # amanda backup services
+sgi-cmsd        17001/udp               # Cluster membership services daemon
+sgi-crsd        17002/udp
+sgi-gcd         17003/udp                       # SGI Group membership daemon
+sgi-cad         17004/tcp                       # Cluster Admin daemon
+binkp           24554/tcp                       # binkp fidonet protocol
+asp             27374/tcp                       # Address Search Protocol
+asp             27374/udp
+csync2          30865/tcp                       # cluster synchronization tool
+dircproxy       57000/tcp                       # Detachable IRC Proxy
+tfido           60177/tcp                       # fidonet EMSI over telnet
+fido            60179/tcp                       # fidonet EMSI over TCP
+
+# Local services
+➜  deepssh git:(fix-claude-code-scrolling) ✗
+
+=== Scroll Debug Report ===
+DeepSSH Scroll Diagnostic Report
+================================
+
+Scroll Position:
+  Current: 40137.00
+  Min: 0.00
+  Max: 40137.00
+  Viewport: 867.00
+
+Can Scroll: YES ✓
+
+Terminal Mode:
+  Using Alt Buffer: NO
+  Lines in buffer: 2412
+  View size: 98x51
+  Cursor: (0, 50)
+
+Terminal Info:
+  Lines: 2412
+  View: 98x51
+  Alt Buffer: false
+  Scrollback: 2361
+===========================
+
