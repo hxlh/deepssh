@@ -12,6 +12,7 @@ import '../../core/models/theme_settings.dart';
 import '../../core/theme/app_colors.dart';
 import '../local_terminal/local_terminal_bridge.dart';
 import '../ssh/ssh_bridge.dart';
+import 'terminal_debugger.dart';
 import 'terminal_find.dart';
 import 'terminal_state.dart';
 
@@ -196,6 +197,12 @@ class _TerminalViewState extends State<TerminalView> {
     _resetCursorBlinkIdle();
     _scheduleProxyInputOffsetUpdate();
     _schedulePreviewLabelEmit();
+
+    // Debug: Check scroll state periodically (only when debug is enabled)
+    if (TerminalDebugger.enableDebugLogs && _findScrollController.hasClients) {
+      TerminalDebugger.checkScrollPosition(_findScrollController, 'terminal_changed');
+      TerminalDebugger.checkTerminalState(terminal, 'terminal_changed');
+    }
   }
 
   void _schedulePreviewLabelEmit() {

@@ -113,7 +113,10 @@ class _TerminalScrollGestureHandlerState
 
   @override
   Widget build(BuildContext context) {
-    if (!isAltBuffer) {
+    // Only use InfiniteScrollView in alternate buffer mode AND when the terminal
+    // is actually using it. This prevents infinite scroll from interfering with
+    // normal scrollback buffer scrolling (e.g., when running Claude Code).
+    if (!isAltBuffer || !widget.terminal.isUsingAltBuffer) {
       return widget.child;
     }
 

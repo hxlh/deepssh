@@ -1,0 +1,26 @@
+--- a/third_party/xterm/lib/src/ui/scroll_handler.dart
++++ b/third_party/xterm/lib/src/ui/scroll_handler.dart
+@@ -113,7 +113,10 @@ class _TerminalScrollGestureHandlerState
+
+   @override
+   Widget build(BuildContext context) {
+-    if (!isAltBuffer) {
++    // Only use InfiniteScrollView in alternate buffer mode AND when the terminal
++    // is actually using it. This prevents infinite scroll from interfering with
++    // normal scrollback buffer scrolling.
++    if (!isAltBuffer || !widget.terminal.isUsingAltBuffer) {
+       return widget.child;
+     }
+
+--- a/lib/core/models/theme_settings.dart
++++ b/lib/core/models/theme_settings.dart
+@@ -176,7 +176,8 @@ class TerminalThemeSettings {
+     terminalBackground: Color(0xFF252526),
+     selectionColor: Color(0xFF094771),
+     cursorColor: Color(0xFF3794FF),
+-    scrollbackLines: 10000,
++    // Increased from 10000 to handle long outputs from tools like Claude Code
++    scrollbackLines: 50000,
+     regexHighlights: [
+       RegexHighlight(
+         pattern: 'ERROR|FATAL|Exception|Traceback',

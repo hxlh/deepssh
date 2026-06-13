@@ -176,7 +176,8 @@ class TerminalThemeSettings {
     terminalBackground: Color(0xFF252526),
     selectionColor: Color(0xFF094771),
     cursorColor: Color(0xFF3794FF),
-    scrollbackLines: 10000,
+    // Increased from 10000 to 50000 to handle long outputs from tools like Claude Code
+    scrollbackLines: 50000,
     regexHighlights: [
       RegexHighlight(
         pattern: 'ERROR|FATAL|Exception|Traceback',
@@ -228,7 +229,7 @@ class TerminalThemeSettings {
     terminalBackground: Color(0xFF282C34),
     selectionColor: Color(0xFF3E4451),
     cursorColor: Color(0xFF528BFF),
-    scrollbackLines: 10000,
+    scrollbackLines: 50000,
     regexHighlights: [],
   );
 
@@ -244,7 +245,7 @@ class TerminalThemeSettings {
     terminalBackground: Color(0xFF002B36),
     selectionColor: Color(0xFF073642),
     cursorColor: Color(0xFF93A1A1),
-    scrollbackLines: 10000,
+    scrollbackLines: 50000,
     regexHighlights: [],
   );
 }
