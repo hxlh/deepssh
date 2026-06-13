@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import 'package:xterm/core.dart';
-import 'package:xterm/src/ui/infinite_scroll_view.dart';
 
 /// Handles scrolling gestures in the alternate screen buffer. In alternate
 /// screen buffer, the terminal don't have a scrollback buffer, instead, the
@@ -113,32 +112,22 @@ class _TerminalScrollGestureHandlerState
 
   @override
   Widget build(BuildContext context) {
-    // Debug logging to diagnose scrolling issues
-    final useInfiniteScroll = isAltBuffer && widget.terminal.isUsingAltBuffer;
-
-    // Uncomment for debugging:
-    // debugPrint('[ScrollHandler] isAltBuffer=$isAltBuffer, '
-    //     'terminal.isUsingAltBuffer=${widget.terminal.isUsingAltBuffer}, '
-    //     'useInfiniteScroll=$useInfiniteScroll');
-
-    // Only use InfiniteScrollView in alternate buffer mode AND when the terminal
-    // is actually using it. This prevents infinite scroll from interfering with
-    // normal scrollback buffer scrolling (e.g., when running Claude Code).
-    if (!useInfiniteScroll) {
-      return widget.child;
-    }
-
-    return Listener(
-      onPointerSignal: (event) {
-        lastPointerPosition = event.position;
-      },
-      onPointerDown: (event) {
-        lastPointerPosition = event.position;
-      },
-      child: InfiniteScrollView(
-        onScroll: _onScroll,
-        child: widget.child,
-      ),
-    );
+    // The alternate buffer now accumulates scrollback history (see
+    // Buffer.index() in buffer.dart), so we let the terminal's native
+    // Scrollable handle wheel scrolling directly — the same way the main
+    // buffer does.
+    //
+    // Previously, alt-buffer mode wrapped the child in InfiniteScrollView,
+    // which set maxScrollExtent to infinity and converted wheel events into
+    // up/down arrow keys (or mouse events) sent to the application. That made
+    // scrolling depend on the app handling those events: full-screen TUIs that
+    // stream text in the alt buffer (e.g. Claude Code, opencode) never became
+    // scrollable, because they don't scroll on arrow-key input. With native
+    // scrollback, the wheel scrolls the real history regardless of the app.
+    //
+    // Trade-off: apps that previously relied on wheel-to-arrow simulation
+    // (some vim/less configurations without mouse reporting) lose wheel
+    // scrolling, but keep keyboard scrolling (Ctrl-U/Ctrl-D, j/k).
+    return widget.child;
   }
 }
