@@ -113,10 +113,18 @@ class _TerminalScrollGestureHandlerState
 
   @override
   Widget build(BuildContext context) {
+    // Debug logging to diagnose scrolling issues
+    final useInfiniteScroll = isAltBuffer && widget.terminal.isUsingAltBuffer;
+
+    // Uncomment for debugging:
+    // debugPrint('[ScrollHandler] isAltBuffer=$isAltBuffer, '
+    //     'terminal.isUsingAltBuffer=${widget.terminal.isUsingAltBuffer}, '
+    //     'useInfiniteScroll=$useInfiniteScroll');
+
     // Only use InfiniteScrollView in alternate buffer mode AND when the terminal
     // is actually using it. This prevents infinite scroll from interfering with
     // normal scrollback buffer scrolling (e.g., when running Claude Code).
-    if (!isAltBuffer || !widget.terminal.isUsingAltBuffer) {
+    if (!useInfiniteScroll) {
       return widget.child;
     }
 

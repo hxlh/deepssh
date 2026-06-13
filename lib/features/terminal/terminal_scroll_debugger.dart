@@ -119,20 +119,47 @@ class TerminalScrollDebugger {
     final canScroll = position.maxScrollExtent > position.minScrollExtent;
     buffer.writeln('Can Scroll: ${canScroll ? "YES ✓" : "NO ✗"}');
 
+    // Check for alternate buffer mode
+    final isAltBuffer = terminal.isUsingAltBuffer;
+    buffer.writeln('');
+    buffer.writeln('Terminal Mode:');
+    buffer.writeln('  Using Alt Buffer: ${isAltBuffer ? "YES" : "NO"}');
+    buffer.writeln('  Lines in buffer: ${terminal.buffer.lines.length}');
+    buffer.writeln('  View size: ${terminal.viewWidth}x${terminal.viewHeight}');
+    buffer.writeln('  Cursor: (${terminal.buffer.cursorX}, ${terminal.buffer.cursorY})');
+
     if (!canScroll) {
       buffer.writeln('');
       buffer.writeln('DIAGNOSIS:');
       if (position.maxScrollExtent.isInfinite) {
         buffer.writeln('  ❌ Infinite scroll detected!');
         buffer.writeln('  ⚠️  InfiniteScrollView is incorrectly active.');
-        buffer.writeln('  ⚠️  Terminal alt buffer: ${terminal.isUsingAltBuffer}');
+        if (!isAltBuffer) {
+          buffer.writeln('  ⚠️  BUT terminal is NOT in alt buffer mode!');
+          buffer.writeln('  ⚠️  This is the BUG: InfiniteScrollView should only');
+          buffer.writeln('  ⚠️  be active in alt buffer (vim, less, etc.)');
+        } else {
+          buffer.writeln('  ⚠️  Alt buffer is active, but you\'re trying to scroll');
+          buffer.writeln('  ⚠️  in a full-screen app. These apps don\'t need scrolling.');
+        }
         buffer.writeln('  Fix: Check scroll_handler.dart line 119');
       } else if (position.maxScrollExtent == 0) {
         buffer.writeln('  ❌ Zero scroll extent!');
         buffer.writeln('  Content lines: ${terminal.buffer.lines.length}');
         buffer.writeln('  Viewport height: ${terminal.viewHeight}');
-        buffer.writeln('  Possible cause: Content fits in viewport');
+        if (isAltBuffer) {
+          buffer.writeln('  Note: Alt buffer apps fill the screen,');
+          buffer.writeln('        so maxScrollExtent=0 is expected.');
+        } else {
+          buffer.writeln('  Possible cause: Content fits in viewport');
+        }
       }
+    } else if (isAltBuffer) {
+      buffer.writeln('');
+      buffer.writeln('WARNING:');
+      buffer.writeln('  Terminal is in alt buffer mode (full-screen app)');
+      buffer.writeln('  but scrolling is enabled. This is unusual.');
+      buffer.writeln('  Most alt buffer apps (vim, less) don\'t use scrolling.');
     }
 
     buffer.writeln('');
@@ -140,6 +167,7 @@ class TerminalScrollDebugger {
     buffer.writeln('  Lines: ${terminal.buffer.lines.length}');
     buffer.writeln('  View: ${terminal.viewWidth}x${terminal.viewHeight}');
     buffer.writeln('  Alt Buffer: ${terminal.isUsingAltBuffer}');
+    buffer.writeln('  Scrollback: ${terminal.buffer.scrollBack}');
 
     return buffer.toString();
   }
