@@ -233,7 +233,15 @@ class Buffer {
   void index() {
     if (isInVerticalMargin) {
       if (_cursorY == _marginBottom) {
-        if (marginTop == 0 && !isAltBuffer) {
+        if (marginTop == 0) {
+          // Push a new line so the scrolled-off content becomes scrollback
+          // history, in BOTH the main and alternate buffers. This lets
+          // full-screen apps that stream text in the alternate buffer
+          // (e.g. Claude Code, opencode) be scrolled back like a shell,
+          // instead of discarding every line that scrolls off the top.
+          // Full-screen TUI apps (vim, less) redraw via absolute cursor
+          // positioning rather than line-feeds at the bottom, so they do
+          // not hit this path and are unaffected.
           lines.insert(absoluteMarginBottom + 1, _newEmptyLine());
         } else {
           scrollUp(1);
@@ -247,11 +255,7 @@ class Buffer {
     // the cursor is not in the scrollable region
     if (_cursorY >= viewHeight - 1) {
       // we are at the bottom
-      if (isAltBuffer) {
-        scrollUp(1);
-      } else {
-        lines.push(_newEmptyLine());
-      }
+      lines.push(_newEmptyLine());
     } else {
       // there're still lines so we simply move cursor down.
       moveCursorY(1);
