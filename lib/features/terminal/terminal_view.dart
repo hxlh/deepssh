@@ -13,6 +13,7 @@ import '../../core/theme/app_colors.dart';
 import '../local_terminal/local_terminal_bridge.dart';
 import '../ssh/ssh_bridge.dart';
 import 'terminal_debugger.dart';
+import 'terminal_scroll_debugger.dart';
 import 'terminal_find.dart';
 import 'terminal_state.dart';
 
@@ -361,6 +362,22 @@ class _TerminalViewState extends State<TerminalView> {
       } else {
         _openFind();
       }
+      return KeyEventResult.handled;
+    }
+    // Debug: Ctrl+Shift+D to print scroll diagnostics
+    if (event is KeyDownEvent &&
+        HardwareKeyboard.instance.isControlPressed &&
+        HardwareKeyboard.instance.isShiftPressed &&
+        event.logicalKey == LogicalKeyboardKey.keyD) {
+      final report = TerminalScrollDebugger.generateReport(
+        _findScrollController,
+        terminal,
+      );
+      debugPrint('\n$report\n');
+      // Also write to terminal
+      terminal.write('\r\n=== Scroll Debug Report ===\r\n');
+      terminal.write(report.replaceAll('\n', '\r\n'));
+      terminal.write('===========================\r\n');
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;

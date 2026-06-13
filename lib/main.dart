@@ -1,6 +1,7 @@
 import 'dart:developer' as developer;
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'core/logging/app_logger.dart';
@@ -8,6 +9,7 @@ import 'core/logging/frontend_error_hooks.dart';
 import 'core/models/ssh_profile_item.dart';
 import 'core/models/theme_settings.dart';
 import 'core/theme/app_theme.dart';
+import 'core/version_info.dart';
 import 'features/ssh/ssh_bridge.dart';
 import 'features/theme/theme_bridge.dart';
 import 'workbench/workbench_page.dart';
@@ -21,6 +23,11 @@ Future<void> main(List<String> args) async {
   final imageCache = PaintingBinding.instance.imageCache;
   imageCache.maximumSize = 100;
   imageCache.maximumSizeBytes = 10 << 20;
+
+  // Print version info in debug mode
+  if (kDebugMode) {
+    ScrollFixInfo.printInfo();
+  }
 
   if (shouldEnableVmService(args)) {
     await _enableVmService();
