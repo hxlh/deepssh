@@ -140,6 +140,7 @@ class Terminal with Observable implements TerminalState, EscapeHandler {
   int debugMouseInputCalls = 0;
   int debugMouseInputHandled = 0;
   CellOffset? debugLastMouseCell;
+  String? debugLastMouseOutput;
 
   bool _cursorBlinkMode = false;
 
@@ -349,6 +350,7 @@ class Terminal with Observable implements TerminalState, EscapeHandler {
     ));
     if (output != null) {
       debugMouseInputHandled++;
+      debugLastMouseOutput = output;
       onOutput?.call(output);
       return true;
     }

@@ -141,6 +141,10 @@ class TerminalScrollDebugger {
       '  sent to SSH: ${terminal.debugMouseInputHandled}  (calls that produced output)',
     );
     buffer.writeln('  last mouse cell: ${terminal.debugLastMouseCell}');
+    buffer.writeln('  report mode: ${terminal.mouseReportMode}');
+    buffer.writeln(
+      '  last output: ${_escape(terminal.debugLastMouseOutput)}  (expect <ESC>[<64;x;yM for wheel up)',
+    );
 
     if (!canScroll) {
       buffer.writeln('');
@@ -184,5 +188,22 @@ class TerminalScrollDebugger {
     buffer.writeln('  Scrollback: ${terminal.buffer.scrollBack}');
 
     return buffer.toString();
+  }
+
+  /// Render control bytes in [s] as readable escape notation, so mouse
+  /// report sequences (which start with ESC) can be inspected in the terminal.
+  static String _escape(String? s) {
+    if (s == null) return '(none yet)';
+    final out = StringBuffer();
+    for (final c in s.runes) {
+      if (c == 0x1b) {
+        out.write('<ESC>');
+      } else if (c < 32) {
+        out.write('^${String.fromCharCode(c + 64)}');
+      } else {
+        out.write(String.fromCharCode(c));
+      }
+    }
+    return out.toString();
   }
 }
