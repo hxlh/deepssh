@@ -796,15 +796,17 @@ class _TerminalViewState extends State<TerminalView> {
                   _focusTerminalInput();
                 }
               },
-              child: xterm.TerminalView(
-                terminal,
-                key: _xtermTerminalViewKey,
-                controller: terminalController,
-                scrollController: _findScrollController,
-                focusNode: inputFocusNode,
-                autofocus: _isMacOS,
-                hardwareKeyboardOnly: !_isMacOS,
-                onKeyEvent: _handleTerminalKeyEvent,
+              child: Scrollbar(
+                controller: _findScrollController,
+                child: xterm.TerminalView(
+                  terminal,
+                  key: _xtermTerminalViewKey,
+                  controller: terminalController,
+                  scrollController: _findScrollController,
+                  focusNode: inputFocusNode,
+                  autofocus: _isMacOS,
+                  hardwareKeyboardOnly: !_isMacOS,
+                  onKeyEvent: _handleTerminalKeyEvent,
                 // Route copy through _copySelectionIfNotEmpty so trailing
                 // spaces are trimmed on all platforms, including macOS where
                 // Cmd+C goes through xterm's TerminalActions.
@@ -855,6 +857,7 @@ class _TerminalViewState extends State<TerminalView> {
                   searchHitBackground: AppColors.accent.withOpacity(0.3),
                   searchHitBackgroundCurrent: AppColors.accent.withOpacity(0.7),
                   searchHitForeground: settings.foreground,
+                ),
                 ),
               ),
             ),
