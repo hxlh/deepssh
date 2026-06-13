@@ -1,10 +1,18 @@
 import 'package:flutter/widgets.dart';
 import 'package:xterm/core.dart';
+import 'package:xterm/src/ui/infinite_scroll_view.dart';
 
-/// Handles scrolling gestures in the alternate screen buffer. In alternate
-/// screen buffer, the terminal don't have a scrollback buffer, instead, the
-/// scroll gestures are converted to escape sequences based on the current
-/// report mode declared by the application.
+/// Routes mouse-wheel scrolling for the terminal.
+///
+/// Behavior:
+///  - Main buffer, or alternate buffer that has accumulated scrollback
+///    (streaming apps, e.g. `seq`, `cat`, Claude Code's streaming output):
+///    the terminal's native Scrollable scrolls the real history directly.
+///  - Alternate buffer with NO scrollback (full-screen redraw TUIs that paint
+///    the screen in place, e.g. vim, less, Claude Code's UI): wheel events are
+///    converted to mouse / arrow-key events and sent to the application, which
+///    then scrolls its own view. This is the only way to scroll such apps,
+///    since the terminal buffer holds only the current screen.
 class TerminalScrollGestureHandler extends StatefulWidget {
   const TerminalScrollGestureHandler({
     super.key,
@@ -37,23 +45,26 @@ class TerminalScrollGestureHandler extends StatefulWidget {
 
 class _TerminalScrollGestureHandlerState
     extends State<TerminalScrollGestureHandler> {
-  /// Whether the application is in alternate screen buffer. If false, then this
-  /// widget does nothing.
+  /// Whether the application is in the alternate screen buffer.
   var isAltBuffer = false;
 
-  /// The variable that tracks the line offset in last scroll event. Used to
-  /// determine how many the scroll events should be sent to the terminal.
+  /// Whether the current buffer has scrollback history that the native
+  /// Scrollable can scroll through.
+  var hasScrollback = false;
+
+  /// The line offset tracked across scroll events, used to compute how many
+  /// scroll events to send to the terminal.
   var lastLineOffset = 0;
 
-  /// This variable tracks the last offset where the scroll gesture started.
-  /// Used to calculate the cell offset of the terminal mouse event.
+  /// The last pointer position where a scroll gesture happened, used to
+  /// compute the cell offset of the terminal mouse event.
   var lastPointerPosition = Offset.zero;
 
   @override
   void initState() {
-    widget.terminal.addListener(_onTerminalUpdated);
-    isAltBuffer = widget.terminal.isUsingAltBuffer;
     super.initState();
+    widget.terminal.addListener(_onTerminalUpdated);
+    _refreshState();
   }
 
   @override
@@ -64,20 +75,34 @@ class _TerminalScrollGestureHandlerState
 
   @override
   void didUpdateWidget(covariant TerminalScrollGestureHandler oldWidget) {
+    super.didUpdateWidget(oldWidget);
     if (oldWidget.terminal != widget.terminal) {
       oldWidget.terminal.removeListener(_onTerminalUpdated);
       widget.terminal.addListener(_onTerminalUpdated);
-      isAltBuffer = widget.terminal.isUsingAltBuffer;
+      _refreshState();
     }
-    super.didUpdateWidget(oldWidget);
+  }
+
+  void _refreshState() {
+    isAltBuffer = widget.terminal.isUsingAltBuffer;
+    hasScrollback =
+        widget.terminal.buffer.lines.length > widget.terminal.viewHeight;
   }
 
   void _onTerminalUpdated() {
-    if (isAltBuffer != widget.terminal.isUsingAltBuffer) {
-      isAltBuffer = widget.terminal.isUsingAltBuffer;
+    final wasRoutingToApp = isAltBuffer && !hasScrollback;
+    _refreshState();
+    final routeToApp = isAltBuffer && !hasScrollback;
+    if (wasRoutingToApp != routeToApp) {
+      // Only the widget tree shape changed (native scroll <-> app routing),
+      // so rebuild when the routing decision flips.
       setState(() {});
     }
   }
+
+  /// True when wheel events should be sent to the application instead of
+  /// scrolling the terminal's native scrollback.
+  bool get _routeWheelToApp => isAltBuffer && !hasScrollback;
 
   /// Send a single scroll event to the terminal. If [simulateScroll] is true,
   /// then if the application doesn't recognize mouse wheel events, this method
@@ -112,22 +137,24 @@ class _TerminalScrollGestureHandlerState
 
   @override
   Widget build(BuildContext context) {
-    // The alternate buffer now accumulates scrollback history (see
-    // Buffer.index() in buffer.dart), so we let the terminal's native
-    // Scrollable handle wheel scrolling directly — the same way the main
-    // buffer does.
-    //
-    // Previously, alt-buffer mode wrapped the child in InfiniteScrollView,
-    // which set maxScrollExtent to infinity and converted wheel events into
-    // up/down arrow keys (or mouse events) sent to the application. That made
-    // scrolling depend on the app handling those events: full-screen TUIs that
-    // stream text in the alt buffer (e.g. Claude Code, opencode) never became
-    // scrollable, because they don't scroll on arrow-key input. With native
-    // scrollback, the wheel scrolls the real history regardless of the app.
-    //
-    // Trade-off: apps that previously relied on wheel-to-arrow simulation
-    // (some vim/less configurations without mouse reporting) lose wheel
-    // scrolling, but keep keyboard scrolling (Ctrl-U/Ctrl-D, j/k).
-    return widget.child;
+    // Full-screen redraw TUI with no scrollback: route wheel to the app so it
+    // can scroll its own view. Everything else (main buffer, or alt buffer
+    // that has accumulated scrollback) uses the native Scrollable.
+    if (!_routeWheelToApp) {
+      return widget.child;
+    }
+
+    return Listener(
+      onPointerSignal: (event) {
+        lastPointerPosition = event.position;
+      },
+      onPointerDown: (event) {
+        lastPointerPosition = event.position;
+      },
+      child: InfiniteScrollView(
+        onScroll: _onScroll,
+        child: widget.child,
+      ),
+    );
   }
 }

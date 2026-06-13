@@ -121,12 +121,19 @@ class TerminalScrollDebugger {
 
     // Check for alternate buffer mode
     final isAltBuffer = terminal.isUsingAltBuffer;
+    final hasScrollback = terminal.buffer.lines.length > terminal.viewHeight;
+    final routeWheelToApp = isAltBuffer && !hasScrollback;
     buffer.writeln('');
     buffer.writeln('Terminal Mode:');
     buffer.writeln('  Using Alt Buffer: ${isAltBuffer ? "YES" : "NO"}');
     buffer.writeln('  Lines in buffer: ${terminal.buffer.lines.length}');
     buffer.writeln('  View size: ${terminal.viewWidth}x${terminal.viewHeight}');
     buffer.writeln('  Cursor: (${terminal.buffer.cursorX}, ${terminal.buffer.cursorY})');
+    buffer.writeln('  Mouse Mode: ${terminal.mouseMode}  (none = app does NOT report mouse)');
+    buffer.writeln('  Has Scrollback: ${hasScrollback ? "YES" : "NO"}');
+    buffer.writeln(
+      '  Wheel Routing: ${routeWheelToApp ? "to APP (vim/Claude Code style)" : "NATIVE scrollback"}',
+    );
 
     if (!canScroll) {
       buffer.writeln('');
