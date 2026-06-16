@@ -1,11 +1,25 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:xterm/core.dart';
-import 'package:xterm/src/ui/infinite_scroll_view.dart';
 
-/// Handles scrolling gestures in the alternate screen buffer. In alternate
-/// screen buffer, the terminal don't have a scrollback buffer, instead, the
-/// scroll gestures are converted to escape sequences based on the current
-/// report mode declared by the application.
+/// Routes mouse-wheel scrolling for the terminal.
+///
+/// Behavior:
+///  - Main buffer, or alternate buffer that has accumulated scrollback
+///    (streaming apps, e.g. `seq`, `cat`): the terminal's native Scrollable
+///    scrolls the real history directly.
+///  - Alternate buffer with NO scrollback (full-screen redraw TUIs that paint
+///    the screen in place, e.g. vim, less, Claude Code's UI): wheel events are
+///    captured directly and converted to mouse / arrow-key events sent to the
+///    application, which then scrolls its own view. This is the only way to
+///    scroll such apps, since the terminal buffer holds only the current
+///    screen.
+///
+/// The app-routing path uses a raw [Listener.onPointerSignal] rather than a
+/// nested infinite [Scrollable], because a nested Scrollable whose inner
+/// viewport has maxScrollExtent == 0 absorbs the wheel event and the outer
+/// scrollable never sees it — which silently broke wheel forwarding for
+/// full-screen TUIs.
 class TerminalScrollGestureHandler extends StatefulWidget {
   const TerminalScrollGestureHandler({
     super.key,
@@ -38,23 +52,22 @@ class TerminalScrollGestureHandler extends StatefulWidget {
 
 class _TerminalScrollGestureHandlerState
     extends State<TerminalScrollGestureHandler> {
-  /// Whether the application is in alternate screen buffer. If false, then this
-  /// widget does nothing.
+  /// Whether the application is in the alternate screen buffer.
   var isAltBuffer = false;
 
-  /// The variable that tracks the line offset in last scroll event. Used to
-  /// determine how many the scroll events should be sent to the terminal.
-  var lastLineOffset = 0;
+  /// Whether the current buffer has scrollback history that the native
+  /// Scrollable can scroll through.
+  var hasScrollback = false;
 
-  /// This variable tracks the last offset where the scroll gesture started.
-  /// Used to calculate the cell offset of the terminal mouse event.
+  /// The last pointer position where a scroll gesture happened, used to
+  /// compute the cell offset of the terminal mouse event.
   var lastPointerPosition = Offset.zero;
 
   @override
   void initState() {
-    widget.terminal.addListener(_onTerminalUpdated);
-    isAltBuffer = widget.terminal.isUsingAltBuffer;
     super.initState();
+    widget.terminal.addListener(_onTerminalUpdated);
+    _refreshState();
   }
 
   @override
@@ -65,20 +78,32 @@ class _TerminalScrollGestureHandlerState
 
   @override
   void didUpdateWidget(covariant TerminalScrollGestureHandler oldWidget) {
+    super.didUpdateWidget(oldWidget);
     if (oldWidget.terminal != widget.terminal) {
       oldWidget.terminal.removeListener(_onTerminalUpdated);
       widget.terminal.addListener(_onTerminalUpdated);
-      isAltBuffer = widget.terminal.isUsingAltBuffer;
+      _refreshState();
     }
-    super.didUpdateWidget(oldWidget);
+  }
+
+  void _refreshState() {
+    isAltBuffer = widget.terminal.isUsingAltBuffer;
+    hasScrollback =
+        widget.terminal.buffer.lines.length > widget.terminal.viewHeight;
   }
 
   void _onTerminalUpdated() {
-    if (isAltBuffer != widget.terminal.isUsingAltBuffer) {
-      isAltBuffer = widget.terminal.isUsingAltBuffer;
+    final wasRoutingToApp = isAltBuffer && !hasScrollback;
+    _refreshState();
+    final routeToApp = isAltBuffer && !hasScrollback;
+    if (wasRoutingToApp != routeToApp) {
       setState(() {});
     }
   }
+
+  /// True when wheel events should be sent to the application instead of
+  /// scrolling the terminal's native scrollback.
+  bool get _routeWheelToApp => isAltBuffer && !hasScrollback;
 
   /// Send a single scroll event to the terminal. If [simulateScroll] is true,
   /// then if the application doesn't recognize mouse wheel events, this method
@@ -99,35 +124,42 @@ class _TerminalScrollGestureHandlerState
     }
   }
 
-  void _onScroll(double offset) {
-    final currentLineOffset = offset ~/ widget.getLineHeight();
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    if (event.kind != PointerDeviceKind.mouse) return;
 
-    final delta = currentLineOffset - lastLineOffset;
+    lastPointerPosition = event.position;
 
-    for (var i = 0; i < delta.abs(); i++) {
-      _sendScrollEvent(delta < 0);
+    // PointerScrollEvent.scrollDelta.dy follows the platform convention:
+    //   dy > 0 => user spun the wheel DOWN (wants content below)
+    //   dy < 0 => user spun the wheel UP   (wants content above)
+    final lineHeight = widget.getLineHeight();
+    final dy = event.scrollDelta.dy;
+    if (dy == 0) return;
+    final up = dy < 0;
+    var count = (dy.abs() / lineHeight).round();
+    if (count < 1) count = 1;
+    for (var i = 0; i < count; i++) {
+      _sendScrollEvent(up);
     }
-
-    lastLineOffset = currentLineOffset;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!isAltBuffer) {
+    // Full-screen redraw TUI with no scrollback: capture the wheel directly
+    // and forward mouse/arrow events to the app so it can scroll its own view.
+    // Everything else (main buffer, or alt buffer that has scrollback) uses
+    // the native Scrollable.
+    if (!_routeWheelToApp) {
       return widget.child;
     }
 
     return Listener(
-      onPointerSignal: (event) {
-        lastPointerPosition = event.position;
-      },
+      onPointerSignal: _onPointerSignal,
       onPointerDown: (event) {
         lastPointerPosition = event.position;
       },
-      child: InfiniteScrollView(
-        onScroll: _onScroll,
-        child: widget.child,
-      ),
+      child: widget.child,
     );
   }
 }
