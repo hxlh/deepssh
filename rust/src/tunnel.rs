@@ -355,34 +355,62 @@ async fn relay_tcp_stream_and_channel(
     let (mut reader, mut writer) = stream.split();
     let mut stream_closed = false;
     let mut buf = vec![0; 65536];
-    loop {
+
+    // Drive the relay until either half closes. Every exit path `break`s out
+    // instead of returning early, so control always reaches `channel.close()`
+    // below. russh's plain `Channel` does NOT send `SSH_MSG_CHANNEL_CLOSE` on
+    // drop (only the opt-in `ChannelCloseOnDrop` / `into_stream` path does),
+    // and the server keeps the channel — and the target socket behind it —
+    // alive until it sees CLOSE. Skipping it leaks one CLOSE_WAIT channel per
+    // forwarded connection, which accumulates to hundreds of sockets and
+    // hundreds of MB on a long-lived tunnel.
+    let outcome: Result<()> = loop {
         tokio::select! {
             read = reader.read(&mut buf), if !stream_closed => {
                 match read {
                     Ok(0) => {
                         stream_closed = true;
-                        channel.eof().await?;
+                        if let Err(error) = channel.eof().await {
+                            break Err(error.into());
+                        }
                     }
-                    Ok(n) => channel.data(&buf[..n]).await?,
-                    Err(error) => return Err(error.into()),
+                    Ok(n) => {
+                        if let Err(error) = channel.data(&buf[..n]).await {
+                            break Err(error.into());
+                        }
+                    }
+                    Err(error) => break Err(error.into()),
                 }
             }
             message = channel.wait() => {
                 match message {
-                    Some(ChannelMsg::Data { data }) => writer.write_all(&data).await?,
-                    Some(ChannelMsg::ExtendedData { data, .. }) => writer.write_all(&data).await?,
+                    Some(ChannelMsg::Data { data }) => {
+                        if let Err(error) = writer.write_all(&data).await {
+                            break Err(error.into());
+                        }
+                    }
+                    Some(ChannelMsg::ExtendedData { data, .. }) => {
+                        if let Err(error) = writer.write_all(&data).await {
+                            break Err(error.into());
+                        }
+                    }
                     Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => {
                         if !stream_closed {
                             let _ = channel.eof().await;
                         }
-                        break;
+                        break Ok(());
                     }
                     _ => {}
                 }
             }
         }
-    }
-    Ok(())
+    };
+
+    // Always complete the close handshake so the server frees the channel and
+    // the target socket. Best-effort: a failure here is still reported via
+    // `outcome` so callers see the original relay error.
+    let _ = channel.close().await;
+    outcome
 }
 
 async fn remote_target_is_open_via_ssh(
@@ -395,7 +423,11 @@ async fn remote_target_is_open_via_ssh(
         .await
     {
         Ok(channel) => {
+            // This probe channel must be closed explicitly too; otherwise each
+            // readiness check leaks a channel on the server (same root cause as
+            // the relay). `close()` completes the handshake on its own.
             let _ = channel.eof().await;
+            let _ = channel.close().await;
             true
         }
         Err(_) => false,
