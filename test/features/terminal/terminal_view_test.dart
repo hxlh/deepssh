@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:characters/characters.dart';
@@ -472,6 +471,7 @@ void main() {
   testWidgets('paints selection at the terminal render offset', (tester) async {
     final terminal = xterm.Terminal(maxLines: 3000);
     terminal.resize(20, 5);
+    terminal.write('abcde');
     final controller = xterm.TerminalController();
 
     const stackKey = Key('selection-paint-offset-stack');
@@ -520,14 +520,12 @@ void main() {
     );
     await tester.pump();
 
+    // Content 'abcde' is written so the row has cells to select; the selection
+    // (cols 1-3) must still paint at the terminal render offset (40, 48).
     expect(
       tester.renderObject(find.byKey(stackKey)),
       paints
         ..rect(rect: const Rect.fromLTWH(40, 48, 360, 120), color: Colors.black)
-        ..rect(
-          rect: Rect.fromLTWH(40, 48, cellSize.width, cellSize.height),
-          color: Colors.white,
-        )
         ..rect(
           rect: Rect.fromLTWH(
             40 + cellSize.width,
@@ -535,6 +533,74 @@ void main() {
             cellSize.width * 3,
             cellSize.height,
           ),
+          color: const Color(0xFFFF0000),
+        ),
+    );
+  });
+
+  testWidgets('clamps selection highlight to last content cell', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.resize(20, 5);
+    terminal.write('hi'); // cols 0-1 content; rest of the row stays empty
+    final controller = xterm.TerminalController();
+
+    const stackKey = Key('selection-clamp-stack');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            key: stackKey,
+            children: [
+              Positioned(
+                left: 40,
+                top: 48,
+                width: 360,
+                height: 120,
+                child: xterm.TerminalView(
+                  terminal,
+                  controller: controller,
+                  hardwareKeyboardOnly: true,
+                  theme: _selectionPaintTestTheme,
+                  textStyle: const xterm.TerminalStyle(fontSize: 20),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final renderTerminal =
+        tester.renderObject(
+              find.descendant(
+                of: find.byType(xterm.TerminalView),
+                matching: find.byWidgetPredicate(
+                  (widget) => widget.runtimeType.toString() == '_TerminalView',
+                ),
+              ),
+            )
+            as dynamic;
+    final cellSize = renderTerminal.cellSize as Size;
+
+    // Select the whole row, well past the 2-cell content.
+    controller.setSelection(
+      terminal.buffer.createAnchor(0, 0),
+      terminal.buffer.createAnchor(19, 0),
+    );
+    await tester.pump();
+
+    // The highlight is clamped to the content ('hi' = 2 cells) instead of
+    // spanning the full 20-cell selection width.
+    expect(
+      tester.renderObject(find.byKey(stackKey)),
+      paints
+        ..rect(
+          rect: Rect.fromLTWH(40, 48, cellSize.width * 2, cellSize.height),
           color: const Color(0xFFFF0000),
         ),
     );
@@ -2184,7 +2250,7 @@ void main() {
   });
 
   testWidgets(
-    'Ctrl+C trims trailing spaces from each copied line',
+    'Ctrl+C preserves written trailing spaces when copying',
     (tester) async {
       final bridge = RecordingSshBridgeClient();
       final terminal = xterm.Terminal(maxLines: 3000);
@@ -2202,9 +2268,9 @@ void main() {
             .setMockMethodCallHandler(SystemChannels.platform, null);
       });
 
-      // Write lines with explicit trailing spaces (codePoint == 32).
-      // These are NOT trimmed by xterm's getTrimmedLength (which only skips
-      // codePoint == 0 cells), so they appear in getText() output.
+      // Write lines with explicit trailing spaces (codePoint == 32). These are
+      // content: xterm's getTrimmedLength only skips codePoint == 0 cells, so
+      // the written spaces must survive into the copied text verbatim.
       terminal.write('hello   \r\nworld   \r\n');
       final tab = OpenTerminalTab.ssh(
         id: 'ssh-tab-1',
@@ -2242,19 +2308,15 @@ void main() {
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
       await tester.pump();
 
-      expect(copiedText, isNotNull);
-      for (final line in copiedText!.split('\n')) {
-        expect(
-          line,
-          isNot(endsWith(' ')),
-          reason: 'line ${jsonEncode(line)} still has trailing spaces',
-        );
-      }
+      // Written trailing spaces (codePoint 0x20) are content and must be
+      // preserved; only never-written empty cells (codePoint 0) are dropped by
+      // getText, so each copied line keeps its three trailing spaces.
+      expect(copiedText, 'hello   \nworld   ');
     },
   );
 
   testWidgets(
-    'CopySelectionTextIntent trims trailing spaces from each copied line',
+    'CopySelectionTextIntent preserves written trailing spaces when copying',
     (tester) async {
       final bridge = RecordingSshBridgeClient();
       final terminal = xterm.Terminal(maxLines: 3000);
@@ -2315,14 +2377,10 @@ void main() {
       Actions.invoke(deepest!, CopySelectionTextIntent.copy);
       await tester.pump();
 
-      expect(copiedText, isNotNull);
-      for (final line in copiedText!.split('\n')) {
-        expect(
-          line,
-          isNot(endsWith(' ')),
-          reason: 'line ${jsonEncode(line)} still has trailing spaces',
-        );
-      }
+      // Written trailing spaces (codePoint 0x20) are content and must be
+      // preserved; only never-written empty cells (codePoint 0) are dropped by
+      // getText, so each copied line keeps its three trailing spaces.
+      expect(copiedText, 'hello   \nworld   ');
     },
   );
 }

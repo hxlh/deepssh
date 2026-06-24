@@ -632,7 +632,13 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         break;
       }
 
-      _paintSegment(canvas, offset, segment, _painter.theme.selection);
+      _paintSegment(
+        canvas,
+        offset,
+        segment,
+        _painter.theme.selection,
+        trimToContent: true,
+      );
     }
   }
 
@@ -673,10 +679,28 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     Canvas canvas,
     Offset offset,
     BufferSegment segment,
-    Color color,
-  ) {
-    final start = segment.start ?? 0;
-    final end = segment.end ?? _terminal.viewWidth;
+    Color color, {
+    bool trimToContent = false,
+  }) {
+    var start = segment.start ?? 0;
+    var end = segment.end ?? _terminal.viewWidth;
+
+    // Selection (unlike regex/search highlights) should hug the actual
+    // content: clamp this segment's right edge to the last cell that has
+    // content, so trailing cells that were never written (codePoint == 0)
+    // are not highlighted. Written spaces (codePoint == 0x20) count as
+    // content and stay selected. getTrimmedLength already encodes this
+    // distinction and handles wide characters.
+    if (trimToContent) {
+      final line = _terminal.buffer.lines[segment.line];
+      final contentEnd = line.getTrimmedLength(end);
+      if (end > contentEnd) {
+        end = contentEnd;
+      }
+      if (end <= start) {
+        return;
+      }
+    }
 
     final startOffset = offset.translate(
       start * _painter.cellSize.width,
