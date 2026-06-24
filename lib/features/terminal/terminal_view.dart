@@ -519,11 +519,11 @@ class _TerminalViewState extends State<TerminalView> {
     if (selection == null) return false;
     final text = terminal.buffer.getText(selection);
     if (text.isEmpty) return false;
-    // Trim trailing spaces from each line, consistent with most terminal emulators.
-    // buffer.getText() preserves actual space chars (codePoint == 32) used for
-    // padding by terminal programs; we strip them here at copy time only.
-    final trimmed = text.split('\n').map((l) => l.trimRight()).join('\n');
-    Clipboard.setData(ClipboardData(text: trimmed));
+    // buffer.getText() already clamps each line to its last cell with content
+    // (getTrimmedLength): trailing *empty* cells (never written, codePoint == 0)
+    // are dropped, while written spaces (codePoint == 0x20) are preserved
+    // verbatim. So the copied text hugs the actual terminal content.
+    Clipboard.setData(ClipboardData(text: text));
     return true;
   }
 
@@ -783,14 +783,14 @@ class _TerminalViewState extends State<TerminalView> {
                   autofocus: _isMacOS,
                   hardwareKeyboardOnly: !_isMacOS,
                   onKeyEvent: _handleTerminalKeyEvent,
-                // Route copy through _copySelectionIfNotEmpty so trailing
-                // spaces are trimmed on all platforms, including macOS where
-                // Cmd+C goes through xterm's TerminalActions.
+                // macOS Cmd+C flows through xterm's TerminalActions -> onCopy.
+                // `text` is already buffer.getText(), which clamps each line to
+                // its last content cell: trailing empty cells are dropped and
+                // written spaces are preserved. Same semantics as the Ctrl+C /
+                // context-menu path above, on all platforms.
                 onCopy: (text) {
-                  final trimmed =
-                      text.split('\n').map((l) => l.trimRight()).join('\n');
-                  if (trimmed.isNotEmpty) {
-                    Clipboard.setData(ClipboardData(text: trimmed));
+                  if (text.isNotEmpty) {
+                    Clipboard.setData(ClipboardData(text: text));
                   }
                 },
                 cursorType: _xtermCursorType(settings.cursorStyle),
