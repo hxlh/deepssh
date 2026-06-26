@@ -606,6 +606,150 @@ void main() {
     );
   });
 
+  testWidgets('snaps selection end forward past a wide char half-cell', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.resize(20, 5);
+    terminal.write('A你B'); // A=col0, 你=col1-2, B=col3
+    final controller = xterm.TerminalController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: xterm.TerminalView(
+            terminal,
+            controller: controller,
+            hardwareKeyboardOnly: true,
+            textStyle: const xterm.TerminalStyle(fontSize: 20),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final renderTerminal = _renderTerminal(tester);
+    final cellSize = renderTerminal.cellSize as Size;
+
+    // Drag from col0 and release on col1 (the left half of 你). Without
+    // wide-char snapping the selection end stops at col2 and copies as
+    // just 'A', dropping the CJK character whose placeholder is excluded.
+    renderTerminal.selectCharacters(Offset(0, 0));
+    await tester.pump();
+    renderTerminal.selectCharacters(
+      Offset(0, 0),
+      Offset(1 * cellSize.width, 0),
+    );
+    await tester.pump();
+
+    final selection = controller.selection!.normalized;
+    expect(terminal.buffer.getText(selection), 'A你');
+  });
+
+  testWidgets('snaps selection start back off a wide char placeholder', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.resize(20, 5);
+    terminal.write('A你B');
+    final controller = xterm.TerminalController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: xterm.TerminalView(
+            terminal,
+            controller: controller,
+            hardwareKeyboardOnly: true,
+            textStyle: const xterm.TerminalStyle(fontSize: 20),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final renderTerminal = _renderTerminal(tester);
+    final cellSize = renderTerminal.cellSize as Size;
+
+    // Start the drag on col2 (你's placeholder cell) and release on col3
+    // (B). Without snapping the selection begins at col2 and copies as
+    // ' B', missing the CJK character whose leading cell is excluded.
+    renderTerminal.selectCharacters(Offset(2 * cellSize.width, 0));
+    await tester.pump();
+    renderTerminal.selectCharacters(
+      Offset(2 * cellSize.width, 0),
+      Offset(3 * cellSize.width, 0),
+    );
+    await tester.pump();
+
+    final selection = controller.selection!.normalized;
+    expect(terminal.buffer.getText(selection), '你B');
+  });
+
+  testWidgets('paints selection across both halves of a wide char', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.resize(20, 5);
+    terminal.write('你'); // col0-1
+    final controller = xterm.TerminalController();
+
+    const stackKey = Key('wide-char-selection-stack');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            key: stackKey,
+            children: [
+              Positioned(
+                left: 40,
+                top: 48,
+                width: 360,
+                height: 120,
+                child: xterm.TerminalView(
+                  terminal,
+                  controller: controller,
+                  hardwareKeyboardOnly: true,
+                  theme: _selectionPaintTestTheme,
+                  textStyle: const xterm.TerminalStyle(fontSize: 20),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final renderTerminal = _renderTerminal(tester);
+    final cellSize = renderTerminal.cellSize as Size;
+
+    // Release on col0 (你's left half). The highlight must span both
+    // cells (2 * cellWidth); without snapping it would cover only the
+    // left half, painting the CJK glyph as half-selected.
+    renderTerminal.selectCharacters(Offset(0, 0));
+    await tester.pump();
+    renderTerminal.selectCharacters(Offset(0, 0), Offset(0, 0));
+    await tester.pump();
+
+    expect(
+      tester.renderObject(find.byKey(stackKey)),
+      paints
+        ..rect(
+          rect: const Rect.fromLTWH(40, 48, 360, 120),
+          color: Colors.black,
+        )
+        ..rect(
+          rect: Rect.fromLTWH(40, 48, cellSize.width * 2, cellSize.height),
+          color: const Color(0xFFFF0000),
+        ),
+    );
+  });
+
   testWidgets(
     'does not clamp find scroll to bottom for lower scrollback matches',
     (tester) async {
@@ -2411,6 +2555,18 @@ Color? regexForegroundColor(
 
 xterm.TerminalView terminalView(WidgetTester tester) {
   return tester.widget<xterm.TerminalView>(find.byType(xterm.TerminalView));
+}
+
+dynamic _renderTerminal(WidgetTester tester) {
+  return tester.renderObject(
+        find.descendant(
+          of: find.byType(xterm.TerminalView),
+          matching: find.byWidgetPredicate(
+            (widget) => widget.runtimeType.toString() == '_TerminalView',
+          ),
+        ),
+      )
+      as dynamic;
 }
 
 Widget _terminalApp({
