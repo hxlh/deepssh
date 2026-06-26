@@ -390,14 +390,55 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       );
     } else {
       var toPosition = getCellOffset(to);
-      if (toPosition.x >= fromPosition.x) {
+      final forward = toPosition.x >= fromPosition.x;
+      if (forward) {
         toPosition = CellOffset(toPosition.x + 1, toPosition.y);
       }
+      // Snap selection edges to wide-character (CJK) boundaries so a drag
+      // never splits a double-width cell in half. A wide char occupies a
+      // leading cell (width == 2) plus a trailing placeholder (codePoint
+      // == 0): pull the inclusive start back off a placeholder, and extend
+      // the exclusive end past a wide char's leading cell.
+      final begin = forward ? fromPosition : toPosition;
+      final end = forward ? toPosition : fromPosition;
       _controller.setSelection(
-        _terminal.buffer.createAnchorFromOffset(fromPosition),
-        _terminal.buffer.createAnchorFromOffset(toPosition),
+        _terminal.buffer.createAnchorFromOffset(_snapBeginToWideChar(begin)),
+        _terminal.buffer.createAnchorFromOffset(_snapEndToWideChar(end)),
       );
     }
+  }
+
+  /// Pulls an inclusive selection start leftward off a wide character's
+  /// placeholder cell so the leading cell is included.
+  CellOffset _snapBeginToWideChar(CellOffset begin) {
+    final line = _lineAt(begin.y);
+    if (line == null) return begin;
+    final x = begin.x;
+    if (x > 0 &&
+        x < line.length &&
+        line.getCodePoint(x) == 0 &&
+        line.getWidth(x - 1) == 2) {
+      return CellOffset(x - 1, begin.y);
+    }
+    return begin;
+  }
+
+  /// Extends an exclusive selection end rightward past a wide character's
+  /// leading cell so the placeholder is included.
+  CellOffset _snapEndToWideChar(CellOffset end) {
+    final line = _lineAt(end.y);
+    if (line == null) return end;
+    final x = end.x;
+    if (x > 0 && x < line.length && line.getWidth(x - 1) == 2) {
+      return CellOffset(x + 1, end.y);
+    }
+    return end;
+  }
+
+  BufferLine? _lineAt(int y) {
+    final lines = _terminal.buffer.lines;
+    if (y < 0 || y >= lines.length) return null;
+    return lines[y];
   }
 
   /// Send a mouse event at [offset] with [button] being currently in [buttonState].
