@@ -256,8 +256,34 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     markNeedsPaint();
   }
 
+  /// Fingerprint of the inputs to [performLayout], captured at the end of the
+  /// last layout pass. A terminal notification that leaves this value unchanged
+  /// cannot change layout's output — box [size] is [constraints.biggest], the
+  /// scroll extents derive from the viewport size and total line count, and the
+  /// stick-to-bottom correction is identical — so a layout pass would be pure
+  /// waste. This is the steady state for full-screen TUI apps in the alternate
+  /// screen: the viewport size and total line count are constant and only cell
+  /// *content* changes frame to frame, yet xterm was running a full layout per
+  /// PTY write.
+  int? _layoutFingerprint;
+
+  int _computeLayoutFingerprint() {
+    final cell = _painter.cellSize;
+    return Object.hash(
+      _terminal.viewWidth,
+      _terminal.viewHeight,
+      _terminal.buffer.lines.length,
+      cell.width,
+      cell.height,
+    );
+  }
+
   void _onTerminalChange() {
-    markNeedsLayout();
+    if (_layoutFingerprint == _computeLayoutFingerprint()) {
+      markNeedsPaint();
+    } else {
+      markNeedsLayout();
+    }
     _notifyEditableRect();
   }
 
@@ -311,6 +337,8 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       // the valid range when maxScrollExtent is not a cell-height multiple.
       _offset.correctBy(_maxScrollExtent - _offset.pixels);
     }
+
+    _layoutFingerprint = _computeLayoutFingerprint();
   }
 
   /// Total height of the terminal in pixels. Includes scrollback buffer.
