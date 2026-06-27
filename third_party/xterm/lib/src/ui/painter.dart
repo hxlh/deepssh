@@ -149,6 +149,95 @@ class TerminalPainter {
     List<Color?>? foregroundColors,
     int foregroundColorOffset = 0,
   }) {
+    _paintLineBackgrounds(canvas, offset, line);
+    _paintLineForegrounds(
+      canvas,
+      offset,
+      line,
+      foregroundColors: foregroundColors,
+      foregroundColorOffset: foregroundColorOffset,
+    );
+  }
+
+  /// The background color to paint for [cellData], or `null` when the cell uses
+  /// the default background (nothing to draw). Inverse cells swap to the
+  /// effective foreground color, matching [paintCellBackground].
+  @pragma('vm:prefer-inline')
+  Color? cellBackgroundColor(CellData cellData) {
+    if (cellData.flags & CellFlags.inverse != 0) {
+      return resolveForegroundColor(cellData.foreground);
+    }
+    final colorType = cellData.background & CellColor.typeMask;
+    if (colorType == CellColor.normal) {
+      return null;
+    }
+    return resolveBackgroundColor(cellData.background);
+  }
+
+  /// Paints the backgrounds of [line], merging horizontally-adjacent
+  /// single-width cells that share the same resolved color into one
+  /// [drawRect]. A full-screen TUI paints large flat regions (walls, carpet)
+  /// where this turns thousands of per-cell rects per frame into a handful.
+  /// Default-background cells paint nothing and merely break a run; wide
+  /// (double-width) cells paint their own 2-wide rect and never merge, so the
+  /// output is pixel-identical to the previous per-cell paint.
+  void _paintLineBackgrounds(Canvas canvas, Offset offset, BufferLine line) {
+    final cellData = CellData.empty();
+    final cellWidth = _cellSize.width;
+    final cellHeight = _cellSize.height;
+
+    var runStart = 0;
+    Color? runColor;
+
+    void flushRun(int endExclusive) {
+      final color = runColor;
+      if (color == null || endExclusive <= runStart) return;
+      canvas.drawRect(
+        offset.translate(runStart * cellWidth, 0) &
+            Size((endExclusive - runStart) * cellWidth + 1, cellHeight),
+        Paint()..color = color,
+      );
+    }
+
+    var i = 0;
+    while (i < line.length) {
+      line.getCellData(i, cellData);
+      final charWidth = cellData.content >> CellContent.widthShift;
+
+      if (charWidth == 2) {
+        flushRun(i);
+        final color = cellBackgroundColor(cellData);
+        if (color != null) {
+          canvas.drawRect(
+            offset.translate(i * cellWidth, 0) &
+                Size(cellWidth * 2 + 1, cellHeight),
+            Paint()..color = color,
+          );
+        }
+        runColor = null;
+        runStart = i + 2;
+        i += 2;
+        continue;
+      }
+
+      final color = cellBackgroundColor(cellData);
+      if (color != runColor) {
+        flushRun(i);
+        runStart = i;
+        runColor = color;
+      }
+      i++;
+    }
+    flushRun(line.length);
+  }
+
+  void _paintLineForegrounds(
+    Canvas canvas,
+    Offset offset,
+    BufferLine line, {
+    List<Color?>? foregroundColors,
+    int foregroundColorOffset = 0,
+  }) {
     final cellData = CellData.empty();
     final cellWidth = _cellSize.width;
 
@@ -161,7 +250,8 @@ class TerminalPainter {
           ? null
           : foregroundColors[foregroundColorOffset + i];
 
-      paintCell(canvas, cellOffset, cellData, foregroundColor: foregroundColor);
+      paintCellForeground(canvas, cellOffset, cellData,
+          foregroundColor: foregroundColor);
 
       if (charWidth == 2) {
         i++;
@@ -193,23 +283,28 @@ class TerminalPainter {
     final charCode = cellData.content & CellContent.codepointMask;
     if (charCode == 0) return;
 
-    final cacheKey = cellData.getHash() ^
-        _textScaler.hashCode ^
-        (foregroundColor?.hashCode ?? 0);
+    final cellFlags = cellData.flags;
+
+    // A paragraph encodes only the glyph and its foreground color — never the
+    // cell background, which is painted as a separate rect. Resolve the
+    // effective color once and key the cache on it (plus the glyph and the
+    // style bits that actually affect shaping) instead of on the raw cell
+    // fields. The previous key folded in the background, so a glyph repeated
+    // across many truecolor backgrounds (a full-screen half-block TUI) missed
+    // the cache on nearly every cell every frame and rebuilt a Paragraph each
+    // time.
+    final baseColor = foregroundColor ??
+        (cellFlags & CellFlags.inverse == 0
+            ? resolveForegroundColor(cellData.foreground)
+            : resolveBackgroundColor(cellData.background));
+    final color = cellFlags & CellFlags.faint != 0
+        ? baseColor.withOpacity(0.5)
+        : baseColor;
+
+    final cacheKey = Object.hash(charCode, cellFlags, color, _textScaler);
     var paragraph = _paragraphCache.getLayoutFromCache(cacheKey);
 
     if (paragraph == null) {
-      final cellFlags = cellData.flags;
-
-      var color = foregroundColor ??
-          (cellFlags & CellFlags.inverse == 0
-              ? resolveForegroundColor(cellData.foreground)
-              : resolveBackgroundColor(cellData.background));
-
-      if (cellData.flags & CellFlags.faint != 0) {
-        color = color.withOpacity(0.5);
-      }
-
       final style = _textStyle.toTextStyle(
         color: color,
         bold: cellFlags & CellFlags.bold != 0,
