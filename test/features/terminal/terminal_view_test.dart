@@ -688,6 +688,77 @@ void main() {
     expect(terminal.buffer.getText(selection), '你B');
   });
 
+  testWidgets('double-tap selects a full wide char via the word boundary', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.resize(20, 5);
+    terminal.write('A你B'); // A=col0, 你=col1-2, B=col3
+    final controller = xterm.TerminalController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: xterm.TerminalView(
+            terminal,
+            controller: controller,
+            hardwareKeyboardOnly: true,
+            textStyle: const xterm.TerminalStyle(fontSize: 20),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final renderTerminal = _renderTerminal(tester);
+    final cellSize = renderTerminal.cellSize as Size;
+
+    // defaultWordSeparators includes codePoint 0, which is also 你's
+    // placeholder cell, so the raw word boundary stops at [1,2) — half a
+    // cell. The snap must extend the selection to the whole glyph.
+    renderTerminal.selectWord(Offset(1 * cellSize.width, 0));
+    await tester.pump();
+
+    final selection = controller.selection!.normalized;
+    expect(terminal.buffer.getText(selection), '你');
+  });
+
+  testWidgets('double-tap on a wide char placeholder selects the whole char', (
+    tester,
+  ) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.resize(20, 5);
+    terminal.write('A你B');
+    final controller = xterm.TerminalController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: xterm.TerminalView(
+            terminal,
+            controller: controller,
+            hardwareKeyboardOnly: true,
+            textStyle: const xterm.TerminalStyle(fontSize: 20),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final renderTerminal = _renderTerminal(tester);
+    final cellSize = renderTerminal.cellSize as Size;
+
+    // Double-click lands on col2 (你's placeholder). The selection must
+    // still resolve to the full glyph rather than the placeholder alone.
+    renderTerminal.selectWord(Offset(2 * cellSize.width, 0));
+    await tester.pump();
+
+    final selection = controller.selection!.normalized;
+    expect(terminal.buffer.getText(selection), '你');
+  });
+
   testWidgets('paints selection across both halves of a wide char', (
     tester,
   ) async {

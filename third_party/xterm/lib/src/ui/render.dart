@@ -353,10 +353,19 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     final fromOffset = getCellOffset(from);
     final fromBoundary = _terminal.buffer.getWordBoundary(fromOffset);
     if (fromBoundary == null) return;
+    // Word boundaries are cell-based, and defaultWordSeparators includes
+    // codePoint 0 — which is also a wide char's placeholder cell. A
+    // double-click on a CJK glyph therefore stops at its leading cell and
+    // selects only half the character. Snap the boundary to whole wide-char
+    // edges so the glyph is selected intact.
     if (to == null) {
       _controller.setSelection(
-        _terminal.buffer.createAnchorFromOffset(fromBoundary.begin),
-        _terminal.buffer.createAnchorFromOffset(fromBoundary.end),
+        _terminal.buffer.createAnchorFromOffset(
+          _snapBeginToWideChar(fromBoundary.begin),
+        ),
+        _terminal.buffer.createAnchorFromOffset(
+          _snapEndToWideChar(fromBoundary.end),
+        ),
         mode: SelectionMode.line,
       );
     } else {
@@ -365,8 +374,12 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       if (toBoundary == null) return;
       final range = fromBoundary.merge(toBoundary);
       _controller.setSelection(
-        _terminal.buffer.createAnchorFromOffset(range.begin),
-        _terminal.buffer.createAnchorFromOffset(range.end),
+        _terminal.buffer.createAnchorFromOffset(
+          _snapBeginToWideChar(range.begin),
+        ),
+        _terminal.buffer.createAnchorFromOffset(
+          _snapEndToWideChar(range.end),
+        ),
         mode: SelectionMode.line,
       );
     }
