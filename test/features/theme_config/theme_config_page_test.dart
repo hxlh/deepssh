@@ -65,15 +65,14 @@ void main() {
     expect(theme.textTheme.titleLarge?.fontWeight, FontWeight.w800);
   });
 
-  testWidgets('matches the prototype sections and head actions', (tester) async {
+  testWidgets('matches the prototype sections and head actions', (
+    tester,
+  ) async {
     await _pumpPage(tester);
 
     expect(find.text('APPEARANCE'), findsOneWidget);
     expect(find.text('主题配置'), findsOneWidget);
-    expect(
-      find.text('分别设置界面外观与终端渲染，并配置基于正则的输出高亮规则。'),
-      findsOneWidget,
-    );
+    expect(find.text('分别设置界面外观与终端渲染，并配置基于正则的输出高亮规则。'), findsOneWidget);
     expect(find.text('恢复默认'), findsOneWidget);
     expect(find.text('保存主题'), findsOneWidget);
 

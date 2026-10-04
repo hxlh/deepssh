@@ -25,7 +25,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('dock splitter drags below the fold and back out', (tester) async {
+  testWidgets('dock splitter drags below the fold and back out', (
+    tester,
+  ) async {
     await pumpWorkbench(tester);
 
     final dock = find.byType(WorkbenchDock);
