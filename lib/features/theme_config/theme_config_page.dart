@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 
 import '../../core/models/theme_settings.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/deck_page.dart';
+import '../../core/widgets/deck_widgets.dart';
 import '../../core/widgets/color_picker_field.dart';
 
 class ThemeConfigPage extends StatefulWidget {
@@ -71,43 +74,53 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: widget.onBack,
-                icon: const Icon(Icons.arrow_back, size: 18),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                style: IconButton.styleFrom(
-                  foregroundColor: AppColors.textMuted,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                '主题配置',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return DeckPageScaffold(
+      eyebrow: 'Theme',
+      title: '主题配置',
+      subtitle: '界面与终端外观；修改即时保存。',
+      actions: [
+        DeckButton(
+          label: '返回',
+          style: DeckButtonStyle.ghost,
+          icon: Icons.arrow_back,
+          onPressed: widget.onBack,
+        ),
+      ],
+      child: SingleChildScrollView(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final uiSection = _SectionCard(
+              title: '界面主题',
+              icon: Icons.palette_outlined,
+              child: _buildUiSection(),
+            );
+            final terminalSection = _SectionCard(
+              title: '终端主题',
+              icon: Icons.terminal,
+              child: _buildTerminalSection(),
+            );
+            // The prototype stacks the two panels once the column gets narrow
+            // enough that each would otherwise squeeze its own controls.
+            if (constraints.maxWidth < 900) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _SectionCard(title: '界面主题', child: _buildUiSection()),
-                  const SizedBox(height: 20),
-                  _SectionCard(title: '终端主题', child: _buildTerminalSection()),
+                  uiSection,
+                  const SizedBox(height: 16),
+                  terminalSection,
                 ],
-              ),
-            ),
-          ),
-        ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: uiSection),
+                const SizedBox(width: 16),
+                Expanded(child: terminalSection),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -378,32 +391,40 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.child});
+  const _SectionCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
 
   final String title;
+  final IconData icon;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E0F0F),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.border),
-      ),
+    return DeckPanel(
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Color(0xFFD6C7B8),
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            children: [
+              Icon(icon, size: 16, color: DeckTokens.accentInk),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontFamily: 'Georgia',
+                  fontFamilyFallback: DeckTokens.fontDisplay,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: DeckTokens.fg,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 15),
           child,
         ],
       ),
@@ -418,12 +439,15 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: Color(0xFFD6C7B8),
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.only(bottom: 6),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: DeckTokens.border)),
+        ),
+        child: DeckLabel(text, size: 10),
       ),
     );
   }
@@ -497,7 +521,7 @@ class _PresetOptionState extends State<_PresetOption> {
             color: selected
                 ? const Color(0xFF1A1B1C)
                 : (hovered ? const Color(0xFF181A1B) : const Color(0xFF121314)),
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.zero,
             border: Border.all(
               color: selected
                   ? const Color(0xFFFFB280)
@@ -728,7 +752,7 @@ class _CursorStyleSelectorState extends State<_CursorStyleSelector> {
               child: Container(
                 decoration: BoxDecoration(
                   color: AppColors.panel,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.zero,
                   border: Border.all(color: AppColors.border),
                   boxShadow: const [
                     BoxShadow(
@@ -778,7 +802,7 @@ class _CursorStyleSelectorState extends State<_CursorStyleSelector> {
             height: 32,
             decoration: BoxDecoration(
               color: highlight ? _triggerHoverBg : AppColors.background,
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.zero,
               border: Border.all(
                 color: highlight ? _amberAccent : AppColors.border,
               ),
@@ -901,7 +925,7 @@ class _BlinkCheckboxState extends State<_BlinkCheckbox> {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             color: AppColors.background,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.zero,
             border: Border.all(
               color: hovered ? AppColors.accent : AppColors.border,
             ),
@@ -1087,11 +1111,11 @@ class _TextInputState extends State<_TextInput> {
             vertical: 6,
           ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.zero,
             borderSide: BorderSide(color: AppColors.border),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.zero,
             borderSide: BorderSide(color: AppColors.border),
           ),
           focusedBorder: OutlineInputBorder(
@@ -1177,11 +1201,11 @@ class _NumberInputState extends State<_NumberInput> {
                 vertical: 6,
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.zero,
                 borderSide: BorderSide(color: AppColors.border),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.zero,
                 borderSide: BorderSide(color: AppColors.border),
               ),
               focusedBorder: OutlineInputBorder(
