@@ -101,7 +101,7 @@ class _DeepSshAppState extends State<DeepSshApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'DeepSSH',
-      theme: AppTheme.dark(),
+      theme: AppTheme.deck(),
       home: WorkbenchPage(
         sshBridge: _sshBridge,
         themeBridge: _themeBridge,

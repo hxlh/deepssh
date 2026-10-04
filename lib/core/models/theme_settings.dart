@@ -80,12 +80,12 @@ class UiThemeSettings {
     fontSize: 14,
     normalFontWeight: 500,
     boldFontWeight: 700,
-    background: Color(0xFF1E1E1E),
-    panel: Color(0xFF252526),
-    sidebar: Color(0xFF181818),
-    accent: Color(0xFF3794FF),
-    textPrimary: Color(0xFFE6E6E6),
-    textMuted: Color(0xFF9D9D9D),
+    background: Color(0xFFFAF9F5),
+    panel: Color(0xFFFFFFFF),
+    sidebar: Color(0xFFFAF9F5),
+    accent: Color(0xFFD97757),
+    textPrimary: Color(0xFF1F1E1D),
+    textMuted: Color(0xFF6B6862),
   );
 
   static UiThemeSettings vsCodeDark() => const UiThemeSettings(
@@ -172,10 +172,10 @@ class TerminalThemeSettings {
     boldFontWeight: 700,
     cursorStyle: CursorStyle.bar,
     cursorBlink: true,
-    foreground: Color(0xFFE6E6E6),
-    terminalBackground: Color(0xFF252526),
-    selectionColor: Color(0xFF094771),
-    cursorColor: Color(0xFF3794FF),
+    foreground: Color(0xFFDEDCD6),
+    terminalBackground: Color(0xFF17181A),
+    selectionColor: Color(0xFF3A3F44),
+    cursorColor: Color(0xFFD9A24B),
     scrollbackLines: 10000,
     regexHighlights: [
       RegexHighlight(

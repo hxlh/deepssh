@@ -69,7 +69,7 @@ void main() {
       ),
     );
 
-    final theme = AppTheme.dark();
+    final theme = AppTheme.deck();
 
     expect(theme.textTheme.bodyMedium?.fontWeight, FontWeight.w300);
     expect(theme.textTheme.titleLarge?.fontWeight, FontWeight.w800);
@@ -304,7 +304,7 @@ void main() {
     final reorderable = tester.widget<ReorderableListView>(
       find.byType(ReorderableListView),
     );
-    reorderable.onReorder(0, 3);
+    reorderable.onReorder?.call(0, 3);
     await tester.pump();
 
     expect(

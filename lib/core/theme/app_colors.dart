@@ -1,24 +1,35 @@
 import 'package:flutter/material.dart';
 
 import '../models/theme_settings.dart';
+import 'app_tokens.dart';
 
+/// Runtime palette.
+///
+/// The base tokens live in [DeckTokens] and are locked; this class resolves
+/// them against the user's `UiThemeSettings` so a saved theme still wins. The
+/// field names are kept stable because a lot of widgets read them directly, but
+/// everything that is *not* persisted (border, tab washes, selection) is derived
+/// here rather than stored, so it can never drift from the base tokens.
 abstract final class AppColors {
   static String fontFamily = 'Inter';
   static int fontSize = 14;
   static int normalFontWeight = 500;
   static int boldFontWeight = 700;
-  static Color background = const Color(0xFF1E1E1E);
-  static Color panel = const Color(0xFF252526);
-  static Color sidebar = const Color(0xFF181818);
-  static Color border = const Color(0xFF2B2B2B);
-  static Color tabActive = const Color(0xFF1F1F1F);
-  static Color tabInactive = const Color(0xFF2D2D2D);
-  static Color tabHover = const Color(0xFF373737);
-  static Color textPrimary = const Color(0xFFE6E6E6);
-  static Color textMuted = const Color(0xFF9D9D9D);
-  static Color accent = const Color(0xFF3794FF);
-  static Color selection = const Color(0xFF094771);
 
+  static Color background = DeckTokens.bg;
+  static Color panel = DeckTokens.surface;
+  static Color sidebar = DeckTokens.bg;
+  static Color border = DeckTokens.border;
+  static Color textPrimary = DeckTokens.fg;
+  static Color textMuted = DeckTokens.muted;
+  static Color accent = DeckTokens.accent;
+  static Color selection = DeckTokens.accentSoft;
+  static Color tabActive = DeckTokens.bg;
+  static Color tabInactive = Colors.transparent;
+  static Color tabHover = DeckTokens.fgSoft;
+
+  /// Applies a persisted UI theme, then re-derives everything that is not
+  /// stored so the derived colours stay consistent with the chosen base.
   static void applyUi(UiThemeSettings settings) {
     fontFamily = settings.fontFamily;
     fontSize = settings.fontSize;
@@ -30,6 +41,12 @@ abstract final class AppColors {
     accent = settings.accent;
     textPrimary = settings.textPrimary;
     textMuted = settings.textMuted;
+
+    border = DeckTokens.mix(DeckTokens.border, settings.textPrimary, 0.12);
+    selection = DeckTokens.mix(settings.accent, settings.textPrimary, 0.14);
+    tabActive = settings.background;
+    tabInactive = Colors.transparent;
+    tabHover = DeckTokens.wash(settings.textPrimary, 0.06);
   }
 
   static void applyTerminal(TerminalThemeSettings settings) {}

@@ -26,11 +26,11 @@ void main() {
     await tester.tap(find.text('主题配置'));
     await tester.pumpAndSettle();
     expect(find.text('主题配置'), findsWidgets);
-    expect(find.textContaining('#1E1E1E'), findsWidgets);
-    await tester.tap(find.text('#1E1E1E').first);
+    expect(find.textContaining('#FAF9F5'), findsWidgets);
+    await tester.tap(find.text('#FAF9F5').first);
     await tester.pumpAndSettle();
     final hexField = find.byWidgetPredicate(
-      (widget) => widget is TextField && widget.controller?.text == '#1E1E1E',
+      (widget) => widget is TextField && widget.controller?.text == '#FAF9F5',
     );
     expect(hexField, findsOneWidget);
     await tester.enterText(hexField, '#123456');
