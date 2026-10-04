@@ -3,7 +3,7 @@ use std::{
     fs,
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
         mpsc as std_mpsc, Arc, Mutex,
     },
     time::Duration,
@@ -274,6 +274,48 @@ async fn sleep_or_stop(stop_rx: &mut oneshot::Receiver<()>, delay: Duration) -> 
 
 fn is_channel_open_failure(message: &str) -> bool {
     message.contains("Failed to open channel")
+}
+
+/// How many consecutive channel-open refusals (relays *and* readiness probes)
+/// before the SSH session is thrown away and rebuilt.
+///
+/// `ConnectFailed` usually means the target is down, and retrying on the same
+/// session is right for that. But the server also answers it when the session
+/// itself can no longer take channels — OpenSSH's `MaxSessions` is 10 by
+/// default, and it also hits this once it runs out of file descriptors. In that
+/// case the SSH connection stays perfectly alive, so the `handle.is_closed()`
+/// reconnect below never fires: the listener stays bound, nothing accepts, and
+/// the tunnel is wedged until it is stopped and started again.
+const MAX_CHANNEL_OPEN_FAILURES: u32 = 3;
+
+/// Consecutive channel-open refusals on one tunnel runtime.
+///
+/// A single run of refusals means the session can no longer take channels and
+/// has to be rebuilt; a refusal followed by a successful probe (which itself
+/// opens a channel) resets the run.
+struct ChannelOpenFailures {
+    count: AtomicU32,
+}
+
+impl ChannelOpenFailures {
+    fn new() -> Self {
+        ChannelOpenFailures {
+            count: AtomicU32::new(0),
+        }
+    }
+
+    fn record(&self) {
+        self.count.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// A probe opened a channel, so whatever refused earlier is healthy again.
+    fn reset(&self) {
+        self.count.store(0, Ordering::Relaxed);
+    }
+
+    fn should_recycle(&self) -> bool {
+        self.count.load(Ordering::Relaxed) >= MAX_CHANNEL_OPEN_FAILURES
+    }
 }
 
 fn is_expected_connection_close(message: &str) -> bool {
@@ -818,8 +860,39 @@ async fn run_local_tunnel(
     let remote_routes = Arc::new(Mutex::new(HashMap::new()));
     let mut backoff = Duration::from_secs(1);
     let mut handle: Option<Arc<client::Handle<TunnelClientHandler>>> = None;
+    // Shared with the relay tasks: a refused channel there means the same thing
+    // as a refused probe here.
+    let channel_open_failures = Arc::new(ChannelOpenFailures::new());
+    // A rebuild triggered by refusals must not reset the backoff: that would
+    // turn a target that is genuinely down into a reconnect every few seconds
+    // instead of the intended 1→2→4→…→60s ramp.
+    let mut forced_recycle = false;
 
     loop {
+        // A session that refuses channels is not "closed", so the branch below
+        // would reconnect forever and never actually reconnect. Drop it after
+        // a run of refusals and let the normal path rebuild it.
+        forced_recycle = false;
+        if channel_open_failures.should_recycle() {
+            if let Some(wedged) = handle.take() {
+                forced_recycle = true;
+                channel_open_failures.reset();
+                let _ = tokio::time::timeout(
+                    Duration::from_secs(2),
+                    wedged.disconnect(Disconnect::ByApplication, "", "English"),
+                )
+                .await;
+                crate::app_log::log_error_message(
+                    "tunnel.local.session",
+                    &format!(
+                        "SSH session for tunnel \"{}\" refused {} channels in a row; \
+                         recycling it",
+                        tunnel.name, MAX_CHANNEL_OPEN_FAILURES
+                    ),
+                    None,
+                );
+            }
+        }
         if handle.as_ref().is_none_or(|handle| handle.is_closed()) {
             if let Some(closed) = handle.take() {
                 let _ = tokio::time::timeout(
@@ -851,7 +924,9 @@ async fn run_local_tunnel(
             match connected {
                 Ok(new_handle) => {
                     handle = Some(Arc::new(new_handle));
-                    backoff = Duration::from_secs(1);
+                    if !forced_recycle {
+                        backoff = Duration::from_secs(1);
+                    }
                 }
                 Err(error) => {
                     crate::app_log::log_error("tunnel.local.connect", &error);
@@ -877,6 +952,7 @@ async fn run_local_tunnel(
             ready = &mut probe => ready,
         };
         if !ready {
+            channel_open_failures.record();
             update_runtime_status(&tunnel.id, generation, TunnelRuntimeStatus::Waiting);
             if sleep_or_stop(&mut stop_rx, backoff).await {
                 return Ok(());
@@ -884,6 +960,8 @@ async fn run_local_tunnel(
             backoff = next_backoff_delay(backoff);
             continue;
         }
+        // The probe opened a channel, so the session can still take them.
+        channel_open_failures.reset();
         backoff = Duration::from_secs(1);
         update_runtime_status(&tunnel.id, generation, TunnelRuntimeStatus::Forwarding);
 
@@ -906,6 +984,7 @@ async fn run_local_tunnel(
                     let (stream, originator) = accepted?;
                     let connection_handle = Arc::clone(&current);
                     let connection_unhealthy = Arc::clone(&unhealthy);
+                    let connection_failures = Arc::clone(&channel_open_failures);
                     let target_host = tunnel.target_host.clone();
                     let target_port = tunnel.target_port;
                     TOKIO_RUNTIME.spawn(async move {
@@ -921,6 +1000,7 @@ async fn run_local_tunnel(
                             let message = format!("{error:#}");
                             if is_channel_open_failure(&message) {
                                 connection_unhealthy.store(true, Ordering::Relaxed);
+                                connection_failures.record();
                             }
                             log_tunnel_connection_error("tunnel.local.connection", &error);
                         }
@@ -1457,5 +1537,46 @@ sJWR7W+cGvJ/vLsw==
             SshConnectErrorCode::PassphraseRequired
         );
         assert!(!RUNTIME_STORE.lock().unwrap().contains_key(&tunnel.id));
+    }
+
+    /// A live SSH session that has stopped accepting channels reports neither
+    /// "closed" nor a broken pipe — it just answers every channel open with
+    /// `ConnectFailed`. Without this run-length check the tunnel keeps its
+    /// listener bound, stops accepting, and only recovers on a restart.
+    #[test]
+    fn channel_open_failures_trip_after_three_in_a_row() {
+        let failures = ChannelOpenFailures::new();
+        assert!(!failures.should_recycle());
+
+        failures.record();
+        assert!(!failures.should_recycle());
+        failures.record();
+        assert!(!failures.should_recycle());
+
+        failures.record();
+        assert!(failures.should_recycle());
+    }
+
+    /// One refusal is normal: the target may genuinely be restarting. A probe
+    /// that succeeds afterwards opens a channel, so the session is healthy and
+    /// the run restarts.
+    #[test]
+    fn a_successful_probe_clears_the_run() {
+        let failures = ChannelOpenFailures::new();
+        failures.record();
+        failures.record();
+        failures.reset();
+
+        assert!(!failures.should_recycle());
+        failures.record();
+        assert!(!failures.should_recycle());
+    }
+
+    #[test]
+    fn channel_open_failure_messages_are_recognised() {
+        assert!(is_channel_open_failure(
+            "Failed to open channel (ChannelOpenFailure(ConnectFailed))"
+        ));
+        assert!(!is_channel_open_failure("Broken pipe (os error 32)"));
     }
 }
