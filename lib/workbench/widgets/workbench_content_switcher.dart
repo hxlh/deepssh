@@ -43,6 +43,8 @@ class WorkbenchContentSwitcher extends StatelessWidget {
     required this.onReorderTab,
     required this.onAddSshProfile,
     required this.onConnectSshProfile,
+    required this.onlineSshProfileIds,
+    required this.lastConnectedSshProfileAt,
     required this.onEditSshProfile,
     required this.onDeleteSshProfile,
     required this.onCancelSshForm,
@@ -52,7 +54,6 @@ class WorkbenchContentSwitcher extends StatelessWidget {
     required this.onStopTunnelConfig,
     required this.onEditTunnelConfig,
     required this.onDeleteTunnelConfig,
-    required this.onTunnelTypeChanged,
     required this.onCancelTunnelForm,
     required this.onSaveTunnelConfig,
     required this.onUiThemeChanged,
@@ -82,6 +83,8 @@ class WorkbenchContentSwitcher extends StatelessWidget {
   final LocalTerminalBridgeClient localTerminalBridge;
   final VoidCallback onAddSshProfile;
   final ValueChanged<SshProfileItem> onConnectSshProfile;
+  final List<String> onlineSshProfileIds;
+  final Map<String, DateTime> lastConnectedSshProfileAt;
   final ValueChanged<SshProfileItem> onEditSshProfile;
   final ValueChanged<SshProfileItem> onDeleteSshProfile;
   final VoidCallback onCancelSshForm;
@@ -91,8 +94,6 @@ class WorkbenchContentSwitcher extends StatelessWidget {
   final ValueChanged<TunnelConfigItem> onStopTunnelConfig;
   final ValueChanged<TunnelConfigItem> onEditTunnelConfig;
   final ValueChanged<TunnelConfigItem> onDeleteTunnelConfig;
-  final void Function(TunnelConfigItem tunnel, TunnelForwardType type)
-  onTunnelTypeChanged;
   final VoidCallback onCancelTunnelForm;
   final ValueChanged<TunnelConfigDraft> onSaveTunnelConfig;
   final ValueChanged<UiThemeSettings> onUiThemeChanged;
@@ -109,6 +110,8 @@ class WorkbenchContentSwitcher extends StatelessWidget {
         return SshProfilesPage(
           profiles: sshProfiles,
           errorMessage: sshErrorMessage,
+          onlineProfileIds: onlineSshProfileIds.toSet(),
+          lastConnectedAt: lastConnectedSshProfileAt,
           onAdd: onAddSshProfile,
           onConnect: onConnectSshProfile,
           onEdit: onEditSshProfile,
@@ -130,7 +133,6 @@ class WorkbenchContentSwitcher extends StatelessWidget {
           onStop: onStopTunnelConfig,
           onEdit: onEditTunnelConfig,
           onDelete: onDeleteTunnelConfig,
-          onTypeChanged: onTunnelTypeChanged,
         );
       case WorkbenchContentMode.tunnelConfigForm:
         return TunnelConfigFormPage(

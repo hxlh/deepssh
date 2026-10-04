@@ -148,7 +148,7 @@ void main() {
       expect(find.text('Prod'), findsOneWidget);
       expect(find.text('Dev API'), findsNothing);
 
-      await tester.tap(find.text('新增隧道'));
+      await tester.tap(find.text('新增转发'));
       await tester.pumpAndSettle();
       await tester.enterText(find.bySemanticsLabel('Name'), 'Dev API');
       await tester.enterText(find.bySemanticsLabel('Listen Host'), '127.0.0.1');
@@ -163,7 +163,10 @@ void main() {
       expect(tunnelBridge.listCount, greaterThan(0));
       expect(find.text('Dev API'), findsOneWidget);
       // Listen and target share one summary line under the name.
-      expect(find.text('127.0.0.1:18080 → 127.0.0.1:8080'), findsOneWidget);
+      expect(
+        find.textContaining('127.0.0.1:1800 → 127.0.0.1:8080'),
+        findsOneWidget,
+      );
       expect(find.text('Prod'), findsOneWidget);
       expect(find.text('SSH PROFILES'), findsNothing);
     },

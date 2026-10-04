@@ -256,12 +256,14 @@ class DeckBadge extends StatelessWidget {
     this.foreground,
     this.background,
     this.borderColor,
+    this.leading,
   });
 
   final String text;
   final Color? foreground;
   final Color? background;
   final Color? borderColor;
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -272,17 +274,52 @@ class DeckBadge extends StatelessWidget {
         color: background ?? DeckTokens.bg,
         border: Border.all(color: borderColor ?? DeckTokens.border),
       ),
-      child: Text(
-        text.toUpperCase(),
-        style: TextStyle(
-          fontFamily: 'JetBrains Mono',
-          fontFamilyFallback: DeckTokens.fontMono,
-          fontSize: 10,
-          letterSpacing: 0.06,
-          fontWeight: FontWeight.w600,
-          color: fg,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (leading != null) ...[leading!, const SizedBox(width: 5)],
+          Text(
+            text.toUpperCase(),
+            style: TextStyle(
+              fontFamily: 'JetBrains Mono',
+              fontFamilyFallback: DeckTokens.fontMono,
+              fontSize: 10,
+              letterSpacing: 0.06,
+              fontWeight: FontWeight.w600,
+              color: fg,
+            ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// Status badge: a square mark plus a mono label. The prototype pairs the
+/// square dot with words ("运行中" / "已停止") so status survives a narrow row
+/// where the colour alone would not.
+class DeckStatusBadge extends StatelessWidget {
+  const DeckStatusBadge({
+    super.key,
+    required this.label,
+    required this.color,
+    this.background,
+    this.borderColor,
+  });
+
+  final String label;
+  final Color color;
+  final Color? background;
+  final Color? borderColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return DeckBadge(
+      label,
+      foreground: color,
+      background: background,
+      borderColor: borderColor,
+      leading: DeckStatusSquare(color, size: 7, outlined: false),
     );
   }
 }

@@ -17,6 +17,8 @@ class SshProfilesPage extends StatefulWidget {
     required this.onConnect,
     required this.onEdit,
     required this.onDelete,
+    this.onlineProfileIds = const <String>{},
+    this.lastConnectedAt = const <String, DateTime>{},
   });
 
   final List<SshProfileItem> profiles;
@@ -25,6 +27,13 @@ class SshProfilesPage extends StatefulWidget {
   final ValueChanged<SshProfileItem> onConnect;
   final ValueChanged<SshProfileItem> onEdit;
   final ValueChanged<SshProfileItem> onDelete;
+
+  /// Profiles with at least one open session. The prototype shows an
+  /// 在线/已停止 badge; open sessions are the honest signal we have.
+  final Set<String> onlineProfileIds;
+
+  /// Last successful connect per profile, shown in the middle column.
+  final Map<String, DateTime> lastConnectedAt;
 
   @override
   State<SshProfilesPage> createState() => _SshProfilesPageState();
@@ -50,6 +59,20 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
           profile.host.toLowerCase().contains(query) ||
           profile.username.toLowerCase().contains(query);
     }).toList();
+  }
+
+  String _lastConnectedLabel(String profileId) {
+    final at = widget.lastConnectedAt[profileId];
+    if (at == null) return '—';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(at.year, at.month, at.day);
+    final hh = at.hour.toString().padLeft(2, '0');
+    final mm = at.minute.toString().padLeft(2, '0');
+    final ss = at.second.toString().padLeft(2, '0');
+    if (day == today) return '$hh:$mm:$ss';
+    if (day == today.subtract(const Duration(days: 1))) return '昨天 $hh:$mm';
+    return '${at.month}/${at.day} $hh:$mm';
   }
 
   Future<void> _confirmDelete(SshProfileItem profile) async {
@@ -84,7 +107,8 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
     return DeckPageScaffold(
       eyebrow: 'SSH',
       title: '连接配置',
-      subtitle: '保存常用的 SSH 主机，选择一条即可直接连接。',
+      subtitle: '管理远程主机凭据、认证方式与终端类型。共 ${widget.profiles.length} 个配置，'
+          '其中 ${widget.onlineProfileIds.length} 个在线。',
       actions: [
         DeckButton(
           label: '新增 SSH 配置',
@@ -117,7 +141,7 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
             onChanged: (mode) => setState(() => _authFilter = mode),
           ),
           const Spacer(),
-          DeckLabel('${visible.length} / ${widget.profiles.length}', size: 10),
+          DeckLabel('${visible.length} / ${widget.profiles.length}', size: 11),
         ],
       ),
       child: Column(
@@ -145,25 +169,18 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
                   for (final profile in visible)
                     DeckTableRow(
                       flexWeights: const [1],
-                      statusColor: DeckTokens.ok,
+                      statusColor: widget.onlineProfileIds.contains(profile.id)
+                          ? DeckTokens.ok
+                          : DeckTokens.border,
                       cells: [
-                        Row(
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Padding(
-                              padding: EdgeInsets.only(top: 4),
-                              child: DeckStatusSquare(
-                                DeckTokens.ok,
-                                size: 8,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
                                     profile.name,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -172,36 +189,41 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
                                       color: DeckTokens.fg,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${profile.username}@${profile.host}:${profile.port}',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontFamily: 'JetBrains Mono',
-                                      fontFamilyFallback: DeckTokens.fontMono,
-                                      fontSize: 11,
-                                      color: DeckTokens.muted,
-                                    ),
+                                ),
+                                const SizedBox(width: 8),
+                                _OnlineBadge(
+                                  online: widget.onlineProfileIds.contains(
+                                    profile.id,
                                   ),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 6),
+                                DeckBadge(
+                                  profile.authMode == SshAuthMode.password
+                                      ? '密码'
+                                      : '私钥',
+                                ),
+                                const SizedBox(width: 6),
+                                DeckBadge(profile.termType),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            DeckBadge(
-                              profile.authMode == SshAuthMode.password
-                                  ? '密码'
-                                  : '私钥',
-                              foreground: DeckTokens.accentInk,
-                              background: DeckTokens.accentSoft,
-                              borderColor: DeckTokens.mix(
-                                DeckTokens.accent,
-                                DeckTokens.border,
-                                0.4,
+                            const SizedBox(height: 4),
+                            Text(
+                              '${profile.username}@${profile.host}:${profile.port}',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'JetBrains Mono',
+                                fontFamilyFallback: DeckTokens.fontMono,
+                                fontSize: 11,
+                                color: DeckTokens.muted,
                               ),
                             ),
                           ],
                         ),
                       ],
+                      meta: (
+                        label: '最后连接',
+                        value: _lastConnectedLabel(profile.id),
+                      ),
                       trailingWidth: actionsWidth,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -245,7 +267,7 @@ class _AuthFilter extends StatelessWidget {
   final ValueChanged<SshAuthMode?> onChanged;
 
   static const _options = <(String, SshAuthMode?)>[
-    ('全部', null),
+    ('全部认证方式', null),
     ('密码', SshAuthMode.password),
     ('私钥', SshAuthMode.privateKey),
   ];
@@ -256,7 +278,9 @@ class _AuthFilter extends StatelessWidget {
       children: [
         for (final option in _options) ...[
           DeckButton(
-            key: ValueKey('auth-filter-${option.$1}'),
+            key: ValueKey(
+              'auth-filter-${option.$1 == '全部认证方式' ? 'all' : option.$1}',
+            ),
             label: option.$1,
             dense: true,
             style: selected == option.$2
@@ -267,6 +291,23 @@ class _AuthFilter extends StatelessWidget {
           const SizedBox(width: 4),
         ],
       ],
+    );
+  }
+}
+
+class _OnlineBadge extends StatelessWidget {
+  const _OnlineBadge({required this.online});
+
+  final bool online;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!online) return const DeckBadge('已停止');
+    return DeckStatusBadge(
+      label: '在线',
+      color: DeckTokens.ok,
+      background: DeckTokens.okSoft,
+      borderColor: DeckTokens.mix(DeckTokens.ok, DeckTokens.border, 0.4),
     );
   }
 }

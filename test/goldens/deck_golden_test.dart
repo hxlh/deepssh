@@ -80,7 +80,6 @@ void main() {
             onStop: (_) {},
             onEdit: (_) {},
             onDelete: (_) {},
-            onTypeChanged: (_, _) {},
           ),
         ),
       ),

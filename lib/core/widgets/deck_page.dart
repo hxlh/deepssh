@@ -153,6 +153,7 @@ class DeckTableRow extends StatelessWidget {
     required this.flexWeights,
     required this.statusColor,
     required this.cells,
+    this.meta,
     this.trailing,
     this.trailingWidth = 0,
   });
@@ -160,6 +161,9 @@ class DeckTableRow extends StatelessWidget {
   final List<int> flexWeights;
   final Color statusColor;
   final List<Widget> cells;
+
+  /// The prototype's middle column: a small caption over a monospace value.
+  final ({String label, String value})? meta;
   final Widget? trailing;
   final double trailingWidth;
 
@@ -180,6 +184,11 @@ class DeckTableRow extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: cells[index],
                 ),
+              ),
+            if (meta != null)
+              SizedBox(
+                width: 210,
+                child: DeckMetaCell(label: meta!.label, value: meta!.value),
               ),
             if (trailing != null)
               SizedBox(
@@ -215,6 +224,40 @@ class DeckMonoCell extends StatelessWidget {
         fontWeight: FontWeight.w600,
         color: color ?? DeckTokens.fg,
       ),
+    );
+  }
+}
+
+/// Caption-over-value cell used for the table's middle column.
+class DeckMetaCell extends StatelessWidget {
+  const DeckMetaCell({super.key, required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11.5, color: DeckTokens.muted),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontFamily: 'JetBrains Mono',
+            fontFamilyFallback: DeckTokens.fontMono,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: DeckTokens.fg,
+          ),
+        ),
+      ],
     );
   }
 }

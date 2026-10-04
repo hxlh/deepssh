@@ -6,9 +6,9 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/deck_page.dart';
 import '../../core/widgets/deck_widgets.dart';
 
-/// Tunnel list. Each row exposes the forward type as an inline segmented
-/// control (switching it takes effect immediately) plus a start/stop toggle,
-/// matching the prototype's row-level controls.
+/// Tunnel list. Row layout follows the prototype: name + status + direction
+/// badges over a `listen → target 经 profile` sub-line, then the listen port
+/// as the middle column, then the actions.
 class TunnelConfigsPage extends StatefulWidget {
   const TunnelConfigsPage({
     super.key,
@@ -20,7 +20,6 @@ class TunnelConfigsPage extends StatefulWidget {
     required this.onStop,
     required this.onEdit,
     required this.onDelete,
-    required this.onTypeChanged,
   });
 
   final List<TunnelConfigItem> tunnels;
@@ -31,8 +30,6 @@ class TunnelConfigsPage extends StatefulWidget {
   final ValueChanged<TunnelConfigItem> onStop;
   final ValueChanged<TunnelConfigItem> onEdit;
   final ValueChanged<TunnelConfigItem> onDelete;
-  final void Function(TunnelConfigItem tunnel, TunnelForwardType type)
-  onTypeChanged;
 
   @override
   State<TunnelConfigsPage> createState() => _TunnelConfigsPageState();
@@ -45,14 +42,14 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
     for (final profile in widget.profiles) {
       if (profile.id == profileId) return profile.name;
     }
-    return '未知 SSH 配置';
+    return '未知配置';
   }
 
   Future<void> _confirmDelete(TunnelConfigItem tunnel) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('删除隧道'),
+        title: const Text('删除转发'),
         content: Text('删除「${tunnel.name}」后不可恢复，确定继续？'),
         actions: [
           DeckButton(
@@ -72,21 +69,43 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
     if (confirmed == true) widget.onDelete(tunnel);
   }
 
-  Color _statusColor(TunnelConfigItem tunnel) => switch (tunnel.status) {
-    TunnelRuntimeStatus.forwarding => DeckTokens.ok,
-    TunnelRuntimeStatus.waiting => DeckTokens.warnBar,
-    TunnelRuntimeStatus.stopped => DeckTokens.border,
+  ({Color color, String label, Color background, Color border}) _status(
+    TunnelConfigItem tunnel,
+  ) => switch (tunnel.status) {
+    TunnelRuntimeStatus.forwarding => (
+      color: DeckTokens.ok,
+      label: '运行中',
+      background: DeckTokens.okSoft,
+      border: DeckTokens.mix(DeckTokens.ok, DeckTokens.border, 0.4),
+    ),
+    TunnelRuntimeStatus.waiting => (
+      color: DeckTokens.warn,
+      label: '等待中',
+      background: DeckTokens.warnSoft,
+      border: DeckTokens.mix(DeckTokens.warnBar, DeckTokens.border, 0.45),
+    ),
+    TunnelRuntimeStatus.stopped => (
+      color: DeckTokens.muted,
+      label: '已停止',
+      background: DeckTokens.bg,
+      border: DeckTokens.border,
+    ),
   };
 
   @override
   Widget build(BuildContext context) {
+    final running = widget.tunnels
+        .where((t) => t.status == TunnelRuntimeStatus.forwarding)
+        .length;
+
     return DeckPageScaffold(
       eyebrow: 'Port Forwarding',
       title: '端口转发',
-      subtitle: '把本地或远程端口经 SSH 隧道转给另一端的服务。',
+      subtitle: '基于 SSH 配置的本地与远程隧道。共 ${widget.tunnels.length} 条，'
+          '其中 $running 条运行中。',
       actions: [
         DeckButton(
-          label: '新增隧道',
+          label: '新增转发',
           style: DeckButtonStyle.solid,
           icon: Icons.add,
           onPressed: widget.onAdd,
@@ -101,39 +120,34 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
           ],
           if (widget.tunnels.isEmpty)
             DeckEmptyState(
-              title: '还没有隧道',
-              hint: '点击右上角「新增隧道」，只需填写远程端口，本地端口可自动分配。',
+              title: '还没有转发',
+              hint: '点击右上角「新增转发」，只需填写远程端口，本地端口可自动分配。',
               icon: Icons.swap_horiz,
             )
           else
             SingleChildScrollView(
               child: DeckTable(
                 flexWeights: const [1],
-                headerLabels: const ['隧道'],
+                headerLabels: const ['转发'],
                 trailingWidth: _actionsWidth,
                 children: [
                   for (final tunnel in widget.tunnels)
                     DeckTableRow(
                       flexWeights: const [1],
-                      statusColor: _statusColor(tunnel),
+                      statusColor: switch (tunnel.status) {
+                        TunnelRuntimeStatus.forwarding => DeckTokens.accent,
+                        TunnelRuntimeStatus.waiting => DeckTokens.warnBar,
+                        TunnelRuntimeStatus.stopped => DeckTokens.border,
+                      },
                       cells: [
-                        Row(
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: DeckStatusSquare(
-                                _statusColor(tunnel),
-                                size: 8,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
                                     tunnel.name,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -142,50 +156,64 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
                                       color: DeckTokens.fg,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: Text(
-                                          '${tunnel.listenHost}:${tunnel.listenPortLabel} → ${tunnel.targetHost}:${tunnel.targetPort}',
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontFamily: 'JetBrains Mono',
-                                            fontFamilyFallback: DeckTokens.fontMono,
-                                            fontSize: 11,
-                                            color: DeckTokens.muted,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      // Which SSH config owns this tunnel —
-                                      // not obvious from the addresses alone.
-                                      Flexible(
-                                        child: Text(
-                                          profileName(tunnel.sshProfileId),
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontFamily: 'JetBrains Mono',
-                                            fontFamilyFallback: DeckTokens.fontMono,
-                                            fontSize: 11,
-                                            color: DeckTokens.accentInk,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                ),
+                                const SizedBox(width: 8),
+                                DeckStatusBadge(
+                                  label: _status(tunnel).label,
+                                  color: _status(tunnel).color,
+                                  background: _status(tunnel).background,
+                                  borderColor: _status(tunnel).border,
+                                ),
+                                const SizedBox(width: 6),
+                                DeckBadge(
+                                  tunnel.type == TunnelForwardType.local
+                                      ? '本地转发'
+                                      : '远程转发',
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text:
+                                        '${tunnel.listenHost}:${tunnel.listenPortLabel}',
                                   ),
+                                  TextSpan(
+                                    text: '  →  ',
+                                    style: const TextStyle(
+                                      color: DeckTokens.muted,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text:
+                                        '${tunnel.targetHost}:${tunnel.targetPort}',
+                                  ),
+                                  const TextSpan(
+                                    text: '  经  ',
+                                    style: TextStyle(color: DeckTokens.muted),
+                                  ),
+                                  TextSpan(text: profileName(tunnel.sshProfileId)),
                                 ],
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            _TypeSegment(
-                              value: tunnel.type,
-                              onChanged: (type) =>
-                                  widget.onTypeChanged(tunnel, type),
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'JetBrains Mono',
+                                fontFamilyFallback: DeckTokens.fontMono,
+                                fontSize: 11,
+                                color: DeckTokens.muted,
+                              ),
                             ),
                           ],
                         ),
                       ],
+                      meta: (
+                        label: '监听端口',
+                        value: tunnel.listenPort == 0
+                            ? '自动分配'
+                            : '${tunnel.listenPort}',
+                      ),
                       trailingWidth: _actionsWidth,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -225,34 +253,6 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
             ),
         ],
       ),
-    );
-  }
-}
-
-/// Two-state segmented control used for the forward direction.
-class _TypeSegment extends StatelessWidget {
-  const _TypeSegment({required this.value, required this.onChanged});
-
-  final TunnelForwardType value;
-  final ValueChanged<TunnelForwardType> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final option in TunnelForwardType.values) ...[
-          DeckButton(
-            label: option == TunnelForwardType.local ? '本地' : '远程',
-            dense: true,
-            style: option == value
-                ? DeckButtonStyle.solid
-                : DeckButtonStyle.ghost,
-            onPressed: () => onChanged(option),
-          ),
-          const SizedBox(width: 3),
-        ],
-      ],
     );
   }
 }

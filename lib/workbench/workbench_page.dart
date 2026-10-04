@@ -333,6 +333,10 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   HostTreeState hostTreeState = HostTreeState();
   TerminalState terminalState = const TerminalState();
   WorkbenchContentMode contentMode = WorkbenchContentMode.terminal;
+
+  /// Last successful connect per SSH profile, shown in the connections list.
+  /// Kept in memory only — the prototype treats it as a display value.
+  final Map<String, DateTime> _lastConnectedAt = <String, DateTime>{};
   int localTerminalCounter = 0;
   bool localExpanded = true;
   List<LocalTerminalItem> localTerminals = const [];
@@ -859,36 +863,6 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       setState(() {
         tunnelErrorMessage = 'Save tunnel failed: $error';
         contentMode = WorkbenchContentMode.tunnelConfigs;
-      });
-    }
-  }
-
-  /// Flipping the forward direction inline has to persist, otherwise the row
-  /// would show a different direction than the stored config on reload.
-  Future<void> _handleTunnelTypeChanged(
-    TunnelConfigItem tunnel,
-    TunnelForwardType type,
-  ) async {
-    if (tunnel.type == type) return;
-    try {
-      final updated = await widget.tunnelBridge.updateTunnel(
-        id: tunnel.id,
-        name: tunnel.name,
-        type: type,
-        sshProfileId: tunnel.sshProfileId,
-        listenHost: tunnel.listenHost,
-        listenPort: tunnel.listenPort,
-        targetHost: tunnel.targetHost,
-        targetPort: tunnel.targetPort,
-      );
-      await loadTunnelConfigs();
-      if (!mounted) return;
-      _replaceTunnelConfig(updated);
-    } catch (error, stackTrace) {
-      unawaited(_errorLogger.error('tunnel.update', error, stackTrace));
-      if (!mounted) return;
-      setState(() {
-        tunnelErrorMessage = 'Update tunnel type failed: $error';
       });
     }
   }
@@ -1472,6 +1446,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         }
         return;
       }
+      _lastConnectedAt[profile.id] = DateTime.now();
       final currentSessions =
           sshSessionsByProfileId[profile.id] ?? const <SshSessionItem>[];
       SshSessionItem? currentSession;
@@ -1595,6 +1570,18 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     _themeSaveInFlight = false;
   }
 
+  /// The Explorer belongs to the workbench only. The settings pages are
+  /// full-bleed views under the topbar, exactly like the prototype — keeping
+  /// the sidebar beside them would squeeze their tables into ~500px.
+  bool get _showExplorer => switch (contentMode) {
+    WorkbenchContentMode.terminal || WorkbenchContentMode.diagnostics => true,
+    WorkbenchContentMode.sshProfiles ||
+    WorkbenchContentMode.sshProfileForm ||
+    WorkbenchContentMode.tunnelConfigs ||
+    WorkbenchContentMode.tunnelConfigForm ||
+    WorkbenchContentMode.themeConfig => false,
+  };
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1610,51 +1597,53 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
           Expanded(
             child: Row(
               children: [
-                Sidebar(
-                  width: _sidebarWidth,
-                  // The prototype collapses the Explorer into an icon rail once
-                  // the column gets too narrow to carry labels.
-                  compact: _sidebarWidth <= Sidebar.compactBreakpoint,
-                  onAddConnectionSelected: _handleAddConnection,
-                  child: HostTree(
-                    state: hostTreeState,
-                    selectedTerminalId: terminalState.activeTabId,
-                    onToggleHost: _handleHostToggle,
-                    onTerminalTap: _handleTerminalTap,
-                    localTerminals: localTerminals,
-                    localExpanded: localExpanded,
-                    onToggleLocal: _handleLocalToggle,
-                    onLocalTerminalTap: _handleLocalTerminalTap,
-                    sshProfiles: sshProfiles,
-                    sshSessionsByProfileId: sshSessionsByProfileId,
-                    onSshProfileTap: (_) {},
-                    onSshSessionTap: _handleSshSessionTap,
-                    onEditSshSessionNote: _handleEditSshSessionNote,
-                    onCloseSshSession: _handleCloseSshSession,
-                    onDuplicateSshSession: _handleDuplicateSshSession,
-                    onCloseLocalTerminal: _handleCloseLocalTerminal,
-                    onOpenThemeConfig: _handleOpenThemeConfig,
-                    themeConfigActive:
-                        contentMode == WorkbenchContentMode.themeConfig,
-                    onOpenDiagnostics: _handleOpenDiagnostics,
-                    diagnosticsActive:
-                        contentMode == WorkbenchContentMode.diagnostics,
-                    onReorderSessions: _handleReorderSessions,
-                    onReorderLocalTerminals: _handleReorderLocalTerminals,
-                    sectionOrder: explorerSectionOrder,
-                    onSectionOrderChanged: _handleExplorerSectionOrderChanged,
+                if (_showExplorer) ...[
+                  Sidebar(
+                    width: _sidebarWidth,
+                    // The prototype collapses the Explorer into an icon rail once
+                    // the column gets too narrow to carry labels.
+                    compact: _sidebarWidth <= Sidebar.compactBreakpoint,
+                    onAddConnectionSelected: _handleAddConnection,
+                    child: HostTree(
+                      state: hostTreeState,
+                      selectedTerminalId: terminalState.activeTabId,
+                      onToggleHost: _handleHostToggle,
+                      onTerminalTap: _handleTerminalTap,
+                      localTerminals: localTerminals,
+                      localExpanded: localExpanded,
+                      onToggleLocal: _handleLocalToggle,
+                      onLocalTerminalTap: _handleLocalTerminalTap,
+                      sshProfiles: sshProfiles,
+                      sshSessionsByProfileId: sshSessionsByProfileId,
+                      onSshProfileTap: (_) {},
+                      onSshSessionTap: _handleSshSessionTap,
+                      onEditSshSessionNote: _handleEditSshSessionNote,
+                      onCloseSshSession: _handleCloseSshSession,
+                      onDuplicateSshSession: _handleDuplicateSshSession,
+                      onCloseLocalTerminal: _handleCloseLocalTerminal,
+                      onOpenThemeConfig: _handleOpenThemeConfig,
+                      themeConfigActive:
+                          contentMode == WorkbenchContentMode.themeConfig,
+                      onOpenDiagnostics: _handleOpenDiagnostics,
+                      diagnosticsActive:
+                          contentMode == WorkbenchContentMode.diagnostics,
+                      onReorderSessions: _handleReorderSessions,
+                      onReorderLocalTerminals: _handleReorderLocalTerminals,
+                      sectionOrder: explorerSectionOrder,
+                      onSectionOrderChanged: _handleExplorerSectionOrderChanged,
+                    ),
                   ),
-                ),
-                ResizeHandle(
-                  onDrag: (delta) {
-                    setState(() {
-                      _sidebarWidth = max(
-                        _minSidebarWidth,
-                        _sidebarWidth + delta,
-                      );
-                    });
-                  },
-                ),
+                  ResizeHandle(
+                    onDrag: (delta) {
+                      setState(() {
+                        _sidebarWidth = max(
+                          _minSidebarWidth,
+                          _sidebarWidth + delta,
+                        );
+                      });
+                    },
+                  ),
+                ],
                 Expanded(
                   child: WorkbenchContentSwitcher(
                     mode: contentMode,
@@ -1671,6 +1660,11 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                     onCloseTab: _handleTabClose,
                     onReorderTab: _handleTabReorder,
                     onAddSshProfile: _handleAddSshProfile,
+                    onlineSshProfileIds: [
+                      for (final entry in sshSessionsByProfileId.entries)
+                        if (entry.value.isNotEmpty) entry.key,
+                    ],
+                    lastConnectedSshProfileAt: _lastConnectedAt,
                     onConnectSshProfile: _handleConnectSshProfile,
                     onEditSshProfile: _handleEditSshProfile,
                     onDeleteSshProfile: _handleDeleteSshProfile,
@@ -1681,7 +1675,6 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                     onStopTunnelConfig: _handleStopTunnelConfig,
                     onEditTunnelConfig: _handleEditTunnelConfig,
                     onDeleteTunnelConfig: _handleDeleteTunnelConfig,
-                    onTunnelTypeChanged: _handleTunnelTypeChanged,
                     onCancelTunnelForm: _handleCancelTunnelForm,
                     onSaveTunnelConfig: _handleSaveTunnelConfig,
                     onUiThemeChanged: _handleUiThemeChanged,

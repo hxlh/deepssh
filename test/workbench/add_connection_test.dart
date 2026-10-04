@@ -117,6 +117,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('deck-page-title')), findsOneWidget);
-    expect(find.text('新增隧道'), findsOneWidget);
+    expect(find.text('新增转发'), findsOneWidget);
   });
 }
