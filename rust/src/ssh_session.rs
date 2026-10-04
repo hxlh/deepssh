@@ -24,12 +24,21 @@ static OUTPUT_SINK_STORE: Lazy<Mutex<HashMap<String, StreamSink<Vec<u8>>>>> =
 static SSH_CLIENT_STORE: Lazy<Mutex<HashMap<String, SshConnectionInfo>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 pub(crate) static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
-    // SSH/PTY work is I/O-bound. The default num_cpus workers each carry a
-    // 2 MiB stack and live for the lifetime of the static, which dominates
-    // the post-close RSS floor. One worker + 256 KiB stack is enough for a
-    // typical 1-3 sessions; russh handshakes are short and cooperative.
+    // SSH/PTY handshakes are I/O-bound, but tunnel forwarding is not: bulk
+    // transfers drive russh's per-packet crypto and the relay loop as
+    // CPU-bound tasks, and everything (sessions, tunnels, the russh event
+    // loops) multiplexes on this one runtime. A single worker starves video
+    // and large HTTP responses under load. Scale workers to the machine, but
+    // cap them so the resident-stack footprint stays bounded — each worker
+    // lives for the lifetime of this static, and the 256 KiB stack below
+    // keeps each one cheap (so the old "1 worker" memory tradeoff no longer
+    // buys us much).
+    let worker_threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .clamp(2, 4);
     let runtime = Builder::new_multi_thread()
-        .worker_threads(1)
+        .worker_threads(worker_threads)
         .max_blocking_threads(4)
         .thread_keep_alive(Duration::from_secs(5))
         .thread_stack_size(256 * 1024)

@@ -68,7 +68,9 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
       text: tunnel?.listenHost ?? '127.0.0.1',
     );
     listenPortController = TextEditingController(
-      text: tunnel?.listenPort.toString() ?? '',
+      text: (tunnel == null || tunnel.listenPort == 0)
+          ? ''
+          : tunnel.listenPort.toString(),
     );
     targetHostController = TextEditingController(
       text: tunnel?.targetHost ?? '127.0.0.1',
@@ -123,11 +125,14 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
     return null;
   }
 
-  String? validatePort(String? value) {
+  String? validatePort(String? value, {bool allowAuto = false}) {
+    if (allowAuto && (value == null || value.trim().isEmpty)) {
+      return null;
+    }
     final requiredError = requiredText(value);
     if (requiredError != null) return requiredError;
     final port = int.tryParse(value!.trim());
-    if (port == null || port < 1 || port > 65535) {
+    if (port == null || port < (allowAuto ? 0 : 1) || port > 65535) {
       return 'Invalid port';
     }
     return null;
@@ -137,13 +142,14 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
     if (!formKey.currentState!.validate()) return;
     final profileId = selectedProfileId;
     if (profileId == null) return;
+    final listenPortText = listenPortController.text.trim();
     widget.onSaved(
       TunnelConfigDraft(
         name: nameController.text.trim(),
         type: selectedType,
         sshProfileId: profileId,
         listenHost: listenHostController.text.trim(),
-        listenPort: int.parse(listenPortController.text.trim()),
+        listenPort: listenPortText.isEmpty ? 0 : int.parse(listenPortText),
         targetHost: targetHostController.text.trim(),
         targetPort: int.parse(targetPortController.text.trim()),
       ),
@@ -275,7 +281,14 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
                   keyboardType: TextInputType.number,
                   textInputAction: TextInputAction.next,
                   onFieldSubmitted: (_) => targetHostFocusNode.requestFocus(),
-                  validator: validatePort,
+                  validator: (value) => validatePort(value, allowAuto: true),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(top: 4, left: 12, bottom: 2),
+                child: Text(
+                  'Listen port 0 or empty = auto-assign a free local port',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ),
               const SizedBox(height: 6),

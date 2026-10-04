@@ -2,7 +2,10 @@ use std::{
     collections::HashMap,
     fs,
     net::SocketAddr,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        mpsc as std_mpsc, Arc, Mutex,
+    },
     time::Duration,
 };
 
@@ -35,10 +38,20 @@ struct TunnelStore {
     initialized: bool,
 }
 
+static NEXT_RUNTIME_GENERATION: AtomicU64 = AtomicU64::new(1);
+
+type TunnelReadySender = std_mpsc::Sender<Result<u16, String>>;
+
 #[flutter_rust_bridge::frb(ignore)]
 struct TunnelRuntime {
+    generation: u64,
     status: TunnelRuntimeStatus,
+    // Actual bound port when the configured listen port is 0 (auto-assign).
+    active_listen_port: Option<u16>,
     stop_tx: Option<oneshot::Sender<()>>,
+    // Signalled when the spawned runtime task has fully finished and dropped
+    // its listener, so stop/start cannot race on the same local port.
+    done_rx: Option<std_mpsc::Receiver<()>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -150,25 +163,37 @@ impl client::Handler for TunnelClientHandler {
     ) -> Result<(), Self::Error> {
         let key = remote_route_key(connected_address, connected_port as u16);
         let route = self.remote_routes.lock().unwrap().get(&key).cloned();
-        if let Some(route) = route {
-            TOKIO_RUNTIME.spawn(async move {
-                match TcpStream::connect(format!("{}:{}", route.target_host, route.target_port))
-                    .await
-                {
-                    Ok(stream) => {
-                        if let Err(error) = relay_tcp_stream_and_channel(stream, channel).await {
-                            crate::app_log::log_error("tunnel.remote.connection", &error);
+        match route {
+            Some(route) => {
+                TOKIO_RUNTIME.spawn(async move {
+                    match TcpStream::connect(format!("{}:{}", route.target_host, route.target_port))
+                        .await
+                    {
+                        Ok(stream) => {
+                            if let Err(error) = relay_tcp_stream_and_channel(stream, channel).await
+                            {
+                                log_tunnel_connection_error("tunnel.remote.connection", &error);
+                            }
+                        }
+                        Err(error) => {
+                            crate::app_log::log_error_message(
+                                "tunnel.remote.target",
+                                &format!("Failed to connect remote tunnel target: {error:?}"),
+                                None,
+                            );
                         }
                     }
-                    Err(error) => {
-                        crate::app_log::log_error_message(
-                            "tunnel.remote.target",
-                            &format!("Failed to connect remote tunnel target: {error:?}"),
-                            None,
-                        );
-                    }
-                }
-            });
+                });
+            }
+            None => {
+                // A forwarded connection arrived for a port we no longer have
+                // a route for (for example a stale forward on the server).
+                // Complete the close handshake instead of leaking the channel.
+                TOKIO_RUNTIME.spawn(async move {
+                    let _ = channel.eof().await;
+                    let _ = channel.close().await;
+                });
+            }
         }
         Ok(())
     }
@@ -240,6 +265,40 @@ fn next_backoff_delay(current: Duration) -> Duration {
     Duration::from_secs(doubled.min(60).max(1))
 }
 
+async fn sleep_or_stop(stop_rx: &mut oneshot::Receiver<()>, delay: Duration) -> bool {
+    tokio::select! {
+        _ = &mut *stop_rx => true,
+        _ = tokio::time::sleep(delay) => false,
+    }
+}
+
+fn is_channel_open_failure(message: &str) -> bool {
+    message.contains("Failed to open channel")
+}
+
+fn is_expected_connection_close(message: &str) -> bool {
+    // Resets and aborted sockets are normal when a browser or client cancels a
+    // forwarded request. Logging them as errors produced tens of thousands of
+    // noise lines and hid the real reconnect failures.
+    const EXPECTED: [&str; 6] = [
+        "os error 10053",
+        "os error 10054",
+        "os error 104",
+        "os error 32",
+        "Connection reset",
+        "Broken pipe",
+    ];
+    EXPECTED.iter().any(|needle| message.contains(needle))
+}
+
+fn log_tunnel_connection_error(scope: &str, error: &anyhow::Error) {
+    let message = format!("{error:#}");
+    if is_expected_connection_close(&message) {
+        return;
+    }
+    crate::app_log::log_error(scope, error);
+}
+
 async fn local_tcp_port_is_open(host: &str, port: u16) -> bool {
     let addr = format!("{}:{}", host, port);
     tokio::time::timeout(Duration::from_millis(800), TcpStream::connect(addr))
@@ -297,7 +356,16 @@ fn ensure_tunnels_loaded(store: &mut TunnelStore) -> Result<()> {
 }
 
 fn with_runtime_status(mut config: TunnelConfig) -> TunnelConfig {
-    config.status = runtime_status(&config.id);
+    let runtimes = RUNTIME_STORE.lock().unwrap();
+    match runtimes.get(&config.id) {
+        Some(runtime) => {
+            config.status = runtime.status.clone();
+            if let Some(port) = runtime.active_listen_port {
+                config.listen_port = port;
+            }
+        }
+        None => config.status = TunnelRuntimeStatus::Stopped,
+    }
     config
 }
 
@@ -310,6 +378,7 @@ fn runtime_status(id: &str) -> TunnelRuntimeStatus {
         .unwrap_or(TunnelRuntimeStatus::Stopped)
 }
 
+#[cfg(test)]
 fn set_runtime_status(id: &str, status: TunnelRuntimeStatus) {
     let mut runtimes = RUNTIME_STORE.lock().unwrap();
     if matches!(status, TunnelRuntimeStatus::Stopped) {
@@ -320,9 +389,55 @@ fn set_runtime_status(id: &str, status: TunnelRuntimeStatus) {
         .entry(id.to_string())
         .and_modify(|runtime| runtime.status = status.clone())
         .or_insert(TunnelRuntime {
+            generation: 0,
             status,
+            active_listen_port: None,
             stop_tx: None,
+            done_rx: None,
         });
+}
+
+fn update_runtime_status(id: &str, generation: u64, status: TunnelRuntimeStatus) {
+    let mut runtimes = RUNTIME_STORE.lock().unwrap();
+    if let Some(runtime) = runtimes.get_mut(id) {
+        if runtime.generation == generation {
+            runtime.status = status;
+        }
+    }
+}
+
+fn update_runtime_listen_port(id: &str, generation: u64, port: u16) {
+    let mut runtimes = RUNTIME_STORE.lock().unwrap();
+    if let Some(runtime) = runtimes.get_mut(id) {
+        if runtime.generation == generation {
+            runtime.active_listen_port = Some(port);
+        }
+    }
+}
+
+fn remove_runtime_if_generation(id: &str, generation: u64) {
+    let mut runtimes = RUNTIME_STORE.lock().unwrap();
+    let matches_generation = runtimes
+        .get(id)
+        .is_some_and(|runtime| runtime.generation == generation);
+    if matches_generation {
+        runtimes.remove(id);
+    }
+}
+
+fn stop_runtime_and_wait(id: &str) {
+    let runtime = RUNTIME_STORE.lock().unwrap().remove(id);
+    let Some(mut runtime) = runtime else {
+        return;
+    };
+    if let Some(stop_tx) = runtime.stop_tx.take() {
+        let _ = stop_tx.send(());
+    }
+    if let Some(done_rx) = runtime.done_rx.take() {
+        // Wait for the task to drop its listener before returning, otherwise a
+        // quick stop/start rebinds the same port and fails with EADDRINUSE.
+        let _ = done_rx.recv_timeout(Duration::from_secs(5));
+    }
 }
 
 async fn connect_ssh_profile(
@@ -337,7 +452,11 @@ async fn connect_ssh_profile(
     let addr = format!("{}:{}", ssh_profile.host, ssh_profile.port);
     let mut config = client::Config::default();
     config.nodelay = true;
-    config.keepalive_interval = Some(Duration::from_secs(30));
+    // A silently dropped link (server restart, NAT idle timeout) used to stay
+    // undetected for a long time. Keepalives let the session task notice and
+    // close, which is what triggers the reconnect loop below.
+    config.keepalive_interval = Some(Duration::from_secs(15));
+    config.keepalive_max = 3;
     let config = Arc::new(config);
     let mut handle = client::connect(config, addr, TunnelClientHandler { remote_routes })
         .await
@@ -534,11 +653,7 @@ pub fn delete_tunnel(id: String) -> Result<()> {
             .ok_or_else(|| anyhow!("Tunnel not found"))?;
         store.configs.remove(index);
         write_tunnels_to_disk(&store.configs)?;
-        if let Some(mut runtime) = RUNTIME_STORE.lock().unwrap().remove(&id) {
-            if let Some(stop_tx) = runtime.stop_tx.take() {
-                let _ = stop_tx.send(());
-            }
-        }
+        stop_runtime_and_wait(&id);
         Ok(())
     })();
     if let Err(error) = &result {
@@ -573,16 +688,48 @@ pub fn start_tunnel(id: String, credential: SshAuthCredential) -> Result<TunnelS
             }
         }
 
+        let generation = NEXT_RUNTIME_GENERATION.fetch_add(1, Ordering::Relaxed);
         let (stop_tx, stop_rx) = oneshot::channel::<()>();
+        let (done_tx, done_rx) = std_mpsc::channel::<()>();
+        let (ready_tx, ready_rx) = std_mpsc::channel::<Result<u16, String>>();
+        let wait_for_bind = tunnel.forward_type == TunnelForwardType::Local;
+
         RUNTIME_STORE.lock().unwrap().insert(
             id.clone(),
             TunnelRuntime {
+                generation,
                 status: TunnelRuntimeStatus::Waiting,
+                active_listen_port: None,
                 stop_tx: Some(stop_tx),
+                done_rx: Some(done_rx),
             },
         );
 
-        TOKIO_RUNTIME.spawn(run_tunnel(tunnel.clone(), credential, stop_rx));
+        TOKIO_RUNTIME.spawn(run_tunnel(
+            tunnel.clone(),
+            credential,
+            stop_rx,
+            ready_tx,
+            done_tx,
+            generation,
+        ));
+
+        if wait_for_bind {
+            // The local listener is bound before the SSH handshake, so this
+            // returns almost immediately. Surfacing a bind failure here is what
+            // turns a silent "started then stopped" into a visible error.
+            match ready_rx.recv_timeout(Duration::from_secs(5)) {
+                Ok(Ok(_)) => {}
+                Ok(Err(message)) => {
+                    remove_runtime_if_generation(&id, generation);
+                    return Err(anyhow!(message));
+                }
+                Err(_) => {
+                    // Still starting; status polling will pick up the result.
+                }
+            }
+        }
+
         Ok(tunnel_start_success(with_runtime_status(tunnel)))
     })();
     if let Err(error) = &result {
@@ -603,11 +750,7 @@ pub fn stop_tunnel(id: String) -> Result<TunnelConfig> {
                 .cloned()
                 .ok_or_else(|| anyhow!("Tunnel not found"))?
         };
-        if let Some(mut runtime) = RUNTIME_STORE.lock().unwrap().remove(&id) {
-            if let Some(stop_tx) = runtime.stop_tx.take() {
-                let _ = stop_tx.send(());
-            }
-        }
+        stop_runtime_and_wait(&id);
         Ok(tunnel)
     })();
     if let Err(error) = &result {
@@ -620,83 +763,174 @@ async fn run_tunnel(
     tunnel: TunnelConfig,
     credential: SshAuthCredential,
     stop_rx: oneshot::Receiver<()>,
+    ready_tx: TunnelReadySender,
+    done_tx: std_mpsc::Sender<()>,
+    generation: u64,
 ) {
     let result = match tunnel.forward_type {
-        TunnelForwardType::Local => run_local_tunnel(tunnel.clone(), credential, stop_rx).await,
-        TunnelForwardType::Remote => run_remote_tunnel(tunnel.clone(), credential, stop_rx).await,
+        TunnelForwardType::Local => {
+            run_local_tunnel(tunnel.clone(), credential, stop_rx, ready_tx, generation).await
+        }
+        TunnelForwardType::Remote => {
+            drop(ready_tx);
+            run_remote_tunnel(tunnel.clone(), credential, stop_rx, generation).await
+        }
     };
     if let Err(error) = result {
         crate::app_log::log_error("tunnel.runtime", &error);
     }
-    RUNTIME_STORE.lock().unwrap().remove(&tunnel.id);
+    // Only remove the entry if it is still the one we created. Otherwise a
+    // slow-finishing old task would delete a runtime a newer start inserted.
+    remove_runtime_if_generation(&tunnel.id, generation);
+    let _ = done_tx.send(());
 }
 
 async fn run_local_tunnel(
     tunnel: TunnelConfig,
     credential: SshAuthCredential,
     mut stop_rx: oneshot::Receiver<()>,
+    ready_tx: TunnelReadySender,
+    generation: u64,
 ) -> Result<()> {
+    let listen_address = format!("{}:{}", tunnel.listen_host, tunnel.listen_port);
+    // Bind once and keep the listener for the whole runtime. Reconnects reuse
+    // it, so they never race the OS for the local port.
+    let listener = match TcpListener::bind(&listen_address).await {
+        Ok(listener) => listener,
+        Err(error) => {
+            let message = format!(
+                "Failed to bind local tunnel listener {listen_address}: {error}. \
+                 The port may already be in use, or reserved by the OS (on Windows run \
+                 `netsh interface ipv4 show excludedportrange protocol=tcp`); set the \
+                 listen port to 0 to auto-assign a free port."
+            );
+            let _ = ready_tx.send(Err(message.clone()));
+            return Err(anyhow!(message));
+        }
+    };
+    let bound_port = listener
+        .local_addr()
+        .map(|address| address.port())
+        .unwrap_or(tunnel.listen_port);
+    update_runtime_listen_port(&tunnel.id, generation, bound_port);
+    let _ = ready_tx.send(Ok(bound_port));
+
     let remote_routes = Arc::new(Mutex::new(HashMap::new()));
-    let handle = Arc::new(
-        connect_ssh_profile(
-            &tunnel.ssh_profile_id,
-            credential,
-            Arc::clone(&remote_routes),
-        )
-        .await?,
-    );
     let mut backoff = Duration::from_secs(1);
+    let mut handle: Option<Arc<client::Handle<TunnelClientHandler>>> = None;
 
     loop {
-        tokio::select! {
-            _ = &mut stop_rx => return Ok(()),
-            ready = remote_target_is_open_via_ssh(&handle, &tunnel.target_host, tunnel.target_port) => {
-                if ready {
-                    break;
+        if handle.as_ref().is_none_or(|handle| handle.is_closed()) {
+            if let Some(closed) = handle.take() {
+                let _ = tokio::time::timeout(
+                    Duration::from_secs(2),
+                    closed.disconnect(Disconnect::ByApplication, "", "English"),
+                )
+                .await;
+                crate::app_log::log_error_message(
+                    "tunnel.local.session",
+                    &format!(
+                        "SSH session for tunnel \"{}\" closed; reconnecting",
+                        tunnel.name
+                    ),
+                    None,
+                );
+            }
+            update_runtime_status(&tunnel.id, generation, TunnelRuntimeStatus::Waiting);
+
+            let connect = connect_ssh_profile(
+                &tunnel.ssh_profile_id,
+                credential.clone(),
+                Arc::clone(&remote_routes),
+            );
+            tokio::pin!(connect);
+            let connected = tokio::select! {
+                _ = &mut stop_rx => return Ok(()),
+                result = &mut connect => result,
+            };
+            match connected {
+                Ok(new_handle) => {
+                    handle = Some(Arc::new(new_handle));
+                    backoff = Duration::from_secs(1);
                 }
-                set_runtime_status(&tunnel.id, TunnelRuntimeStatus::Waiting);
-                tokio::time::sleep(backoff).await;
-                backoff = next_backoff_delay(backoff);
-            }
-        }
-    }
-
-    let listener = TcpListener::bind(format!("{}:{}", tunnel.listen_host, tunnel.listen_port))
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to bind local tunnel listener {}:{}",
-                tunnel.listen_host, tunnel.listen_port
-            )
-        })?;
-    set_runtime_status(&tunnel.id, TunnelRuntimeStatus::Forwarding);
-
-    loop {
-        tokio::select! {
-            _ = &mut stop_rx => break,
-            accepted = listener.accept() => {
-                let (stream, originator) = accepted?;
-                let handle = Arc::clone(&handle);
-                let target_host = tunnel.target_host.clone();
-                let target_port = tunnel.target_port;
-                TOKIO_RUNTIME.spawn(async move {
-                    if let Err(error) = handle_local_tunnel_connection(
-                        handle,
-                        stream,
-                        originator,
-                        target_host,
-                        target_port,
-                    ).await {
-                        crate::app_log::log_error("tunnel.local.connection", &error);
+                Err(error) => {
+                    crate::app_log::log_error("tunnel.local.connect", &error);
+                    if sleep_or_stop(&mut stop_rx, backoff).await {
+                        return Ok(());
                     }
-                });
+                    backoff = next_backoff_delay(backoff);
+                    continue;
+                }
             }
         }
+
+        let current = match handle.as_ref() {
+            Some(handle) => Arc::clone(handle),
+            None => continue,
+        };
+
+        let probe =
+            remote_target_is_open_via_ssh(&current, &tunnel.target_host, tunnel.target_port);
+        tokio::pin!(probe);
+        let ready = tokio::select! {
+            _ = &mut stop_rx => return Ok(()),
+            ready = &mut probe => ready,
+        };
+        if !ready {
+            update_runtime_status(&tunnel.id, generation, TunnelRuntimeStatus::Waiting);
+            if sleep_or_stop(&mut stop_rx, backoff).await {
+                return Ok(());
+            }
+            backoff = next_backoff_delay(backoff);
+            continue;
+        }
+        backoff = Duration::from_secs(1);
+        update_runtime_status(&tunnel.id, generation, TunnelRuntimeStatus::Forwarding);
+
+        // Set by a relay when the server refuses to open the forwarded channel
+        // (usually the target program restarted). It moves us back to the
+        // waiting/probe state instead of hammering a dead target.
+        let unhealthy = Arc::new(AtomicBool::new(false));
+        loop {
+            if current.is_closed() || unhealthy.load(Ordering::Relaxed) {
+                break;
+            }
+            tokio::select! {
+                _ = &mut stop_rx => return Ok(()),
+                _ = tokio::time::sleep(Duration::from_secs(2)) => {
+                    if current.is_closed() || unhealthy.load(Ordering::Relaxed) {
+                        break;
+                    }
+                }
+                accepted = listener.accept() => {
+                    let (stream, originator) = accepted?;
+                    let connection_handle = Arc::clone(&current);
+                    let connection_unhealthy = Arc::clone(&unhealthy);
+                    let target_host = tunnel.target_host.clone();
+                    let target_port = tunnel.target_port;
+                    TOKIO_RUNTIME.spawn(async move {
+                        if let Err(error) = handle_local_tunnel_connection(
+                            connection_handle,
+                            stream,
+                            originator,
+                            target_host,
+                            target_port,
+                        )
+                        .await
+                        {
+                            let message = format!("{error:#}");
+                            if is_channel_open_failure(&message) {
+                                connection_unhealthy.store(true, Ordering::Relaxed);
+                            }
+                            log_tunnel_connection_error("tunnel.local.connection", &error);
+                        }
+                    });
+                }
+            }
+        }
+
+        update_runtime_status(&tunnel.id, generation, TunnelRuntimeStatus::Waiting);
     }
-    let _ = handle
-        .disconnect(Disconnect::ByApplication, "", "English")
-        .await;
-    Ok(())
 }
 
 async fn handle_local_tunnel_connection(
@@ -713,7 +947,8 @@ async fn handle_local_tunnel_connection(
             originator.ip().to_string(),
             originator.port().into(),
         )
-        .await?;
+        .await
+        .map_err(|error| anyhow!("Failed to open channel ({error:?})"))?;
     relay_tcp_stream_and_channel(stream, channel).await
 }
 
@@ -721,54 +956,160 @@ async fn run_remote_tunnel(
     tunnel: TunnelConfig,
     credential: SshAuthCredential,
     mut stop_rx: oneshot::Receiver<()>,
+    generation: u64,
 ) -> Result<()> {
     let remote_routes = Arc::new(Mutex::new(HashMap::new()));
-    let handle = connect_ssh_profile(
-        &tunnel.ssh_profile_id,
-        credential,
-        Arc::clone(&remote_routes),
-    )
-    .await?;
     let mut backoff = Duration::from_secs(1);
 
     loop {
-        tokio::select! {
+        update_runtime_status(&tunnel.id, generation, TunnelRuntimeStatus::Waiting);
+        let connect = connect_ssh_profile(
+            &tunnel.ssh_profile_id,
+            credential.clone(),
+            Arc::clone(&remote_routes),
+        );
+        tokio::pin!(connect);
+        let connected = tokio::select! {
             _ = &mut stop_rx => return Ok(()),
-            ready = local_tcp_port_is_open(&tunnel.target_host, tunnel.target_port) => {
-                if ready {
-                    break;
+            result = &mut connect => result,
+        };
+        let handle = match connected {
+            Ok(handle) => handle,
+            Err(error) => {
+                crate::app_log::log_error("tunnel.remote.connect", &error);
+                if sleep_or_stop(&mut stop_rx, backoff).await {
+                    return Ok(());
                 }
-                set_runtime_status(&tunnel.id, TunnelRuntimeStatus::Waiting);
-                tokio::time::sleep(backoff).await;
                 backoff = next_backoff_delay(backoff);
+                continue;
             }
-        }
-    }
+        };
+        backoff = Duration::from_secs(1);
 
-    let route_key = remote_route_key(&tunnel.listen_host, tunnel.listen_port);
-    remote_routes.lock().unwrap().insert(
-        route_key.clone(),
-        RemoteRoute {
+        loop {
+            if handle.is_closed() {
+                break;
+            }
+            let probe = local_tcp_port_is_open(&tunnel.target_host, tunnel.target_port);
+            tokio::pin!(probe);
+            let ready = tokio::select! {
+                _ = &mut stop_rx => return Ok(()),
+                ready = &mut probe => ready,
+            };
+            if ready {
+                break;
+            }
+            if sleep_or_stop(&mut stop_rx, backoff).await {
+                return Ok(());
+            }
+            backoff = next_backoff_delay(backoff);
+        }
+        if handle.is_closed() {
+            crate::app_log::log_error_message(
+                "tunnel.remote.session",
+                &format!(
+                    "SSH session for tunnel \"{}\" closed; reconnecting",
+                    tunnel.name
+                ),
+                None,
+            );
+            continue;
+        }
+
+        let requested_port = tunnel.listen_port;
+        let route = RemoteRoute {
             target_host: tunnel.target_host.clone(),
             target_port: tunnel.target_port,
-        },
-    );
+        };
+        if requested_port != 0 {
+            remote_routes.lock().unwrap().insert(
+                remote_route_key(&tunnel.listen_host, requested_port),
+                route.clone(),
+            );
+        }
 
-    handle
-        .tcpip_forward(tunnel.listen_host.clone(), tunnel.listen_port.into())
-        .await
-        .map_err(|e| anyhow!("Remote forward request failed: {:?}", e))?;
-    set_runtime_status(&tunnel.id, TunnelRuntimeStatus::Forwarding);
+        let forward = handle
+            .tcpip_forward(tunnel.listen_host.clone(), requested_port.into())
+            .await;
+        let assigned_port = match forward {
+            Ok(port) => port,
+            Err(error) => {
+                if requested_port != 0 {
+                    remote_routes
+                        .lock()
+                        .unwrap()
+                        .remove(&remote_route_key(&tunnel.listen_host, requested_port));
+                }
+                crate::app_log::log_error_message(
+                    "tunnel.remote.forward",
+                    &format!("Remote forward request failed: {error:?}"),
+                    None,
+                );
+                if sleep_or_stop(&mut stop_rx, backoff).await {
+                    return Ok(());
+                }
+                backoff = next_backoff_delay(backoff);
+                continue;
+            }
+        };
+        let active_port = if requested_port == 0 {
+            u16::try_from(assigned_port).unwrap_or(0)
+        } else {
+            requested_port
+        };
+        let route_key = remote_route_key(&tunnel.listen_host, active_port);
+        if requested_port == 0 {
+            remote_routes
+                .lock()
+                .unwrap()
+                .insert(route_key.clone(), route);
+        }
+        if active_port != 0 {
+            update_runtime_listen_port(&tunnel.id, generation, active_port);
+        }
+        update_runtime_status(&tunnel.id, generation, TunnelRuntimeStatus::Forwarding);
 
-    let _ = (&mut stop_rx).await;
-    remote_routes.lock().unwrap().remove(&route_key);
-    let _ = handle
-        .cancel_tcpip_forward(tunnel.listen_host.clone(), tunnel.listen_port.into())
-        .await;
-    let _ = handle
-        .disconnect(Disconnect::ByApplication, "", "English")
-        .await;
-    Ok(())
+        loop {
+            if handle.is_closed() {
+                break;
+            }
+            tokio::select! {
+                _ = &mut stop_rx => {
+                    remote_routes.lock().unwrap().remove(&route_key);
+                    let _ = tokio::time::timeout(
+                        Duration::from_secs(2),
+                        handle.cancel_tcpip_forward(
+                            tunnel.listen_host.clone(),
+                            requested_port.into(),
+                        ),
+                    )
+                    .await;
+                    let _ = tokio::time::timeout(
+                        Duration::from_secs(2),
+                        handle.disconnect(Disconnect::ByApplication, "", "English"),
+                    )
+                    .await;
+                    return Ok(());
+                }
+                _ = tokio::time::sleep(Duration::from_secs(2)) => {
+                    if handle.is_closed() {
+                        break;
+                    }
+                }
+            }
+        }
+
+        remote_routes.lock().unwrap().remove(&route_key);
+        update_runtime_status(&tunnel.id, generation, TunnelRuntimeStatus::Waiting);
+        crate::app_log::log_error_message(
+            "tunnel.remote.session",
+            &format!(
+                "SSH session for tunnel \"{}\" closed; reconnecting",
+                tunnel.name
+            ),
+            None,
+        );
+    }
 }
 
 pub(crate) fn count_configs() -> usize {
@@ -1004,6 +1345,82 @@ sJWR7W+cGvJ/vLsw==
 
         assert_eq!(tunnels.len(), 1);
         assert_eq!(tunnels[0].status, TunnelRuntimeStatus::Waiting);
+    }
+
+    #[test]
+    fn expected_connection_close_filters_client_resets_only() {
+        assert!(is_expected_connection_close(
+            "你的主机中的软件中止了一个已建立的连接。 (os error 10053)"
+        ));
+        assert!(is_expected_connection_close("Connection reset by peer"));
+        assert!(!is_expected_connection_close(
+            "Failed to open channel (ConnectFailed)"
+        ));
+    }
+
+    #[test]
+    fn runtime_status_overlays_auto_assigned_listen_port() {
+        let _guard = clear_tunnels_for_test();
+        let _workspace = TestWorkspace::new();
+        reset_store();
+        let created = create_tunnel(
+            "Auto Port".to_string(),
+            TunnelForwardType::Local,
+            "profile-1".to_string(),
+            "127.0.0.1".to_string(),
+            0,
+            "127.0.0.1".to_string(),
+            8080,
+        )
+        .unwrap();
+        RUNTIME_STORE.lock().unwrap().insert(
+            created.id.clone(),
+            TunnelRuntime {
+                generation: 7,
+                status: TunnelRuntimeStatus::Forwarding,
+                active_listen_port: Some(52345),
+                stop_tx: None,
+                done_rx: None,
+            },
+        );
+
+        let tunnels = list_tunnels().unwrap();
+
+        assert_eq!(tunnels[0].listen_port, 52345);
+        assert_eq!(tunnels[0].status, TunnelRuntimeStatus::Forwarding);
+    }
+
+    #[test]
+    fn stale_runtime_generation_does_not_remove_newer_runtime() {
+        let _guard = clear_tunnels_for_test();
+        let _workspace = TestWorkspace::new();
+        reset_store();
+        let created = create_tunnel(
+            "Race".to_string(),
+            TunnelForwardType::Local,
+            "profile-1".to_string(),
+            "127.0.0.1".to_string(),
+            18080,
+            "127.0.0.1".to_string(),
+            8080,
+        )
+        .unwrap();
+        RUNTIME_STORE.lock().unwrap().insert(
+            created.id.clone(),
+            TunnelRuntime {
+                generation: 2,
+                status: TunnelRuntimeStatus::Waiting,
+                active_listen_port: None,
+                stop_tx: None,
+                done_rx: None,
+            },
+        );
+
+        remove_runtime_if_generation(&created.id, 1);
+        assert!(RUNTIME_STORE.lock().unwrap().contains_key(&created.id));
+
+        remove_runtime_if_generation(&created.id, 2);
+        assert!(!RUNTIME_STORE.lock().unwrap().contains_key(&created.id));
     }
 
     #[test]

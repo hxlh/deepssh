@@ -34,8 +34,10 @@ class TunnelConfigItem {
     }
   }
 
+  String get listenPortLabel => listenPort == 0 ? 'auto' : '$listenPort';
+
   String get forwardingSummary =>
-      '$directionLabel $listenHost:$listenPort → $targetHost:$targetPort';
+      '$directionLabel $listenHost:$listenPortLabel → $targetHost:$targetPort';
 
   bool get isForwarding => status == TunnelRuntimeStatus.forwarding;
 
