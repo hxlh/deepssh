@@ -6,10 +6,8 @@ import 'package:flutter/material.dart';
 import 'core/logging/app_logger.dart';
 import 'core/logging/frontend_error_hooks.dart';
 import 'core/models/ssh_profile_item.dart';
-import 'core/models/theme_settings.dart';
 import 'core/theme/app_theme.dart';
 import 'features/ssh/ssh_bridge.dart';
-import 'features/theme/theme_bridge.dart';
 import 'workbench/workbench_page.dart';
 
 Future<void> main(List<String> args) async {
@@ -70,10 +68,9 @@ String _dateStamp(DateTime value) {
 }
 
 class DeepSshApp extends StatefulWidget {
-  const DeepSshApp({super.key, this.sshBridge, this.themeBridge});
+  const DeepSshApp({super.key, this.sshBridge});
 
   final SshBridgeClient? sshBridge;
-  final ThemeBridgeClient? themeBridge;
 
   @override
   State<DeepSshApp> createState() => _DeepSshAppState();
@@ -81,19 +78,11 @@ class DeepSshApp extends StatefulWidget {
 
 class _DeepSshAppState extends State<DeepSshApp> {
   late final SshBridgeClient _sshBridge;
-  late final ThemeBridgeClient _themeBridge;
 
   @override
   void initState() {
     super.initState();
     _sshBridge = widget.sshBridge ?? const _DefaultAppSshBridgeClientHolder();
-    _themeBridge =
-        widget.themeBridge ?? const _DefaultAppThemeBridgeClientHolder();
-  }
-
-  void _handleThemeChanged() {
-    if (!mounted) return;
-    setState(() {});
   }
 
   @override
@@ -102,11 +91,7 @@ class _DeepSshAppState extends State<DeepSshApp> {
       debugShowCheckedModeBanner: false,
       title: 'DeepSSH',
       theme: AppTheme.deck(),
-      home: WorkbenchPage(
-        sshBridge: _sshBridge,
-        themeBridge: _themeBridge,
-        onThemeChanged: _handleThemeChanged,
-      ),
+      home: WorkbenchPage(sshBridge: _sshBridge),
     );
   }
 }
@@ -203,20 +188,4 @@ class _DefaultAppSshBridgeClientHolder implements SshBridgeClient {
   @override
   Future<SshConnectionResult> duplicateSession(String sessionId) =>
       _delegate.duplicateSession(sessionId);
-}
-
-class _DefaultAppThemeBridgeClientHolder implements ThemeBridgeClient {
-  const _DefaultAppThemeBridgeClientHolder();
-
-  static final RustThemeBridgeClient _delegate = RustThemeBridgeClient();
-
-  @override
-  Future<({UiThemeSettings ui, TerminalThemeSettings terminal})> loadTheme() =>
-      _delegate.loadTheme();
-
-  @override
-  Future<void> saveTheme({
-    required UiThemeSettings ui,
-    required TerminalThemeSettings terminal,
-  }) => _delegate.saveTheme(ui: ui, terminal: terminal);
 }

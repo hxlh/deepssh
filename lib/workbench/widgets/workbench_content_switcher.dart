@@ -5,7 +5,6 @@ import '../../core/models/theme_settings.dart';
 import '../../core/models/tunnel_config_item.dart';
 import '../../features/local_terminal/local_terminal_bridge.dart';
 import '../../features/ssh/ssh_bridge.dart';
-import '../../features/diagnostics/diagnostics_page.dart';
 import '../../features/ssh_profiles/ssh_profile_form_drawer.dart';
 import '../../features/ssh_profiles/ssh_profiles_page.dart';
 import '../../features/terminal/terminal_tab_shell.dart';
@@ -13,7 +12,6 @@ import '../../features/terminal/terminal_view.dart';
 import '../../features/tunnels/tunnel_config_form_drawer.dart';
 import '../../features/tunnels/tunnel_configs_page.dart';
 import '../../features/terminal/terminal_state.dart';
-import '../../features/theme_config/theme_config_page.dart';
 
 enum WorkbenchContentMode {
   terminal,
@@ -21,8 +19,6 @@ enum WorkbenchContentMode {
   sshProfileForm,
   tunnelConfigs,
   tunnelConfigForm,
-  themeConfig,
-  diagnostics,
 }
 
 class WorkbenchContentSwitcher extends StatelessWidget {
@@ -34,10 +30,9 @@ class WorkbenchContentSwitcher extends StatelessWidget {
     required this.sshErrorMessage,
     required this.editingSshProfile,
     required this.tunnelConfigs,
+    required this.terminalThemeSettings,
     required this.tunnelErrorMessage,
     required this.editingTunnelConfig,
-    required this.uiThemeSettings,
-    required this.terminalThemeSettings,
     required this.onSelectTab,
     required this.onCloseTab,
     required this.onReorderTab,
@@ -56,9 +51,6 @@ class WorkbenchContentSwitcher extends StatelessWidget {
     required this.onDeleteTunnelConfig,
     required this.onCancelTunnelForm,
     required this.onSaveTunnelConfig,
-    required this.onUiThemeChanged,
-    required this.onTerminalThemeChanged,
-    required this.onBackFromConfig,
     required this.sshBridge,
     required this.localTerminalBridge,
     this.onSshInput,
@@ -72,10 +64,9 @@ class WorkbenchContentSwitcher extends StatelessWidget {
   final String? sshErrorMessage;
   final SshProfileItem? editingSshProfile;
   final List<TunnelConfigItem> tunnelConfigs;
+  final TerminalThemeSettings terminalThemeSettings;
   final String? tunnelErrorMessage;
   final TunnelConfigItem? editingTunnelConfig;
-  final UiThemeSettings uiThemeSettings;
-  final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String> onSelectTab;
   final ValueChanged<String> onCloseTab;
   final void Function(int oldIndex, int newIndex) onReorderTab;
@@ -96,9 +87,6 @@ class WorkbenchContentSwitcher extends StatelessWidget {
   final ValueChanged<TunnelConfigItem> onDeleteTunnelConfig;
   final VoidCallback onCancelTunnelForm;
   final ValueChanged<TunnelConfigDraft> onSaveTunnelConfig;
-  final ValueChanged<UiThemeSettings> onUiThemeChanged;
-  final ValueChanged<TerminalThemeSettings> onTerminalThemeChanged;
-  final VoidCallback onBackFromConfig;
   final ValueChanged<String>? onSshInput;
   final SshTerminalInputWriter? onSshTerminalInput;
   final ValueChanged<String>? onPreviewLabelChanged;
@@ -145,16 +133,6 @@ class WorkbenchContentSwitcher extends StatelessWidget {
           onSshTerminalInput: onSshTerminalInput,
           onPreviewLabelChanged: onPreviewLabelChanged,
         );
-      case WorkbenchContentMode.themeConfig:
-        return ThemeConfigPage(
-          uiSettings: uiThemeSettings,
-          terminalSettings: terminalThemeSettings,
-          onUiSettingsChanged: onUiThemeChanged,
-          onTerminalSettingsChanged: onTerminalThemeChanged,
-          onBack: onBackFromConfig,
-        );
-      case WorkbenchContentMode.diagnostics:
-        return DiagnosticsPage(onBack: onBackFromConfig);
     }
   }
 }

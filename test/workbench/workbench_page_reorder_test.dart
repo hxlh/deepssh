@@ -1,6 +1,5 @@
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
-import 'package:deepssh/features/theme/theme_bridge.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,17 +26,10 @@ class _FakeSshBridge extends InMemorySshBridgeClient {
   ];
 }
 
-class _FakeThemeBridge extends InMemoryThemeBridgeClient {}
-
 void main() {
   testWidgets('profiles display after loading', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: WorkbenchPage(
-          sshBridge: _FakeSshBridge(),
-          themeBridge: _FakeThemeBridge(),
-        ),
-      ),
+      MaterialApp(home: WorkbenchPage(sshBridge: _FakeSshBridge())),
     );
 
     await tester.pumpAndSettle();

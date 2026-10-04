@@ -12,7 +12,6 @@ import '../core/models/ssh_session_item.dart';
 import '../core/models/terminal_item.dart';
 import '../core/models/theme_settings.dart';
 import '../core/models/tunnel_config_item.dart';
-import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../features/hosts/host_tree.dart';
 import '../features/hosts/host_tree_state.dart';
@@ -24,7 +23,6 @@ import '../src/rust/mem_metrics.dart';
 import '../features/ssh_profiles/ssh_profile_form_drawer.dart';
 import '../features/terminal/terminal_state.dart';
 import '../features/terminal/terminal_view.dart';
-import '../features/theme/theme_bridge.dart';
 import '../features/tunnels/tunnel_bridge.dart';
 import '../features/tunnels/tunnel_config_form_drawer.dart';
 import '../src/rust/ssh_auth.dart' as rust_auth;
@@ -42,8 +40,6 @@ class WorkbenchPage extends StatefulWidget {
     SshBridgeClient? sshBridge,
     LocalTerminalBridgeClient? localTerminalBridge,
     TunnelBridgeClient? tunnelBridge,
-    ThemeBridgeClient? themeBridge,
-    this.onThemeChanged,
     this.errorLogger,
     this.debugSshInputWriter,
     this.debugSshZModemFactory,
@@ -51,14 +47,11 @@ class WorkbenchPage extends StatefulWidget {
        localTerminalBridge =
            localTerminalBridge ??
            const _DefaultLocalTerminalBridgeClientHolder(),
-       tunnelBridge = tunnelBridge ?? const _DefaultTunnelBridgeClientHolder(),
-       themeBridge = themeBridge ?? const _DefaultThemeBridgeClientHolder();
+       tunnelBridge = tunnelBridge ?? const _DefaultTunnelBridgeClientHolder();
 
   final SshBridgeClient sshBridge;
   final LocalTerminalBridgeClient localTerminalBridge;
   final TunnelBridgeClient tunnelBridge;
-  final ThemeBridgeClient themeBridge;
-  final VoidCallback? onThemeChanged;
   final ErrorLogger? errorLogger;
   final SshTerminalInputWriter? debugSshInputWriter;
   final SshZModemBindingFactory? debugSshZModemFactory;
@@ -308,23 +301,6 @@ class _DefaultLocalTerminalBridgeClientHolder
       _delegate.closeSession(sessionId);
 }
 
-class _DefaultThemeBridgeClientHolder implements ThemeBridgeClient {
-  const _DefaultThemeBridgeClientHolder();
-
-  static final InMemoryThemeBridgeClient _delegate =
-      InMemoryThemeBridgeClient();
-
-  @override
-  Future<({UiThemeSettings ui, TerminalThemeSettings terminal})> loadTheme() =>
-      _delegate.loadTheme();
-
-  @override
-  Future<void> saveTheme({
-    required UiThemeSettings ui,
-    required TerminalThemeSettings terminal,
-  }) => _delegate.saveTheme(ui: ui, terminal: terminal);
-}
-
 class _WorkbenchPageState extends State<WorkbenchPage> {
   static const int sshSessionHistoryLineLimit = 3000;
   // Force an immediate flush when the per-session output buffer crosses this
@@ -379,11 +355,12 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   TunnelConfigItem? editingTunnelConfig;
   String? tunnelErrorMessage;
   Timer? tunnelStatusRefreshTimer;
-  UiThemeSettings uiThemeSettings = UiThemeSettings.commandDeck();
-  TerminalThemeSettings terminalThemeSettings =
+
+  /// Fixed terminal settings. The theme page is gone, so nothing mutates
+  /// these — they are the prototype's terminal colours plus the shipped
+  /// regex-highlight set.
+  final TerminalThemeSettings terminalThemeSettings =
       TerminalThemeSettings.commandDeck();
-  bool _themeSaveInFlight = false;
-  bool _themeSaveQueued = false;
   // 56px is the prototype's icon-rail width; below the compact breakpoint the
   // Explorer sheds its labels and keeps icons only.
   static const double _minSidebarWidth = 56;
@@ -397,7 +374,6 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     super.initState();
     loadSshProfiles();
     loadTunnelConfigs();
-    loadInitialTheme();
     _clock = DateTime.now();
     _clockTimer = Timer.periodic(
       const Duration(seconds: 15),
@@ -485,23 +461,6 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         unawaited(loadTunnelConfigs());
       }
     });
-  }
-
-  Future<void> loadInitialTheme() async {
-    try {
-      final loaded = await widget.themeBridge.loadTheme();
-      if (!mounted) return;
-      AppColors.applyUi(loaded.ui);
-      AppColors.applyTerminal(loaded.terminal);
-      setState(() {
-        uiThemeSettings = loaded.ui;
-        terminalThemeSettings = loaded.terminal;
-      });
-      widget.onThemeChanged?.call();
-    } catch (error, stackTrace) {
-      unawaited(_errorLogger.error('theme.load', error, stackTrace));
-      // Keep built-in defaults if persistence is unavailable.
-    }
   }
 
   void _handleHostToggle(String hostId) {
@@ -1555,7 +1514,6 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     WorkbenchContentMode.sshProfileForm => AppSection.connections,
     WorkbenchContentMode.tunnelConfigs ||
     WorkbenchContentMode.tunnelConfigForm => AppSection.tunnels,
-    WorkbenchContentMode.themeConfig => AppSection.theme,
     _ => AppSection.workbench,
   };
 
@@ -1580,15 +1538,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         });
         loadSshProfiles();
         loadTunnelConfigs();
-      case AppSection.theme:
-        _handleOpenThemeConfig();
     }
-  }
-
-  void _handleOpenThemeConfig() {
-    setState(() {
-      contentMode = WorkbenchContentMode.themeConfig;
-    });
   }
 
   /// Toggles the dock's 内存监控 panel from the Explorer's footer button.
@@ -1596,61 +1546,15 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     setState(() => _memoryDockVisible = !_memoryDockVisible);
   }
 
-  void _handleBackFromConfig() {
-    setState(() {
-      contentMode = WorkbenchContentMode.terminal;
-    });
-  }
-
-  void _handleUiThemeChanged(UiThemeSettings settings) {
-    AppColors.applyUi(settings);
-    setState(() {
-      uiThemeSettings = settings;
-    });
-    widget.onThemeChanged?.call();
-    _persistTheme();
-  }
-
-  void _handleTerminalThemeChanged(TerminalThemeSettings settings) {
-    AppColors.applyTerminal(settings);
-    setState(() {
-      terminalThemeSettings = settings;
-    });
-    widget.onThemeChanged?.call();
-    _persistTheme();
-  }
-
-  Future<void> _persistTheme() async {
-    if (_themeSaveInFlight) {
-      _themeSaveQueued = true;
-      return;
-    }
-
-    _themeSaveInFlight = true;
-    do {
-      _themeSaveQueued = false;
-      final ui = uiThemeSettings;
-      final terminal = terminalThemeSettings;
-      try {
-        await widget.themeBridge.saveTheme(ui: ui, terminal: terminal);
-      } catch (error, stackTrace) {
-        unawaited(_errorLogger.error('theme.save', error, stackTrace));
-        // Ignore persistence errors so the UI keeps responding.
-      }
-    } while (_themeSaveQueued);
-    _themeSaveInFlight = false;
-  }
-
   /// The Explorer belongs to the workbench only. The settings pages are
   /// full-bleed views under the topbar, exactly like the prototype — keeping
   /// the sidebar beside them would squeeze their tables into ~500px.
   bool get _showExplorer => switch (contentMode) {
-    WorkbenchContentMode.terminal || WorkbenchContentMode.diagnostics => true,
+    WorkbenchContentMode.terminal => true,
     WorkbenchContentMode.sshProfiles ||
     WorkbenchContentMode.sshProfileForm ||
     WorkbenchContentMode.tunnelConfigs ||
-    WorkbenchContentMode.tunnelConfigForm ||
-    WorkbenchContentMode.themeConfig => false,
+    WorkbenchContentMode.tunnelConfigForm => false,
   };
 
   /// The form drawer floating over the shell, or null when none is open.
@@ -1725,10 +1629,6 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                                 onDuplicateSshSession:
                                     _handleDuplicateSshSession,
                                 onCloseLocalTerminal: _handleCloseLocalTerminal,
-                                onOpenThemeConfig: _handleOpenThemeConfig,
-                                themeConfigActive:
-                                    contentMode ==
-                                    WorkbenchContentMode.themeConfig,
                                 onToggleMemoryDock: _handleToggleMemoryDock,
                                 memoryDockVisible: _memoryDockVisible,
                                 onReorderSessions: _handleReorderSessions,
@@ -1760,7 +1660,6 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                               tunnelConfigs: tunnelConfigs,
                               tunnelErrorMessage: tunnelErrorMessage,
                               editingTunnelConfig: editingTunnelConfig,
-                              uiThemeSettings: uiThemeSettings,
                               terminalThemeSettings: terminalThemeSettings,
                               onSelectTab: _handleTabSelect,
                               onCloseTab: _handleTabClose,
@@ -1784,10 +1683,6 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                               onDeleteTunnelConfig: _handleDeleteTunnelConfig,
                               onCancelTunnelForm: _handleCancelTunnelForm,
                               onSaveTunnelConfig: _handleSaveTunnelConfig,
-                              onUiThemeChanged: _handleUiThemeChanged,
-                              onTerminalThemeChanged:
-                                  _handleTerminalThemeChanged,
-                              onBackFromConfig: _handleBackFromConfig,
                               sshBridge: widget.sshBridge,
                               localTerminalBridge: widget.localTerminalBridge,
                               onSshInput:

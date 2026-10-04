@@ -1,5 +1,4 @@
 import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
-import 'package:deepssh/features/theme/theme_bridge.dart';
 import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/material.dart';
@@ -11,7 +10,6 @@ Widget _workbenchApp() {
     home: WorkbenchPage(
       localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
       tunnelBridge: InMemoryTunnelBridgeClient(),
-      themeBridge: InMemoryThemeBridgeClient(),
     ),
   );
 }

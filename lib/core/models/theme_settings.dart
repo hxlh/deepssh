@@ -21,88 +21,6 @@ class RegexHighlight {
       );
 }
 
-class UiThemeSettings {
-  const UiThemeSettings({
-    required this.presetName,
-    required this.fontFamily,
-    required this.fontSize,
-    required this.normalFontWeight,
-    required this.boldFontWeight,
-    required this.background,
-    required this.panel,
-    required this.sidebar,
-    required this.accent,
-    required this.textPrimary,
-    required this.textMuted,
-  });
-
-  final String presetName;
-  final String fontFamily;
-  final int fontSize;
-  final int normalFontWeight;
-  final int boldFontWeight;
-  final Color background;
-  final Color panel;
-  final Color sidebar;
-  final Color accent;
-  final Color textPrimary;
-  final Color textMuted;
-
-  UiThemeSettings copyWith({
-    String? presetName,
-    String? fontFamily,
-    int? fontSize,
-    int? normalFontWeight,
-    int? boldFontWeight,
-    Color? background,
-    Color? panel,
-    Color? sidebar,
-    Color? accent,
-    Color? textPrimary,
-    Color? textMuted,
-  }) => UiThemeSettings(
-    presetName: presetName ?? this.presetName,
-    fontFamily: fontFamily ?? this.fontFamily,
-    fontSize: fontSize ?? this.fontSize,
-    normalFontWeight: normalFontWeight ?? this.normalFontWeight,
-    boldFontWeight: boldFontWeight ?? this.boldFontWeight,
-    background: background ?? this.background,
-    panel: panel ?? this.panel,
-    sidebar: sidebar ?? this.sidebar,
-    accent: accent ?? this.accent,
-    textPrimary: textPrimary ?? this.textPrimary,
-    textMuted: textMuted ?? this.textMuted,
-  );
-
-  static UiThemeSettings commandDeck() => const UiThemeSettings(
-    presetName: 'Command Deck',
-    fontFamily: 'Inter',
-    fontSize: 14,
-    normalFontWeight: 500,
-    boldFontWeight: 700,
-    background: Color(0xFFFAF9F5),
-    panel: Color(0xFFFFFFFF),
-    sidebar: Color(0xFFFAF9F5),
-    accent: Color(0xFFD97757),
-    textPrimary: Color(0xFF1F1E1D),
-    textMuted: Color(0xFF6B6862),
-  );
-
-  static UiThemeSettings vsCodeDark() => const UiThemeSettings(
-    presetName: 'VS Code Dark',
-    fontFamily: 'Segoe UI',
-    fontSize: 14,
-    normalFontWeight: 500,
-    boldFontWeight: 700,
-    background: Color(0xFF1E1E1E),
-    panel: Color(0xFF252526),
-    sidebar: Color(0xFF181818),
-    accent: Color(0xFF007ACC),
-    textPrimary: Color(0xFFCCCCCC),
-    textMuted: Color(0xFF858585),
-  );
-}
-
 class TerminalThemeSettings {
   const TerminalThemeSettings({
     required this.presetName,
@@ -177,74 +95,65 @@ class TerminalThemeSettings {
     selectionColor: Color(0xFF3A3F44),
     cursorColor: Color(0xFFD9A24B),
     scrollbackLines: 10000,
+    // The set the app actually ships with, in this order: earlier rules win
+    // when two patterns overlap, so the specific ones come first.
     regexHighlights: [
       RegexHighlight(
-        pattern: 'ERROR|FATAL|Exception|Traceback',
-        color: Color(0xFFF14C4C),
-        note: '错误日志',
+        pattern:
+            r'[dlbcps-]([r-][w-][xs-]){3}|\broot\b|\bsudo\b|\bchmod\b|\bchown\b',
+        color: Color(0xFFC1794F),
+        note: 'Linux权限与用户',
       ),
       RegexHighlight(
-        pattern: 'WARN|WARNING',
-        color: Color(0xFFF5F543),
-        note: '警告日志',
+        pattern: r'(?:^|\s)(?:/[^\s]*|\./[^\s]*|\.\./[^\s]*|~[^\s]*)',
+        color: Color(0xFFE0C828),
+        note: 'Linux文件路径',
       ),
       RegexHighlight(
-        pattern: 'SUCCESS|OK|DONE',
-        color: Color(0xFF23D18B),
-        note: '成功状态',
+        pattern:
+            r'\b(if|then|else|elif|fi|case|esac|for|while|until|do|done|in|function|return|exit|break|continue)\b',
+        color: Color(0xFFFF1495),
+        note: 'Shell关键字与流程控制',
       ),
       RegexHighlight(
-        pattern: r'\b[45]\d\d\b',
-        color: Color(0xFFF14C4C),
-        note: 'HTTP 错误',
+        pattern:
+            r'\b(SUCCESS|PASS|OK|DONE|COMPLETE|ERROR|FAIL|FAILED|FATAL|CRITICAL)\b|✓|✗|❌|✅',
+        color: Color(0xFF1EBF19),
+        note: '成功/错误状态',
       ),
       RegexHighlight(
-        pattern: r'\b\d+ms\b|\b\d+\.\d+s\b',
-        color: Color(0xFF29B8DB),
-        note: '耗时',
+        pattern:
+            r'https?://[^\s]+|ftp://[^\s]+|www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:/[^\s]*)?',
+        color: Color(0xFF3F8EE8),
+        note: '网址链接',
       ),
       RegexHighlight(
-        pattern: r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
-        color: Color(0xFFD670D6),
-        note: 'IP 地址',
+        pattern: r'''"[^"]*"|'[^']*'|`[^`]*`''',
+        color: Color(0xFF5E923D),
+        note: '字符串与引号',
       ),
       RegexHighlight(
-        pattern: r'\b[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\b',
-        color: Color(0xFF3B8EEA),
-        note: 'UUID',
+        pattern: r'\$[A-Za-z_][A-Za-z0-9_]*|--?[A-Za-z][A-Za-z0-9-]*',
+        color: Color(0xFFCC703A),
+        note: '环境变量与参数',
+      ),
+      RegexHighlight(
+        pattern:
+            r'\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b|\b(?:localhost|127\.0\.0\.1)\b',
+        color: Color(0xFF459BFF),
+        note: '网络与IP地址',
+      ),
+      RegexHighlight(
+        pattern:
+            r'\b\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?\b|\b\d{2}:\d{2}(?::\d{2})?\b',
+        color: Color(0xFF7960FF),
+        note: '时间与日期',
+      ),
+      RegexHighlight(
+        pattern: r'\b\d+(?:\.\d+)?\s*(?:[KMGT]i?B|%|MB|GB|KB)?\b',
+        color: Color(0xFF1AA416),
+        note: '数字与计数',
       ),
     ],
-  );
-
-  static TerminalThemeSettings oneDark() => const TerminalThemeSettings(
-    presetName: 'One Dark',
-    fontFamily: 'JetBrains Mono',
-    fontSize: 14,
-    normalFontWeight: 400,
-    boldFontWeight: 700,
-    cursorStyle: CursorStyle.block,
-    cursorBlink: true,
-    foreground: Color(0xFFABB2BF),
-    terminalBackground: Color(0xFF282C34),
-    selectionColor: Color(0xFF3E4451),
-    cursorColor: Color(0xFF528BFF),
-    scrollbackLines: 10000,
-    regexHighlights: [],
-  );
-
-  static TerminalThemeSettings solarized() => const TerminalThemeSettings(
-    presetName: 'Solarized',
-    fontFamily: 'JetBrains Mono',
-    fontSize: 14,
-    normalFontWeight: 400,
-    boldFontWeight: 700,
-    cursorStyle: CursorStyle.block,
-    cursorBlink: false,
-    foreground: Color(0xFF839496),
-    terminalBackground: Color(0xFF002B36),
-    selectionColor: Color(0xFF073642),
-    cursorColor: Color(0xFF93A1A1),
-    scrollbackLines: 10000,
-    regexHighlights: [],
   );
 }

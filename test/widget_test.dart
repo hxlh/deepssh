@@ -1,6 +1,5 @@
-import 'package:deepssh/core/models/theme_settings.dart';
+import 'package:deepssh/core/theme/app_colors.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
-import 'package:deepssh/features/theme/theme_bridge.dart';
 import 'package:deepssh/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,44 +29,15 @@ void main() {
     },
   );
 
-  testWidgets('applies loaded UI font settings to the app theme', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      DeepSshApp(
-        sshBridge: InMemorySshBridgeClient(),
-        themeBridge: FixedThemeBridgeClient(
-          ui: UiThemeSettings.commandDeck().copyWith(
-            fontFamily: 'Fira Sans',
-            fontSize: 17,
-          ),
-        ),
-      ),
-    );
+  testWidgets('app boots on the fixed prototype theme', (tester) async {
+    await tester.pumpWidget(DeepSshApp(sshBridge: InMemorySshBridgeClient()));
     await tester.pumpAndSettle();
 
     final context = tester.element(find.text('EXPLORER'));
-    final style = Theme.of(context).textTheme.bodyMedium;
+    final theme = Theme.of(context);
 
-    expect(style?.fontFamily, 'Fira Sans');
-    expect(style?.fontSize, 17);
+    // The theme page is gone: no loaded preset, just the paper palette.
+    expect(theme.colorScheme.surface, AppColors.panel);
+    expect(theme.scaffoldBackgroundColor, AppColors.background);
   });
-}
-
-class FixedThemeBridgeClient implements ThemeBridgeClient {
-  const FixedThemeBridgeClient({required this.ui});
-
-  final UiThemeSettings ui;
-
-  @override
-  Future<({UiThemeSettings ui, TerminalThemeSettings terminal})>
-  loadTheme() async {
-    return (ui: ui, terminal: TerminalThemeSettings.commandDeck());
-  }
-
-  @override
-  Future<void> saveTheme({
-    required UiThemeSettings ui,
-    required TerminalThemeSettings terminal,
-  }) async {}
 }
