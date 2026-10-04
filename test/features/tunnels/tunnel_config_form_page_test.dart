@@ -75,6 +75,32 @@ void main() {
     expect(savedDraft?.targetPort, 8080);
   });
 
+  testWidgets('saves an empty listen port as auto-assign', (tester) async {
+    TunnelConfigDraft? savedDraft;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TunnelConfigFormPage(
+            profiles: profiles,
+            onCancel: () {},
+            onSaved: (draft) => savedDraft = draft,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.bySemanticsLabel('Name'), 'Dev API');
+    await tester.enterText(find.bySemanticsLabel('Listen Port'), '');
+    await tester.enterText(find.bySemanticsLabel('Target Host'), '127.0.0.1');
+    await tester.enterText(find.bySemanticsLabel('Target Port'), '8080');
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+
+    expect(savedDraft?.listenPort, 0);
+    expect(savedDraft?.targetPort, 8080);
+  });
+
   testWidgets(
     'edit tunnel form pre-fills current values and saves remote type',
     (tester) async {

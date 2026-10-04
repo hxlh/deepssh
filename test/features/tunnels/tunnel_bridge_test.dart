@@ -34,6 +34,21 @@ void main() {
     expect(remote.directionLabel, 'REMOTE');
     expect(remote.forwardingSummary, 'REMOTE 0.0.0.0:19090 → 127.0.0.1:9090');
     expect(remote.isForwarding, isFalse);
+
+    const autoAssigned = TunnelConfigItem(
+      id: 'tunnel-3',
+      name: 'Auto',
+      type: TunnelForwardType.local,
+      sshProfileId: 'profile-1',
+      listenHost: '127.0.0.1',
+      listenPort: 0,
+      targetHost: '127.0.0.1',
+      targetPort: 8080,
+    );
+    expect(
+      autoAssigned.forwardingSummary,
+      'LOCAL 127.0.0.1:auto → 127.0.0.1:8080',
+    );
   });
 
   test(
