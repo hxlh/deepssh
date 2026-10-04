@@ -5,6 +5,7 @@ import '../../core/models/ssh_profile_item.dart';
 import '../../core/models/ssh_session_item.dart';
 import '../../core/models/terminal_item.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_spacing.dart';
 import 'host_tree_node.dart';
 import 'host_tree_state.dart';
@@ -64,7 +65,7 @@ class HostTree extends StatelessWidget {
   final List<String> sectionOrder;
   final ValueChanged<List<String>>? onSectionOrderChanged;
 
-  static const Color _menuAccent = Color(0xFFFFB280);
+  static const Color _menuAccent = DeckTokens.accent;
   static const double _menuItemHeight = 32;
   static const double _menuWidth = 150;
   static const String _localSectionId = 'local';
@@ -121,16 +122,16 @@ class HostTree extends StatelessWidget {
     return showMenu<String>(
       context: context,
       position: _menuPosition(context, position),
-      color: AppColors.panel,
-      elevation: 8,
-      shadowColor: const Color(0x66000000),
+      color: DeckTokens.surface,
+      elevation: 0,
+      shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       menuPadding: EdgeInsets.zero,
       constraints: const BoxConstraints.tightFor(width: _menuWidth),
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(6),
-        side: BorderSide(color: AppColors.border),
+      clipBehavior: Clip.none,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+        side: BorderSide(color: DeckTokens.fg),
       ),
       items: items,
     );
@@ -220,21 +221,37 @@ class HostTree extends StatelessWidget {
       child: Container(
         height: AppSpacing.itemHeight,
         margin: const EdgeInsets.fromLTRB(24, 2, 8, 2),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.only(left: 7, right: 10),
         decoration: BoxDecoration(
+          // The 3px left rule carries connection state; a rounded fill would
+          // fight the deck's zero-radius language.
+          border: Border(
+            left: BorderSide(
+              color: isSelected ? groupColor : Colors.transparent,
+              width: 3,
+            ),
+          ),
           color: isSelected
-              ? groupColor.withOpacity(0.30)
-              : groupColor.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(AppSpacing.radius),
+              ? DeckTokens.wash(groupColor, 0.30)
+              : DeckTokens.wash(groupColor, 0.12),
         ),
         child: Row(
           children: [
-            Icon(Icons.terminal, size: 16, color: AppColors.textMuted),
+            Icon(
+              Icons.terminal,
+              size: 15,
+              color: isSelected ? AppColors.textPrimary : AppColors.textMuted,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 session.displayTitle,
                 overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: isSelected ? AppColors.textPrimary : AppColors.textPrimary,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                ),
               ),
             ),
           ],
@@ -257,21 +274,38 @@ class HostTree extends StatelessWidget {
       child: Container(
         height: AppSpacing.itemHeight,
         margin: const EdgeInsets.fromLTRB(24, 2, 8, 2),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.only(left: 7, right: 10),
         decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: selectedTerminalId == terminal.id
+                  ? DeckTokens.accent
+                  : Colors.transparent,
+              width: 3,
+            ),
+          ),
           color: selectedTerminalId == terminal.id
               ? AppColors.selection
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppSpacing.radius),
         ),
         child: Row(
           children: [
-            Icon(Icons.terminal, size: 16, color: AppColors.textMuted),
+            Icon(
+              Icons.terminal,
+              size: 15,
+              color: AppColors.textMuted,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 terminal.displayTitle,
                 overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: selectedTerminalId == terminal.id
+                      ? DeckTokens.accentInk
+                      : AppColors.textPrimary,
+                ),
               ),
             ),
           ],
@@ -284,15 +318,31 @@ class HostTree extends StatelessWidget {
     return InkWell(
       onTap: () => onSshProfileTap(profile),
       child: Container(
-        height: AppSpacing.itemHeight,
-        margin: const EdgeInsets.fromLTRB(8, 2, 8, 2),
+        height: 32,
+        margin: const EdgeInsets.fromLTRB(4, 2, 4, 2),
         padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: _groupColor(profile.id),
+              width: 3,
+            ),
+          ),
+        ),
         child: Row(
           children: [
-            Icon(Icons.computer, size: 16, color: AppColors.textMuted),
+            Icon(Icons.computer, size: 15, color: AppColors.textMuted),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(profile.name, overflow: TextOverflow.ellipsis),
+              child: Text(
+                profile.name,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: DeckTokens.fg,
+                ),
+              ),
             ),
           ],
         ),
@@ -342,17 +392,31 @@ class HostTree extends StatelessWidget {
           child: InkWell(
             onTap: onToggleLocal,
             child: Container(
-              height: AppSpacing.itemHeight,
-              margin: const EdgeInsets.fromLTRB(8, 2, 8, 2),
+              height: 32,
+              margin: const EdgeInsets.fromLTRB(4, 2, 4, 2),
               padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: const BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: DeckTokens.accent, width: 3),
+                ),
+              ),
               child: Row(
                 children: [
-                  Icon(Icons.laptop, size: 16, color: AppColors.textMuted),
+                  Icon(Icons.laptop, size: 15, color: AppColors.textMuted),
                   const SizedBox(width: 8),
-                  const Expanded(child: Text('Local')),
+                  const Expanded(
+                    child: Text(
+                      'Local',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: DeckTokens.fg,
+                      ),
+                    ),
+                  ),
                   Icon(
                     localExpanded ? Icons.expand_more : Icons.chevron_right,
-                    size: 18,
+                    size: 16,
                     color: AppColors.textMuted,
                   ),
                 ],
@@ -457,7 +521,7 @@ class _HostContextMenuItemState extends State<_HostContextMenuItem> {
       child: Container(
         width: HostTree._menuWidth,
         height: HostTree._menuItemHeight,
-        color: _hovered ? AppColors.tabHover : Colors.transparent,
+        color: _hovered ? DeckTokens.fgSoft : Colors.transparent,
         child: Row(
           children: [
             Container(
