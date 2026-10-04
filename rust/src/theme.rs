@@ -65,6 +65,10 @@ pub struct RegexHighlight {
 #[flutter_rust_bridge::frb(ignore)]
 #[derive(Debug, Deserialize, Serialize)]
 struct ThemeFile {
+    /// Missing on files written before the appearance refresh; those are the
+    /// only ones eligible for the legacy-default upgrade.
+    #[serde(default)]
+    version: Option<u32>,
     ui: UiThemeConfig,
     terminal: TerminalThemeConfig,
 }
@@ -136,6 +140,7 @@ struct RegexHighlightConfig {
 impl From<&ThemeSettings> for ThemeFile {
     fn from(settings: &ThemeSettings) -> Self {
         Self {
+            version: Some(CURRENT_THEME_VERSION),
             ui: UiThemeConfig::from(&settings.ui),
             terminal: TerminalThemeConfig::from(&settings.terminal),
         }
@@ -255,7 +260,109 @@ impl From<RegexHighlightConfig> for RegexHighlight {
     }
 }
 
+const CURRENT_THEME_VERSION: u32 = 1;
+
+/// Prototype defaults: `design/deepssh-prototype.html` `:root` plus the regex
+/// set the user ships (also mirrored in Dart `TerminalThemeSettings.commandDeck`).
 fn default_theme() -> ThemeSettings {
+    ThemeSettings {
+        ui: UiTheme {
+            preset_name: "Command Deck".to_string(),
+            // Empty = platform UI font, the prototype's 「系统默认（含中文）」.
+            font_family: String::new(),
+            font_size: 13,
+            normal_font_weight: default_ui_normal_font_weight(),
+            bold_font_weight: default_ui_bold_font_weight(),
+            background: "#FAF9F5".to_string(),
+            panel: "#FFFFFF".to_string(),
+            sidebar: "#FAF9F5".to_string(),
+            accent: "#D97757".to_string(),
+            text_primary: "#1F1E1D".to_string(),
+            text_muted: "#6B6862".to_string(),
+        },
+        terminal: TerminalTheme {
+            preset_name: "Command Deck".to_string(),
+            font_family: "JetBrains Mono".to_string(),
+            font_size: 14,
+            normal_font_weight: default_terminal_normal_font_weight(),
+            bold_font_weight: default_terminal_bold_font_weight(),
+            cursor_style: "bar".to_string(),
+            cursor_blink: true,
+            foreground: "#DEDCD6".to_string(),
+            terminal_background: "#17181A".to_string(),
+            // Prototype 终端配色: 高亮 #D9A24B, 光标 #8FBF7F.
+            selection_color: "#D9A24B".to_string(),
+            cursor_color: "#8FBF7F".to_string(),
+            scrollback_lines: 10000,
+            regex_highlights: vec![
+                RegexHighlight {
+                    pattern: r"[dlbcps-]([r-][w-][xs-]){3}|\broot\b|\bsudo\b|\bchmod\b|\bchown\b"
+                        .to_string(),
+                    color: "#C1794F".to_string(),
+                    note: "Linux权限与用户".to_string(),
+                },
+                RegexHighlight {
+                    pattern: r"(?:^|\s)(?:/[^\s]*|\./[^\s]*|\.\./[^\s]*|~[^\s]*)"
+                        .to_string(),
+                    color: "#E0C828".to_string(),
+                    note: "Linux文件路径".to_string(),
+                },
+                RegexHighlight {
+                    pattern: r"\b(if|then|else|elif|fi|case|esac|for|while|until|do|done|in|function|return|exit|break|continue)\b"
+                        .to_string(),
+                    color: "#FF1495".to_string(),
+                    note: "Shell关键字与流程控制".to_string(),
+                },
+                RegexHighlight {
+                    pattern: r"\b(SUCCESS|PASS|OK|DONE|COMPLETE|ERROR|FAIL|FAILED|FATAL|CRITICAL)\b|✓|✗|❌|✅"
+                        .to_string(),
+                    color: "#1EBF19".to_string(),
+                    note: "成功/错误状态".to_string(),
+                },
+                RegexHighlight {
+                    pattern: r"https?://[^\s]+|ftp://[^\s]+|www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:/[^\s]*)?"
+                        .to_string(),
+                    color: "#3F8EE8".to_string(),
+                    note: "网址链接".to_string(),
+                },
+                RegexHighlight {
+                    pattern: r#""[^"]*"|'[^']*'|`[^`]*`"#.to_string(),
+                    color: "#5E923D".to_string(),
+                    note: "字符串与引号".to_string(),
+                },
+                RegexHighlight {
+                    pattern: r"\$[A-Za-z_][A-Za-z0-9_]*|--?[A-Za-z][A-Za-z0-9-]*"
+                        .to_string(),
+                    color: "#CC703A".to_string(),
+                    note: "环境变量与参数".to_string(),
+                },
+                RegexHighlight {
+                    pattern: r"\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b|\b(?:localhost|127\.0\.0\.1)\b"
+                        .to_string(),
+                    color: "#459BFF".to_string(),
+                    note: "网络与IP地址".to_string(),
+                },
+                RegexHighlight {
+                    pattern: r"\b\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?\b|\b\d{2}:\d{2}(?::\d{2})?\b"
+                        .to_string(),
+                    color: "#7960FF".to_string(),
+                    note: "时间与日期".to_string(),
+                },
+                RegexHighlight {
+                    pattern: r"\b\d+(?:\.\d+)?\s*(?:[KMGT]i?B|%|MB|GB|KB)?\b"
+                        .to_string(),
+                    color: "#1AA416".to_string(),
+                    note: "数字与计数".to_string(),
+                },
+            ],
+        },
+    }
+}
+
+/// The pre-prototype shipped theme. Files saved before the appearance refresh
+/// are compared against this; an untouched file is upgraded in place instead of
+/// keeping the old 7-rule set forever.
+fn legacy_default_theme() -> ThemeSettings {
     ThemeSettings {
         ui: UiTheme {
             preset_name: "Command Deck".to_string(),
@@ -336,7 +443,15 @@ fn load_theme_from_disk() -> Result<ThemeSettings> {
     };
     let file: ThemeFile = serde_yaml::from_str(&content)
         .with_context(|| format!("Failed to parse {}", path.display()))?;
-    Ok(ThemeSettings::from(file))
+    let version = file.version.unwrap_or(0);
+    let settings = ThemeSettings::from(file);
+    // An untouched pre-refresh file still carries the old seven-rule set and
+    // the old terminal cursor colours; upgrade it to the prototype defaults
+    // instead of showing rules the user replaced.
+    if version < CURRENT_THEME_VERSION && settings == legacy_default_theme() {
+        return Ok(default_theme());
+    }
+    Ok(settings)
 }
 
 fn write_theme_to_disk(settings: &ThemeSettings) -> Result<()> {
@@ -515,6 +630,30 @@ mod tests {
         assert!(yaml.contains("cursor_blink: false"));
         assert!(yaml.contains("scrollback_lines: 5000"));
         assert!(yaml.contains("pattern: FAIL"));
+    }
+
+    #[test]
+    fn legacy_default_file_is_upgraded_to_prototype_defaults() {
+        let _guard = clear_theme_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+        fs::create_dir_all(workspace.path().join("config")).unwrap();
+        let legacy = legacy_default_theme();
+        let file = ThemeFile {
+            version: None,
+            ui: UiThemeConfig::from(&legacy.ui),
+            terminal: TerminalThemeConfig::from(&legacy.terminal),
+        };
+        fs::write(
+            workspace.config_path(),
+            serde_yaml::to_string(&file).unwrap(),
+        )
+        .unwrap();
+
+        let theme = load_theme().unwrap();
+
+        assert_eq!(theme, default_theme());
+        assert_eq!(theme.terminal.regex_highlights.len(), 10);
     }
 
     #[test]

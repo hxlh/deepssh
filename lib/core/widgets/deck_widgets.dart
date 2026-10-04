@@ -107,7 +107,7 @@ class DeckStatusSquare extends StatelessWidget {
   }
 }
 
-enum DeckButtonStyle { solid, outline, ghost, danger }
+enum DeckButtonStyle { solid, accent, outline, ghost, danger }
 
 /// The app's only button. `solid` is reserved for the single primary action on
 /// a screen — a row never shows two of them.
@@ -152,6 +152,14 @@ class _DeckButtonState extends State<DeckButton> {
           : AppColors.textPrimary;
       foreground = AppColors.background;
       borderColor = AppColors.textPrimary;
+    } else if (widget.style == DeckButtonStyle.accent) {
+      background = _pressed || _hovered
+          ? AppColors.accentInk
+          : AppColors.accent;
+      foreground = AppColors.panel;
+      borderColor = _pressed || _hovered
+          ? AppColors.accentInk
+          : AppColors.accent;
     } else if (widget.style == DeckButtonStyle.ghost) {
       background = _hovered ? AppColors.fgSoft : Colors.transparent;
       foreground = destructive ? DeckTokens.danger : AppColors.textPrimary;

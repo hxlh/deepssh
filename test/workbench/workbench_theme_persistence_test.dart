@@ -36,11 +36,16 @@ void main() {
     expect(hexField, findsOneWidget);
     await tester.enterText(hexField, '#123456');
     await tester.pumpAndSettle();
+    // Close the picker, then commit the draft with 保存主题.
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
+    await tester.pumpAndSettle();
 
     expect(themeBridge.savedUi.last.background, const Color(0xFF123456));
   });
 
-  testWidgets('serializes theme saves so the latest typed value persists', (
+  testWidgets('serializes theme saves so the latest edit persists', (
     tester,
   ) async {
     final themeBridge = ControlledThemeBridgeClient();
@@ -57,33 +62,31 @@ void main() {
 
     await tester.tap(find.byKey(appNavKey(AppSection.theme)));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextFormField, 'Inter'), 'A');
-    await tester.enterText(
-      find
-          .byWidgetPredicate(
-            (widget) => widget is EditableText && widget.controller.text == 'A',
-          )
-          .first,
-      'AB',
-    );
+
+    Future<void> chooseSize(String label) async {
+      await tester.tap(find.byKey(const ValueKey('ui-size-select')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(label).last);
+      await tester.pumpAndSettle();
+    }
+
+    await chooseSize('15 px');
+    await chooseSize('14 px');
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
     await tester.pump();
-    expect(
-      find.byWidgetPredicate(
-        (widget) => widget is EditableText && widget.controller.text == 'AB',
-      ),
-      findsOneWidget,
-    );
     expect(themeBridge.pendingSaves, hasLength(1));
 
+    // The terminal callback queued a second save behind the first one; the
+    // queued pass must carry the latest draft, not the value from before.
     themeBridge.completeNextSave();
     await tester.pump();
     await tester.pump();
     expect(themeBridge.pendingSaves, hasLength(1));
-    expect(themeBridge.pendingSaves.single.ui.fontFamily, 'AB');
+    expect(themeBridge.pendingSaves.single.ui.fontSize, 14);
 
     themeBridge.completeNextSave();
     await tester.pump();
-    expect(themeBridge.completedUi.last.fontFamily, 'AB');
+    expect(themeBridge.completedUi.last.fontSize, 14);
   });
 }
 

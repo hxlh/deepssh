@@ -19,6 +19,7 @@ import 'package:deepssh/features/ssh_profiles/ssh_profile_form_drawer.dart';
 import 'package:deepssh/features/ssh_profiles/ssh_profiles_page.dart';
 import 'package:deepssh/features/terminal/terminal_state.dart';
 import 'package:deepssh/features/terminal/terminal_status_bar.dart';
+import 'package:deepssh/core/storage/theme_preset_store.dart';
 import 'package:deepssh/features/theme_config/theme_config_page.dart';
 import 'package:deepssh/features/tunnels/tunnel_config_form_drawer.dart';
 import 'package:deepssh/features/tunnels/tunnel_configs_page.dart';
@@ -204,7 +205,7 @@ void main() {
             height: 260,
             collapsed: false,
             showMemory: true,
-            onToggleCollapsed: () {},
+            onCollapsedChanged: (_) {},
             onHeightChanged: (_) {},
           ),
         ),
@@ -224,7 +225,7 @@ void main() {
             height: 260,
             collapsed: false,
             showMemory: false,
-            onToggleCollapsed: () {},
+            onCollapsedChanged: (_) {},
             onHeightChanged: (_) {},
           ),
         ),
@@ -363,6 +364,7 @@ void main() {
             onUiSettingsChanged: (_) {},
             onTerminalSettingsChanged: (_) {},
             onBack: () {},
+            presetStore: InMemoryThemePresetStore(),
           ),
         ),
       ),

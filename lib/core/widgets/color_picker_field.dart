@@ -63,12 +63,24 @@ class ColorPickerField extends StatelessWidget {
   }
 
   void _showDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) =>
-          _ColorPickerDialog(initialColor: value, onChanged: onChanged),
-    );
+    showColorPickerDialog(context, initialColor: value, onChanged: onChanged);
   }
+}
+
+/// Opens the shared HSV picker and reports every change.
+///
+/// The theme page's swatch cards need the same picker without the bordered
+/// field chrome, so the dialog lives behind this entry point.
+Future<void> showColorPickerDialog(
+  BuildContext context, {
+  required Color initialColor,
+  required ValueChanged<Color> onChanged,
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (_) =>
+        _ColorPickerDialog(initialColor: initialColor, onChanged: onChanged),
+  );
 }
 
 class _ColorPickerDialog extends StatefulWidget {

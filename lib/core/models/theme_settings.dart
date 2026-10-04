@@ -94,8 +94,11 @@ class UiThemeSettings {
 
   static UiThemeSettings commandDeck() => const UiThemeSettings(
     presetName: 'Command Deck',
-    fontFamily: 'Inter',
-    fontSize: 14,
+    // Empty means the platform UI font: the prototype's
+    // 「系统默认（含中文）」. Keeping the tag lets the settings file round-trip
+    // without inventing a family name the OS does not have.
+    fontFamily: '',
+    fontSize: 13,
     normalFontWeight: 500,
     boldFontWeight: 700,
     background: Color(0xFFFAF9F5),
@@ -192,8 +195,9 @@ class TerminalThemeSettings {
     cursorBlink: true,
     foreground: Color(0xFFDEDCD6),
     terminalBackground: Color(0xFF17181A),
-    selectionColor: Color(0xFF3A3F44),
-    cursorColor: Color(0xFFD9A24B),
+    // Prototype 终端配色: 高亮 #D9A24B, 光标 #8FBF7F.
+    selectionColor: Color(0xFFD9A24B),
+    cursorColor: Color(0xFF8FBF7F),
     scrollbackLines: 10000,
     regexHighlights: [
       RegexHighlight(

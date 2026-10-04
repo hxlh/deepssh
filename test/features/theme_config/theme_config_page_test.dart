@@ -1,4 +1,5 @@
 import 'package:deepssh/core/models/theme_settings.dart';
+import 'package:deepssh/core/storage/theme_preset_store.dart';
 import 'package:deepssh/core/theme/app_colors.dart';
 import 'package:deepssh/core/theme/app_theme.dart';
 import 'package:deepssh/features/theme_config/theme_config_page.dart';
@@ -64,123 +65,147 @@ void main() {
     expect(theme.textTheme.titleLarge?.fontWeight, FontWeight.w800);
   });
 
-  testWidgets('updates UI normal and bold font weights', (tester) async {
-    UiThemeSettings? savedUi;
+  testWidgets('matches the prototype sections and head actions', (tester) async {
+    await _pumpPage(tester);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ThemeConfigPage(
-            uiSettings: UiThemeSettings.commandDeck(),
-            terminalSettings: TerminalThemeSettings.commandDeck(),
-            onUiSettingsChanged: (settings) => savedUi = settings,
-            onTerminalSettingsChanged: (_) {},
-            onBack: () {},
-          ),
-        ),
-      ),
+    expect(find.text('APPEARANCE'), findsOneWidget);
+    expect(find.text('主题配置'), findsOneWidget);
+    expect(
+      find.text('分别设置界面外观与终端渲染，并配置基于正则的输出高亮规则。'),
+      findsOneWidget,
     );
+    expect(find.text('恢复默认'), findsOneWidget);
+    expect(find.text('保存主题'), findsOneWidget);
 
-    await tester.enterText(find.widgetWithText(TextFormField, '500'), '300');
-    await tester.pump();
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '700').first,
-      '800',
-    );
-    await tester.pump();
-
-    expect(savedUi?.normalFontWeight, 300);
-    expect(savedUi?.boldFontWeight, 800);
-  });
-
-  testWidgets('updates terminal normal and bold font weights', (tester) async {
-    TerminalThemeSettings? savedTerminal;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ThemeConfigPage(
-            uiSettings: UiThemeSettings.commandDeck(),
-            terminalSettings: TerminalThemeSettings.commandDeck(),
-            onUiSettingsChanged: (_) {},
-            onTerminalSettingsChanged: (settings) => savedTerminal = settings,
-            onBack: () {},
-          ),
-        ),
-      ),
-    );
-
-    await tester.ensureVisible(find.text('普通文本与 ANSI bold 分开控制'));
-    await tester.pump();
-    await tester.enterText(find.widgetWithText(TextFormField, '400'), '300');
-    await tester.pump();
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '700').last,
-      '800',
-    );
-    await tester.pump();
-
-    expect(savedTerminal?.normalFontWeight, 300);
-    expect(savedTerminal?.boldFontWeight, 800);
-  });
-
-  testWidgets('text input changes are emitted as the user types', (
-    tester,
-  ) async {
-    UiThemeSettings? savedUi;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ThemeConfigPage(
-            uiSettings: UiThemeSettings.commandDeck(),
-            terminalSettings: TerminalThemeSettings.commandDeck(),
-            onUiSettingsChanged: (settings) => savedUi = settings,
-            onTerminalSettingsChanged: (_) {},
-            onBack: () {},
-          ),
-        ),
-      ),
-    );
-
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Inter'),
-      'Fira Sans',
-    );
-    await tester.pump();
-
-    expect(savedUi?.fontFamily, 'Fira Sans');
-  });
-
-  testWidgets('updates displayed values when parent settings change', (
-    tester,
-  ) async {
-    final commandDeck = UiThemeSettings.commandDeck();
-    final loaded = commandDeck.copyWith(fontFamily: 'Loaded Font');
-    var currentSettings = commandDeck;
-
-    Widget app() {
-      return MaterialApp(
-        home: Scaffold(
-          body: ThemeConfigPage(
-            uiSettings: currentSettings,
-            terminalSettings: TerminalThemeSettings.commandDeck(),
-            onUiSettingsChanged: (settings) => currentSettings = settings,
-            onTerminalSettingsChanged: (_) {},
-            onBack: () {},
-          ),
-        ),
-      );
+    for (final label in [
+      '预设方案',
+      '字体',
+      '配色',
+      '实时预览',
+      '光标',
+      '终端配色',
+      '正则高亮',
+      '回滚缓冲行数',
+    ]) {
+      expect(find.text(label), findsWidgets, reason: 'missing section $label');
     }
 
-    await tester.pumpWidget(app());
-    expect(find.widgetWithText(TextFormField, 'Inter'), findsOneWidget);
+    expect(find.byKey(const ValueKey('preset-trigger-ui')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('preset-trigger-terminal')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('swatch-ui-background')), findsOneWidget);
+    expect(find.byKey(const ValueKey('swatch-term-cursor')), findsOneWidget);
+  });
 
-    currentSettings = loaded;
-    await tester.pumpWidget(app());
+  testWidgets('buffers edits until 保存主题 is pressed', (tester) async {
+    UiThemeSettings? savedUi;
+    TerminalThemeSettings? savedTerminal;
+
+    await _pumpPage(
+      tester,
+      onUiSaved: (settings) => savedUi = settings,
+      onTerminalSaved: (settings) => savedTerminal = settings,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('ui-size-select')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('15 px').last);
+    await tester.pumpAndSettle();
+
+    expect(savedUi, isNull, reason: 'editing must not persist immediately');
+
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
     await tester.pump();
 
-    expect(find.widgetWithText(TextFormField, 'Loaded Font'), findsOneWidget);
+    expect(savedUi?.fontSize, 15);
+    expect(savedTerminal, isNotNull);
+  });
+
+  testWidgets('恢复默认 swaps the draft back to Command Deck', (tester) async {
+    UiThemeSettings? savedUi;
+
+    await _pumpPage(tester, onUiSaved: (settings) => savedUi = settings);
+
+    await tester.tap(find.byKey(const ValueKey('ui-size-select')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('15 px').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('theme-reset')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
+    await tester.pump();
+
+    expect(savedUi?.fontSize, 13);
+  });
+
+  testWidgets('applies a built-in preset from the dropdown', (tester) async {
+    UiThemeSettings? savedUi;
+
+    await _pumpPage(tester, onUiSaved: (settings) => savedUi = settings);
+
+    await tester.tap(find.byKey(const ValueKey('preset-trigger-ui')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('VS Code Dark'));
+    await tester.pumpAndSettle();
+
+    // The trigger picked up the new scheme…
+    expect(find.text('VS Code Dark'), findsOneWidget);
+    // …and the swatch card did too.
+    expect(find.text('#1E1E1E'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
+    await tester.pump();
+    expect(savedUi?.panel, const Color(0xFF252526));
+  });
+
+  testWidgets('creates and deletes a custom preset', (tester) async {
+    final store = InMemoryThemePresetStore();
+    await _pumpPage(tester, presetStore: store);
+
+    final trigger = find.byKey(const ValueKey('preset-trigger-terminal'));
+    await tester.ensureVisible(trigger);
+    await tester.pumpAndSettle();
+    await tester.tap(trigger);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('新建自定义方案'));
+    await tester.pumpAndSettle();
+
+    // Both the trigger and the open menu row carry the name.
+    expect(find.text('自定义方案 1'), findsWidgets);
+    expect(find.text('自定义'), findsWidgets);
+
+    final saved = await store.load();
+    expect(saved.terminalCustom, hasLength(1));
+
+    // The create action keeps the menu open, so the delete affordance is
+    // already on screen.
+    final deleteButton = find.byTooltip('删除此自定义方案');
+    expect(deleteButton, findsOneWidget);
+    await tester.tap(deleteButton);
+    await tester.pumpAndSettle();
+
+    expect((await store.load()).terminalCustom, isEmpty);
+    expect(find.text('自定义方案 1'), findsNothing);
+  });
+
+  testWidgets('switching to One Dark clears the regex rules', (tester) async {
+    await _pumpPage(tester);
+
+    // Command Deck ships rules, so the empty-state copy is hidden.
+    expect(find.text('当前预设没有高亮规则'), findsNothing);
+
+    final trigger = find.byKey(const ValueKey('preset-trigger-terminal'));
+    await tester.ensureVisible(trigger);
+    await tester.pumpAndSettle();
+    await tester.tap(trigger);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('One Dark'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前预设没有高亮规则'), findsOneWidget);
   });
 
   testWidgets('removes regex highlight rules from terminal settings', (
@@ -198,22 +223,16 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ThemeConfigPage(
-            uiSettings: UiThemeSettings.commandDeck(),
-            terminalSettings: terminalSettings,
-            onUiSettingsChanged: (_) {},
-            onTerminalSettingsChanged: (settings) => savedTerminal = settings,
-            onBack: () {},
-          ),
-        ),
-      ),
+    await _pumpPage(
+      tester,
+      terminalSettings: terminalSettings,
+      onTerminalSaved: (settings) => savedTerminal = settings,
     );
 
     await tester.ensureVisible(find.byTooltip('移除正则规则').first);
     await tester.tap(find.byTooltip('移除正则规则').first);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
     await tester.pump();
 
     expect(savedTerminal?.regexHighlights, hasLength(1));
@@ -234,21 +253,20 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ThemeConfigPage(
-            uiSettings: UiThemeSettings.commandDeck(),
-            terminalSettings: terminalSettings,
-            onUiSettingsChanged: (_) {},
-            onTerminalSettingsChanged: (settings) => savedTerminal = settings,
-            onBack: () {},
-          ),
-        ),
-      ),
+    await _pumpPage(
+      tester,
+      terminalSettings: terminalSettings,
+      onTerminalSaved: (settings) => savedTerminal = settings,
     );
 
-    await tester.enterText(find.widgetWithText(TextFormField, '错误日志'), '异常');
+    final noteField = find.descendant(
+      of: find.byKey(const ValueKey('regex-note-0')),
+      matching: find.byType(TextField),
+    );
+    expect(noteField, findsOneWidget);
+    await tester.enterText(noteField, '异常');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
     await tester.pump();
 
     expect(savedTerminal?.regexHighlights, hasLength(1));
@@ -276,24 +294,18 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ThemeConfigPage(
-            uiSettings: UiThemeSettings.commandDeck(),
-            terminalSettings: terminalSettings,
-            onUiSettingsChanged: (_) {},
-            onTerminalSettingsChanged: (settings) => savedTerminal = settings,
-            onBack: () {},
-          ),
-        ),
-      ),
+    await _pumpPage(
+      tester,
+      terminalSettings: terminalSettings,
+      onTerminalSaved: (settings) => savedTerminal = settings,
     );
 
     final reorderable = tester.widget<ReorderableListView>(
       find.byType(ReorderableListView),
     );
     reorderable.onReorder?.call(0, 3);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
     await tester.pump();
 
     expect(
@@ -305,40 +317,27 @@ void main() {
   testWidgets('keeps regex highlight input focused while settings rebuild', (
     tester,
   ) async {
-    var terminalSettings = TerminalThemeSettings.commandDeck().copyWith(
+    final terminalSettings = TerminalThemeSettings.commandDeck().copyWith(
       regexHighlights: const [
         RegexHighlight(pattern: '', color: Color(0xFFF14C4C), note: ''),
       ],
     );
 
-    Widget app() {
-      return MaterialApp(
-        home: Scaffold(
-          body: ThemeConfigPage(
-            uiSettings: UiThemeSettings.commandDeck(),
-            terminalSettings: terminalSettings,
-            onUiSettingsChanged: (_) {},
-            onTerminalSettingsChanged: (settings) =>
-                terminalSettings = settings,
-            onBack: () {},
-          ),
-        ),
-      );
-    }
+    await _pumpPage(tester, terminalSettings: terminalSettings);
 
-    await tester.pumpWidget(app());
-    final regexFields = find.descendant(
-      of: find.byType(ReorderableListView),
-      matching: find.byType(TextFormField),
-    );
-    await tester.ensureVisible(regexFields.first);
-    await tester.tap(regexFields.first);
-    await tester.enterText(regexFields.first, 'E');
-    await tester.pumpWidget(app());
+    final regexField = find
+        .descendant(
+          of: find.byKey(const ValueKey('regex-pattern-0')).first,
+          matching: find.byType(TextField),
+        )
+        .first;
+    await tester.ensureVisible(regexField);
+    await tester.tap(regexField);
+    await tester.enterText(regexField, 'E');
     await tester.pump();
 
-    expect(terminalSettings.regexHighlights.single.pattern, 'E');
     expect(tester.testTextInput.isVisible, isTrue);
+    expect(find.text('E'), findsOneWidget);
   });
 
   testWidgets('adds regex highlight rule with empty note', (tester) async {
@@ -347,22 +346,16 @@ void main() {
       regexHighlights: const [],
     );
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ThemeConfigPage(
-            uiSettings: UiThemeSettings.commandDeck(),
-            terminalSettings: terminalSettings,
-            onUiSettingsChanged: (_) {},
-            onTerminalSettingsChanged: (settings) => savedTerminal = settings,
-            onBack: () {},
-          ),
-        ),
-      ),
+    await _pumpPage(
+      tester,
+      terminalSettings: terminalSettings,
+      onTerminalSaved: (settings) => savedTerminal = settings,
     );
 
     await tester.ensureVisible(find.text('添加规则'));
     await tester.tap(find.text('添加规则'));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
     await tester.pump();
 
     expect(savedTerminal?.regexHighlights, hasLength(1));
@@ -398,59 +391,51 @@ void main() {
   testWidgets('an invalid regex pattern is reported under its row', (
     tester,
   ) async {
-    // The page is a controlled widget: the host has to feed the edited
-    // settings back, otherwise the row re-renders with the original pattern and
-    // there is nothing to assert against.
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: _ThemeConfigHarness(),
-        ),
-      ),
-    );
+    await _pumpPage(tester);
 
     expect(find.textContaining('正则无效'), findsNothing);
 
     final patternField = find.byKey(const ValueKey('regex-pattern-0'));
     await tester.ensureVisible(patternField);
     await tester.pump();
-    await tester.enterText(patternField, '(unclosed');
+    await tester.enterText(
+      find.descendant(of: patternField, matching: find.byType(TextField)),
+      '(unclosed',
+    );
     await tester.pumpAndSettle();
 
     expect(find.textContaining('正则无效'), findsOneWidget);
     // The rule keeps its slot — the point is to tell the user, not to discard
     // their edit behind their back.
-    final field = tester.widget<TextFormField>(
-      find.descendant(
-        of: patternField,
-        matching: find.byType(TextFormField),
-      ),
+    final field = tester.widget<TextField>(
+      find.descendant(of: patternField, matching: find.byType(TextField)),
     );
     expect(field.controller?.text, '(unclosed');
   });
 }
 
-/// Minimal controlled host: keeps the terminal settings in state so edits stick.
-class _ThemeConfigHarness extends StatefulWidget {
-  const _ThemeConfigHarness();
-
-  @override
-  State<_ThemeConfigHarness> createState() => _ThemeConfigHarnessState();
-}
-
-class _ThemeConfigHarnessState extends State<_ThemeConfigHarness> {
-  UiThemeSettings ui = UiThemeSettings.commandDeck();
-  TerminalThemeSettings terminal = TerminalThemeSettings.commandDeck();
-
-  @override
-  Widget build(BuildContext context) {
-    return ThemeConfigPage(
-      uiSettings: ui,
-      terminalSettings: terminal,
-      onUiSettingsChanged: (settings) => setState(() => ui = settings),
-      onTerminalSettingsChanged: (settings) =>
-          setState(() => terminal = settings),
-      onBack: () {},
-    );
-  }
+Future<void> _pumpPage(
+  WidgetTester tester, {
+  UiThemeSettings? uiSettings,
+  TerminalThemeSettings? terminalSettings,
+  ValueChanged<UiThemeSettings>? onUiSaved,
+  ValueChanged<TerminalThemeSettings>? onTerminalSaved,
+  ThemePresetStore? presetStore,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Scaffold(
+        body: ThemeConfigPage(
+          uiSettings: uiSettings ?? UiThemeSettings.commandDeck(),
+          terminalSettings:
+              terminalSettings ?? TerminalThemeSettings.commandDeck(),
+          onUiSettingsChanged: onUiSaved ?? (_) {},
+          onTerminalSettingsChanged: onTerminalSaved ?? (_) {},
+          onBack: () {},
+          presetStore: presetStore ?? InMemoryThemePresetStore(),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
 }

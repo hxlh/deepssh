@@ -133,6 +133,7 @@ class DeckTextField extends StatelessWidget {
     this.keyboardType,
     this.inputFormatters,
     this.obscure = false,
+    this.onChanged,
     this.onSubmitted,
     this.validator,
     this.enableSuggestions = false,
@@ -153,6 +154,7 @@ class DeckTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final bool obscure;
+  final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final String? Function(String?)? validator;
   final bool enableSuggestions;
@@ -175,6 +177,7 @@ class DeckTextField extends StatelessWidget {
         textInputAction: textInputAction,
         enableSuggestions: enableSuggestions,
         autocorrect: autocorrect,
+        onChanged: onChanged,
         onFieldSubmitted: onSubmitted,
         validator: validator,
       ),
