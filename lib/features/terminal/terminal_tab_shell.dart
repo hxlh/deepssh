@@ -20,6 +20,7 @@ class TerminalTabShell extends StatefulWidget {
     required this.sshBridge,
     required this.localTerminalBridge,
     required this.terminalThemeSettings,
+    this.onRegexRuleError,
     this.onSshInput,
     this.onSshTerminalInput,
     this.onPreviewLabelChanged,
@@ -34,6 +35,9 @@ class TerminalTabShell extends StatefulWidget {
   final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String>? onSshInput;
   final SshTerminalInputWriter? onSshTerminalInput;
+
+  /// See [TerminalView.onRegexRuleError].
+  final void Function(String pattern, String message)? onRegexRuleError;
   final ValueChanged<String>? onPreviewLabelChanged;
 
   @override
@@ -90,6 +94,7 @@ class _TerminalTabShellState extends State<TerminalTabShell> {
               terminalThemeSettings: widget.terminalThemeSettings,
               onSshInput: widget.onSshInput,
               onSshTerminalInput: widget.onSshTerminalInput,
+              onRegexRuleError: widget.onRegexRuleError,
               onPreviewLabelChanged: widget.onPreviewLabelChanged,
               findVisible: _findVisible,
               findQuery: _findQuery,

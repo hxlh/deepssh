@@ -10,6 +10,13 @@ void main() {
   testWidgets('local terminal selection uses UI selection color only', (
     tester,
   ) async {
+    AppColors.selection = const Color(0xFF123456);
+    AppColors.applyTerminal(
+      TerminalThemeSettings.commandDeck().copyWith(
+        selectionColor: const Color(0xFFFF00FF),
+      ),
+    );
+
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -31,7 +38,9 @@ void main() {
             onEditSshSessionNote: (_) async {},
             onCloseSshSession: (_) async {},
             onCloseLocalTerminal: (_) async {},
+            onOpenThemeConfig: () {},
             onDuplicateSshSession: (_) async {},
+            themeConfigActive: false,
             onToggleMemoryDock: () {},
             memoryDockVisible: true,
           ),
@@ -39,19 +48,16 @@ void main() {
       ),
     );
 
-    final uiSelection = AppColors.selection;
-    final terminalSelection =
-        TerminalThemeSettings.commandDeck().selectionColor;
-
     final selectedContainer = tester
         .widgetList<Container>(find.byType(Container))
         .firstWhere((container) {
           final decoration = container.decoration;
-          return decoration is BoxDecoration && decoration.color == uiSelection;
+          return decoration is BoxDecoration &&
+              decoration.color == const Color(0xFF123456);
         });
     final decoration = selectedContainer.decoration as BoxDecoration;
 
-    expect(decoration.color, uiSelection);
-    expect(decoration.color, isNot(terminalSelection));
+    expect(decoration.color, const Color(0xFF123456));
+    expect(decoration.color, isNot(const Color(0xFFFF00FF)));
   });
 }

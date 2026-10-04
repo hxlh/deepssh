@@ -5,9 +5,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/deck_widgets.dart';
 import 'add_connection_button.dart';
 
-/// The three user-visible pages. The shell maps [AppSection] onto the content
+/// The four user-visible pages. The shell maps [AppSection] onto the content
 /// mode the workbench already uses, so navigation stays a pure view concern.
-enum AppSection { workbench, connections, tunnels }
+enum AppSection { workbench, connections, tunnels, theme }
 
 /// Stable test/semantics handle for a nav entry.
 Key appNavKey(AppSection section) => ValueKey('app-nav-${section.name}');
@@ -17,12 +17,14 @@ extension AppSectionMeta on AppSection {
     AppSection.workbench => '工作台',
     AppSection.connections => '连接配置',
     AppSection.tunnels => '端口转发',
+    AppSection.theme => '主题配置',
   };
 
   IconData get icon => switch (this) {
     AppSection.workbench => Icons.terminal,
     AppSection.connections => Icons.dns_outlined,
     AppSection.tunnels => Icons.swap_horiz,
+    AppSection.theme => Icons.palette_outlined,
   };
 }
 

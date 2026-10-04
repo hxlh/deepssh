@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:deepssh/core/logging/app_logger.dart';
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/workbench/widgets/add_connection_button.dart';
+import 'package:deepssh/core/models/theme_settings.dart';
 import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
+import 'package:deepssh/features/theme/theme_bridge.dart';
 import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/gestures.dart';
@@ -12,6 +14,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('logs theme load failures while keeping the workbench visible', (
+    tester,
+  ) async {
+    final logger = RecordingErrorLogger();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkbenchPage(
+          sshBridge: FakeSshBridgeClient(),
+          themeBridge: FailingThemeBridgeClient(),
+          localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+          tunnelBridge: InMemoryTunnelBridgeClient(),
+          errorLogger: logger,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(WorkbenchPage), findsOneWidget);
+    expect(logger.entries.single.scope, 'theme.load');
+    expect(
+      logger.entries.single.error.toString(),
+      contains('theme load failed'),
+    );
+  });
+
   testWidgets('logs SSH connect failures while showing the existing UI error', (
     tester,
   ) async {
@@ -34,6 +62,7 @@ void main() {
             ],
             connectError: StateError('connect failed'),
           ),
+          themeBridge: FakeThemeBridgeClient(),
           localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
           tunnelBridge: InMemoryTunnelBridgeClient(),
           errorLogger: logger,
@@ -79,6 +108,7 @@ void main() {
       MaterialApp(
         home: WorkbenchPage(
           sshBridge: bridge,
+          themeBridge: FakeThemeBridgeClient(),
           localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
           tunnelBridge: InMemoryTunnelBridgeClient(),
           errorLogger: logger,
@@ -139,6 +169,7 @@ void main() {
         MaterialApp(
           home: WorkbenchPage(
             sshBridge: bridge,
+            themeBridge: FakeThemeBridgeClient(),
             localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
             tunnelBridge: InMemoryTunnelBridgeClient(),
             errorLogger: logger,
@@ -148,9 +179,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)),
-      );
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pump();
@@ -188,6 +217,31 @@ class LoggedError {
   final String scope;
   final Object error;
   final StackTrace? stackTrace;
+}
+
+class FakeThemeBridgeClient implements ThemeBridgeClient {
+  @override
+  Future<({UiThemeSettings ui, TerminalThemeSettings terminal})>
+  loadTheme() async {
+    return (
+      ui: UiThemeSettings.commandDeck(),
+      terminal: TerminalThemeSettings.commandDeck(),
+    );
+  }
+
+  @override
+  Future<void> saveTheme({
+    required UiThemeSettings ui,
+    required TerminalThemeSettings terminal,
+  }) async {}
+}
+
+class FailingThemeBridgeClient extends FakeThemeBridgeClient {
+  @override
+  Future<({UiThemeSettings ui, TerminalThemeSettings terminal})>
+  loadTheme() async {
+    throw StateError('theme load failed');
+  }
 }
 
 class FakeSshBridgeClient implements SshBridgeClient {

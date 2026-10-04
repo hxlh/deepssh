@@ -1,35 +1,59 @@
 import 'package:flutter/material.dart';
 
+import '../models/theme_settings.dart';
 import 'app_tokens.dart';
 
-/// The app's palette, fixed to the prototype.
+/// Runtime palette.
 ///
-/// There is no theme switcher any more, so nothing here is mutable: [DeckTokens]
-/// holds the values and this class only adds the derived tones. Widgets keep
-/// reading `AppColors` rather than `DeckTokens` so the "current colour" stays a
-/// single indirection even though the values no longer move.
+/// The base tokens live in [DeckTokens] and are locked; this class resolves
+/// them against the user's `UiThemeSettings` so a saved theme still wins. The
+/// field names are kept stable because a lot of widgets read them directly, but
+/// everything that is *not* persisted (border, tab washes, selection) is derived
+/// here rather than stored, so it can never drift from the base tokens.
 abstract final class AppColors {
-  /// `null` means "the platform UI font" — the prototype's
-  /// `-apple-system, BlinkMacSystemFont, Segoe UI, …` stack, which is what
-  /// Flutter already resolves to per platform.
-  static const String? fontFamily = null;
-  static const int fontSize = 14;
-  static const int normalFontWeight = 400;
-  static const int boldFontWeight = 700;
+  static String fontFamily = 'Inter';
+  static int fontSize = 14;
+  static int normalFontWeight = 500;
+  static int boldFontWeight = 700;
 
-  static const Color background = DeckTokens.bg;
-  static const Color panel = DeckTokens.surface;
-  static const Color sidebar = DeckTokens.bg;
-  static const Color border = DeckTokens.border;
-  static const Color textPrimary = DeckTokens.fg;
-  static const Color textMuted = DeckTokens.muted;
-  static const Color accent = DeckTokens.accent;
-  static final Color selection = DeckTokens.accentSoft;
-  static const Color tabActive = DeckTokens.bg;
-  static const Color tabInactive = Colors.transparent;
-  static final Color tabHover = DeckTokens.fgSoft;
+  static Color background = DeckTokens.bg;
+  static Color panel = DeckTokens.surface;
+  static Color sidebar = DeckTokens.bg;
+  static Color border = DeckTokens.border;
+  static Color textPrimary = DeckTokens.fg;
+  static Color textMuted = DeckTokens.muted;
+  static Color accent = DeckTokens.accent;
+  static Color selection = DeckTokens.accentSoft;
+  static Color tabActive = DeckTokens.bg;
+  static Color tabInactive = Colors.transparent;
+  static Color tabHover = DeckTokens.fgSoft;
 
-  // Derived tones, mirroring the prototype's `color-mix(in oklch, …)` rules.
+  /// Applies a persisted UI theme, then re-derives everything that is not
+  /// stored so the derived colours stay consistent with the chosen base.
+  static void applyUi(UiThemeSettings settings) {
+    fontFamily = settings.fontFamily;
+    fontSize = settings.fontSize;
+    normalFontWeight = settings.normalFontWeight;
+    boldFontWeight = settings.boldFontWeight;
+    background = settings.background;
+    panel = settings.panel;
+    sidebar = settings.sidebar;
+    accent = settings.accent;
+    textPrimary = settings.textPrimary;
+    textMuted = settings.textMuted;
+
+    border = DeckTokens.mix(DeckTokens.border, settings.textPrimary, 0.12);
+    selection = DeckTokens.mix(settings.accent, settings.textPrimary, 0.14);
+    tabActive = settings.background;
+    tabInactive = Colors.transparent;
+    tabHover = DeckTokens.wash(settings.textPrimary, 0.06);
+  }
+
+  static void applyTerminal(TerminalThemeSettings settings) {}
+
+  // Derived tones, recomputed from the live settings so a non-default preset
+  // stays coherent. Widgets must read these rather than [DeckTokens]: the
+  // tokens are the palette definition, not the current theme.
   static Color get accentInk => DeckTokens.mix(accent, textPrimary, 0.68);
   static Color get accentSoft => DeckTokens.wash(accent, 0.14);
   static Color get okSoft => DeckTokens.wash(DeckTokens.ok, 0.12);
@@ -37,15 +61,21 @@ abstract final class AppColors {
   static Color get dangerSoft => DeckTokens.wash(DeckTokens.danger, 0.12);
   static Color get fgSoft => DeckTokens.wash(textPrimary, 0.06);
 
-  /// Hard shadows: a 2px offset edge, never blurred.
+  /// The shadow ink: a hard offset edge in the current text colour, so it
+  /// flips with a dark preset instead of staying grey-on-dark.
+  static Color get shadowInk => DeckTokens.wash(textPrimary, 0.20);
+
+  /// Fully opaque hard shadow (dialogs, drawers, floating layers).
+  static Color get shadowSolidInk => textPrimary;
+
   static List<BoxShadow> get shadowHard => <BoxShadow>[
-    BoxShadow(
-      color: DeckTokens.wash(textPrimary, 0.20),
-      offset: const Offset(2, 2),
-    ),
+    BoxShadow(color: shadowInk, offset: const Offset(2, 2)),
   ];
 
   static List<BoxShadow> get shadowSolid => <BoxShadow>[
-    BoxShadow(color: textPrimary, offset: const Offset(2, 2)),
+    BoxShadow(color: shadowSolidInk, offset: const Offset(2, 2)),
   ];
+
+  /// Chrome that stays put whatever the preset: status colours, the terminal
+  /// stage and the font stacks all read [DeckTokens] directly.
 }

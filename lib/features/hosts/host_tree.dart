@@ -29,6 +29,8 @@ class HostTree extends StatelessWidget {
     required this.onCloseSshSession,
     required this.onDuplicateSshSession,
     required this.onCloseLocalTerminal,
+    required this.onOpenThemeConfig,
+    required this.themeConfigActive,
     required this.onToggleMemoryDock,
     required this.memoryDockVisible,
     this.onReorderSessions,
@@ -53,6 +55,8 @@ class HostTree extends StatelessWidget {
   final Future<void> Function(SshSessionItem) onCloseSshSession;
   final Future<void> Function(SshSessionItem) onDuplicateSshSession;
   final Future<void> Function(LocalTerminalItem) onCloseLocalTerminal;
+  final VoidCallback onOpenThemeConfig;
+  final bool themeConfigActive;
 
   /// Shows/hides the dock's 内存监控 panel (prototype `exMemToggle`).
   final VoidCallback onToggleMemoryDock;
@@ -491,6 +495,12 @@ class HostTree extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
           child: Column(
             children: [
+              _FooterTool(
+                label: '主题配置',
+                icon: Icons.palette_outlined,
+                active: themeConfigActive,
+                onTap: onOpenThemeConfig,
+              ),
               _FooterTool(
                 label: '内存监控',
                 icon: Icons.memory,

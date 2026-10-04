@@ -35,6 +35,7 @@ class TerminalView extends StatefulWidget {
     this.findUseRegex = false,
     this.onFindOpened,
     this.onFindClosed,
+    this.onRegexRuleError,
     this.onFindQueryChanged,
     this.onFindCaseSensitiveChanged,
     this.onFindWholeWordChanged,
@@ -47,6 +48,10 @@ class TerminalView extends StatefulWidget {
   final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String>? onSshInput;
   final SshTerminalInputWriter? onSshTerminalInput;
+
+  /// Reports a rule whose pattern is not a valid regular expression. Without
+  /// it the rule is dropped in silence and the highlight just stops working.
+  final void Function(String pattern, String message)? onRegexRuleError;
   final ValueChanged<String>? onLocalInput;
   final ValueChanged<String>? onPreviewLabelChanged;
   final bool findVisible;
@@ -224,16 +229,21 @@ class _TerminalViewState extends State<TerminalView> {
     final rules = <_CompiledRegexHighlight>[];
     for (final rule in widget.terminalThemeSettings.regexHighlights) {
       if (rule.pattern.isEmpty) continue;
-      try {
-        rules.add(
-          _CompiledRegexHighlight(
-            regex: RegExp(rule.pattern),
-            foreground: rule.color,
-          ),
-        );
-      } on FormatException {
+      final error = RegexHighlight.patternError(rule.pattern);
+      if (error != null) {
+        // Deferred: this runs from initState, and the host may already be
+        // building.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) widget.onRegexRuleError?.call(rule.pattern, error);
+        });
         continue;
       }
+      rules.add(
+        _CompiledRegexHighlight(
+          regex: RegExp(rule.pattern),
+          foreground: rule.color,
+        ),
+      );
     }
     return rules;
   }

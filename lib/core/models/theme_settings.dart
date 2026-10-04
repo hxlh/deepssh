@@ -19,6 +19,106 @@ class RegexHighlight {
         color: color ?? this.color,
         note: note ?? this.note,
       );
+
+  /// Dart's message for [pattern] when it is not a valid regular expression,
+  /// or null when it is fine.
+  ///
+  /// An empty pattern means "no rule", not a broken one — the terminal skips
+  /// those silently. Anything else that fails to compile is a real typo, and
+  /// `TerminalView` used to drop it without a word, so the highlight simply
+  /// stopped working and nobody knew why. Both the theme page and the terminal
+  /// now surface this.
+  static String? patternError(String pattern) {
+    if (pattern.isEmpty) return null;
+    try {
+      RegExp(pattern);
+      return null;
+    } on FormatException catch (error) {
+      return error.message;
+    }
+  }
+}
+
+class UiThemeSettings {
+  const UiThemeSettings({
+    required this.presetName,
+    required this.fontFamily,
+    required this.fontSize,
+    required this.normalFontWeight,
+    required this.boldFontWeight,
+    required this.background,
+    required this.panel,
+    required this.sidebar,
+    required this.accent,
+    required this.textPrimary,
+    required this.textMuted,
+  });
+
+  final String presetName;
+  final String fontFamily;
+  final int fontSize;
+  final int normalFontWeight;
+  final int boldFontWeight;
+  final Color background;
+  final Color panel;
+  final Color sidebar;
+  final Color accent;
+  final Color textPrimary;
+  final Color textMuted;
+
+  UiThemeSettings copyWith({
+    String? presetName,
+    String? fontFamily,
+    int? fontSize,
+    int? normalFontWeight,
+    int? boldFontWeight,
+    Color? background,
+    Color? panel,
+    Color? sidebar,
+    Color? accent,
+    Color? textPrimary,
+    Color? textMuted,
+  }) => UiThemeSettings(
+    presetName: presetName ?? this.presetName,
+    fontFamily: fontFamily ?? this.fontFamily,
+    fontSize: fontSize ?? this.fontSize,
+    normalFontWeight: normalFontWeight ?? this.normalFontWeight,
+    boldFontWeight: boldFontWeight ?? this.boldFontWeight,
+    background: background ?? this.background,
+    panel: panel ?? this.panel,
+    sidebar: sidebar ?? this.sidebar,
+    accent: accent ?? this.accent,
+    textPrimary: textPrimary ?? this.textPrimary,
+    textMuted: textMuted ?? this.textMuted,
+  );
+
+  static UiThemeSettings commandDeck() => const UiThemeSettings(
+    presetName: 'Command Deck',
+    fontFamily: 'Inter',
+    fontSize: 14,
+    normalFontWeight: 500,
+    boldFontWeight: 700,
+    background: Color(0xFFFAF9F5),
+    panel: Color(0xFFFFFFFF),
+    sidebar: Color(0xFFFAF9F5),
+    accent: Color(0xFFD97757),
+    textPrimary: Color(0xFF1F1E1D),
+    textMuted: Color(0xFF6B6862),
+  );
+
+  static UiThemeSettings vsCodeDark() => const UiThemeSettings(
+    presetName: 'VS Code Dark',
+    fontFamily: 'Segoe UI',
+    fontSize: 14,
+    normalFontWeight: 500,
+    boldFontWeight: 700,
+    background: Color(0xFF1E1E1E),
+    panel: Color(0xFF252526),
+    sidebar: Color(0xFF181818),
+    accent: Color(0xFF007ACC),
+    textPrimary: Color(0xFFCCCCCC),
+    textMuted: Color(0xFF858585),
+  );
 }
 
 class TerminalThemeSettings {
@@ -95,8 +195,6 @@ class TerminalThemeSettings {
     selectionColor: Color(0xFF3A3F44),
     cursorColor: Color(0xFFD9A24B),
     scrollbackLines: 10000,
-    // The set the app actually ships with, in this order: earlier rules win
-    // when two patterns overlap, so the specific ones come first.
     regexHighlights: [
       RegexHighlight(
         pattern:
@@ -155,5 +253,37 @@ class TerminalThemeSettings {
         note: '数字与计数',
       ),
     ],
+  );
+
+  static TerminalThemeSettings oneDark() => const TerminalThemeSettings(
+    presetName: 'One Dark',
+    fontFamily: 'JetBrains Mono',
+    fontSize: 14,
+    normalFontWeight: 400,
+    boldFontWeight: 700,
+    cursorStyle: CursorStyle.block,
+    cursorBlink: true,
+    foreground: Color(0xFFABB2BF),
+    terminalBackground: Color(0xFF282C34),
+    selectionColor: Color(0xFF3E4451),
+    cursorColor: Color(0xFF528BFF),
+    scrollbackLines: 10000,
+    regexHighlights: [],
+  );
+
+  static TerminalThemeSettings solarized() => const TerminalThemeSettings(
+    presetName: 'Solarized',
+    fontFamily: 'JetBrains Mono',
+    fontSize: 14,
+    normalFontWeight: 400,
+    boldFontWeight: 700,
+    cursorStyle: CursorStyle.block,
+    cursorBlink: false,
+    foreground: Color(0xFF839496),
+    terminalBackground: Color(0xFF002B36),
+    selectionColor: Color(0xFF073642),
+    cursorColor: Color(0xFF93A1A1),
+    scrollbackLines: 10000,
+    regexHighlights: [],
   );
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/terminal/terminal_view.dart' as app_terminal;
+import 'package:deepssh/features/theme/theme_bridge.dart';
 import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/material.dart';
@@ -65,6 +66,7 @@ Future<void> pumpWorkbench(
         sshBridge: InMemorySshBridgeClient(),
         localTerminalBridge: localBridge,
         tunnelBridge: InMemoryTunnelBridgeClient(),
+        themeBridge: InMemoryThemeBridgeClient(),
       ),
     ),
   );
@@ -74,9 +76,7 @@ Future<void> pumpWorkbench(
 Future<void> createLocalTerminal(WidgetTester tester) async {
   await tester.tap(find.text('新增连接'));
   await tester.pumpAndSettle();
-  await tester.tap(
-    find.byKey(addConnectionMenuKey(AddConnectionAction.localTerminal)),
-  );
+  await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.localTerminal)));
   await tester.pump();
 }
 
