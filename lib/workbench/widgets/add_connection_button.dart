@@ -4,6 +4,11 @@ import '../../core/theme/app_tokens.dart';
 
 enum AddConnectionAction { localTerminal, ssh, tunnel }
 
+/// Stable key for a menu entry, so callers can target one action without
+/// matching on label text (the same words appear in the page eyebrows).
+Key addConnectionMenuKey(AddConnectionAction action) =>
+    ValueKey('add-connection-${action.name}');
+
 const Map<AddConnectionAction, ({String label, IconData icon, String hint})>
     addConnectionMenuItems = {
   AddConnectionAction.localTerminal: (
@@ -53,6 +58,7 @@ class AddConnectionButton extends StatelessWidget {
       itemBuilder: (context) => [
         for (final entry in addConnectionMenuItems.entries)
           PopupMenuItem<AddConnectionAction>(
+            key: addConnectionMenuKey(entry.key),
             value: entry.key,
             height: 44,
             child: Row(

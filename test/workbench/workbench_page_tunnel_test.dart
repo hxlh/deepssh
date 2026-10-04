@@ -1,4 +1,5 @@
 import 'package:deepssh/core/models/ssh_profile_item.dart';
+import 'package:deepssh/workbench/widgets/add_connection_button.dart';
 import 'package:deepssh/core/models/tunnel_config_item.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
@@ -140,29 +141,30 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('隧道连接'));
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.tunnel)));
       await tester.pumpAndSettle();
 
-      expect(find.text('Tunnel Connections'), findsOneWidget);
+      expect(find.byKey(const ValueKey('deck-page-title')), findsOneWidget);
       expect(find.text('Prod'), findsOneWidget);
       expect(find.text('Dev API'), findsNothing);
 
-      await tester.tap(find.text('新增'));
+      await tester.tap(find.text('新增隧道'));
       await tester.pumpAndSettle();
       await tester.enterText(find.bySemanticsLabel('Name'), 'Dev API');
       await tester.enterText(find.bySemanticsLabel('Listen Host'), '127.0.0.1');
       await tester.enterText(find.bySemanticsLabel('Listen Port'), '18080');
       await tester.enterText(find.bySemanticsLabel('Target Host'), '127.0.0.1');
       await tester.enterText(find.bySemanticsLabel('Target Port'), '8080');
+      await tester.ensureVisible(find.text('Create'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Create'));
       await tester.pumpAndSettle();
 
       expect(tunnelBridge.listCount, greaterThan(0));
       expect(find.text('Dev API'), findsOneWidget);
-      expect(
-        find.text('LOCAL 127.0.0.1:18080 → 127.0.0.1:8080 via Prod'),
-        findsOneWidget,
-      );
+      // Listen and target share one summary line under the name.
+      expect(find.text('127.0.0.1:18080 → 127.0.0.1:8080'), findsOneWidget);
+      expect(find.text('Prod'), findsOneWidget);
       expect(find.text('SSH PROFILES'), findsNothing);
     },
   );
@@ -191,7 +193,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('隧道连接'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.tunnel)));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('tunnel-start-tunnel-1')));
@@ -240,7 +242,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('隧道连接'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.tunnel)));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('tunnel-start-tunnel-1')));
@@ -296,7 +298,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('隧道连接'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.tunnel)));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('tunnel-start-tunnel-1')));

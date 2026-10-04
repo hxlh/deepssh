@@ -863,6 +863,36 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     }
   }
 
+  /// Flipping the forward direction inline has to persist, otherwise the row
+  /// would show a different direction than the stored config on reload.
+  Future<void> _handleTunnelTypeChanged(
+    TunnelConfigItem tunnel,
+    TunnelForwardType type,
+  ) async {
+    if (tunnel.type == type) return;
+    try {
+      final updated = await widget.tunnelBridge.updateTunnel(
+        id: tunnel.id,
+        name: tunnel.name,
+        type: type,
+        sshProfileId: tunnel.sshProfileId,
+        listenHost: tunnel.listenHost,
+        listenPort: tunnel.listenPort,
+        targetHost: tunnel.targetHost,
+        targetPort: tunnel.targetPort,
+      );
+      await loadTunnelConfigs();
+      if (!mounted) return;
+      _replaceTunnelConfig(updated);
+    } catch (error, stackTrace) {
+      unawaited(_errorLogger.error('tunnel.update', error, stackTrace));
+      if (!mounted) return;
+      setState(() {
+        tunnelErrorMessage = 'Update tunnel type failed: $error';
+      });
+    }
+  }
+
   Future<void> _handleDeleteTunnelConfig(TunnelConfigItem tunnel) async {
     try {
       await widget.tunnelBridge.deleteTunnel(tunnel.id);
@@ -1651,6 +1681,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                     onStopTunnelConfig: _handleStopTunnelConfig,
                     onEditTunnelConfig: _handleEditTunnelConfig,
                     onDeleteTunnelConfig: _handleDeleteTunnelConfig,
+                    onTunnelTypeChanged: _handleTunnelTypeChanged,
                     onCancelTunnelForm: _handleCancelTunnelForm,
                     onSaveTunnelConfig: _handleSaveTunnelConfig,
                     onUiThemeChanged: _handleUiThemeChanged,

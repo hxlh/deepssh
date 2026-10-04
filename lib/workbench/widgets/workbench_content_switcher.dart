@@ -52,6 +52,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
     required this.onStopTunnelConfig,
     required this.onEditTunnelConfig,
     required this.onDeleteTunnelConfig,
+    required this.onTunnelTypeChanged,
     required this.onCancelTunnelForm,
     required this.onSaveTunnelConfig,
     required this.onUiThemeChanged,
@@ -90,6 +91,8 @@ class WorkbenchContentSwitcher extends StatelessWidget {
   final ValueChanged<TunnelConfigItem> onStopTunnelConfig;
   final ValueChanged<TunnelConfigItem> onEditTunnelConfig;
   final ValueChanged<TunnelConfigItem> onDeleteTunnelConfig;
+  final void Function(TunnelConfigItem tunnel, TunnelForwardType type)
+  onTunnelTypeChanged;
   final VoidCallback onCancelTunnelForm;
   final ValueChanged<TunnelConfigDraft> onSaveTunnelConfig;
   final ValueChanged<UiThemeSettings> onUiThemeChanged;
@@ -127,6 +130,7 @@ class WorkbenchContentSwitcher extends StatelessWidget {
           onStop: onStopTunnelConfig,
           onEdit: onEditTunnelConfig,
           onDelete: onDeleteTunnelConfig,
+          onTypeChanged: onTunnelTypeChanged,
         );
       case WorkbenchContentMode.tunnelConfigForm:
         return TunnelConfigFormPage(

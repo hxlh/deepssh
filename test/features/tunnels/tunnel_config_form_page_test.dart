@@ -34,6 +34,8 @@ void main() {
     await tester.enterText(find.bySemanticsLabel('Name'), '');
     await tester.enterText(find.bySemanticsLabel('Listen Port'), '');
     await tester.enterText(find.bySemanticsLabel('Target Port'), '');
+    await tester.ensureVisible(find.text('Create'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
 
@@ -63,6 +65,8 @@ void main() {
     await tester.enterText(find.bySemanticsLabel('Listen Port'), '18080');
     await tester.enterText(find.bySemanticsLabel('Target Host'), '127.0.0.1');
     await tester.enterText(find.bySemanticsLabel('Target Port'), '8080');
+    await tester.ensureVisible(find.text('Create'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
 
@@ -94,6 +98,8 @@ void main() {
     await tester.enterText(find.bySemanticsLabel('Listen Port'), '');
     await tester.enterText(find.bySemanticsLabel('Target Host'), '127.0.0.1');
     await tester.enterText(find.bySemanticsLabel('Target Port'), '8080');
+    await tester.ensureVisible(find.text('Create'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
 
@@ -130,6 +136,8 @@ void main() {
 
       expect(find.text('Edit Tunnel Connection'), findsOneWidget);
       expect(find.text('Remote Forward'), findsOneWidget);
+      await tester.ensureVisible(find.text('Update'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Update'));
       await tester.pumpAndSettle();
 

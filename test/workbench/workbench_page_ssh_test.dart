@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:deepssh/core/models/ssh_profile_item.dart';
+import 'package:deepssh/workbench/widgets/add_connection_button.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/ssh/ssh_zmodem_session.dart';
 import 'package:deepssh/features/terminal/terminal_view.dart' as app_terminal;
@@ -226,10 +227,10 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
 
-    expect(find.text('SSH Configurations'), findsOneWidget);
+    expect(find.byKey(const ValueKey('deck-page-title')), findsOneWidget);
     expect(find.text('Prod'), findsNothing);
 
     bridge.profiles.add(
@@ -245,7 +246,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
 
     expect(find.text('Prod'), findsWidgets);
@@ -301,7 +302,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -340,7 +341,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -383,7 +384,7 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('SSH'));
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pump();
@@ -394,7 +395,7 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('SSH'));
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pump();
@@ -437,7 +438,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -472,7 +473,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -512,7 +513,7 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('SSH'));
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pumpAndSettle();
@@ -556,7 +557,7 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('SSH'));
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pumpAndSettle();
@@ -621,7 +622,7 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('SSH'));
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pump();
@@ -675,7 +676,7 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('SSH'));
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pump();
@@ -725,7 +726,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -762,7 +763,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -799,7 +800,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -852,7 +853,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -883,10 +884,10 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('SSH'));
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('新增'));
+      await tester.tap(find.text('新增 SSH 配置'));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.bySemanticsLabel('Name'), 'Prod');
@@ -918,7 +919,7 @@ void main() {
 
       expect(bridge.connectCount, 1);
       expect(find.text('terminal1'), findsWidgets);
-      expect(find.text('SSH Configurations'), findsNothing);
+      expect(find.byKey(const ValueKey('deck-page-title')), findsNothing);
 
       await tester.pump(const Duration(milliseconds: 250));
 
@@ -958,7 +959,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -993,7 +994,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -1038,7 +1039,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -1099,7 +1100,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -1158,7 +1159,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
