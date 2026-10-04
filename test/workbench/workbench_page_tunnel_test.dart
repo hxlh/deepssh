@@ -5,6 +5,8 @@ import 'package:deepssh/core/models/tunnel_config_item.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
 import 'package:deepssh/src/rust/ssh_auth.dart' as rust_auth;
+import 'package:deepssh/features/tunnels/tunnel_config_form_drawer.dart';
+import 'package:deepssh/features/tunnels/tunnel_configs_page.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -183,6 +185,51 @@ void main() {
       expect(find.text('Prod'), findsOneWidget);
     },
   );
+
+  testWidgets('keeps the tunnels list mounted behind the form drawer', (
+    tester,
+  ) async {
+    final sshBridge = FakeSshBridgeClient();
+    final tunnelBridge = FakeTunnelBridgeClient();
+    await tunnelBridge.createTunnel(
+      name: 'Dev API',
+      type: TunnelForwardType.local,
+      sshProfileId: 'profile-1',
+      listenHost: '127.0.0.1',
+      listenPort: 18080,
+      targetHost: '127.0.0.1',
+      targetPort: 8080,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkbenchPage(sshBridge: sshBridge, tunnelBridge: tunnelBridge),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(addConnectionMenuKey(AddConnectionAction.tunnel)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(TunnelConfigFormDrawer), findsNothing);
+
+    await tester.tap(find.text('新增转发'));
+    await tester.pumpAndSettle();
+
+    // The drawer overlays the page rather than replacing it.
+    expect(find.byType(TunnelConfigFormDrawer), findsOneWidget);
+    expect(find.byType(TunnelConfigsPage), findsOneWidget);
+    expect(find.text('Dev API'), findsWidgets);
+
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TunnelConfigFormDrawer), findsNothing);
+    expect(find.text('Dev API'), findsOneWidget);
+  });
 
   testWidgets('starts and stops a saved tunnel from the workbench page', (
     tester,

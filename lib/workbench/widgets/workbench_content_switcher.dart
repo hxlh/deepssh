@@ -6,11 +6,11 @@ import '../../core/models/tunnel_config_item.dart';
 import '../../features/local_terminal/local_terminal_bridge.dart';
 import '../../features/ssh/ssh_bridge.dart';
 import '../../features/diagnostics/diagnostics_page.dart';
-import '../../features/ssh_profiles/ssh_profile_form_page.dart';
+import '../../features/ssh_profiles/ssh_profile_form_drawer.dart';
 import '../../features/ssh_profiles/ssh_profiles_page.dart';
 import '../../features/terminal/terminal_tab_shell.dart';
 import '../../features/terminal/terminal_view.dart';
-import '../../features/tunnels/tunnel_config_form_page.dart';
+import '../../features/tunnels/tunnel_config_form_drawer.dart';
 import '../../features/tunnels/tunnel_configs_page.dart';
 import '../../features/terminal/terminal_state.dart';
 import '../../features/theme_config/theme_config_page.dart';
@@ -106,7 +106,10 @@ class WorkbenchContentSwitcher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     switch (mode) {
+      // The form modes keep the list mounted behind the drawer scrim, so the
+      // switcher renders the same page either way.
       case WorkbenchContentMode.sshProfiles:
+      case WorkbenchContentMode.sshProfileForm:
         return SshProfilesPage(
           profiles: sshProfiles,
           errorMessage: sshErrorMessage,
@@ -117,13 +120,8 @@ class WorkbenchContentSwitcher extends StatelessWidget {
           onEdit: onEditSshProfile,
           onDelete: onDeleteSshProfile,
         );
-      case WorkbenchContentMode.sshProfileForm:
-        return SshProfileFormPage(
-          profile: editingSshProfile,
-          onCancel: onCancelSshForm,
-          onSaved: onSaveSshProfile,
-        );
       case WorkbenchContentMode.tunnelConfigs:
+      case WorkbenchContentMode.tunnelConfigForm:
         return TunnelConfigsPage(
           tunnels: tunnelConfigs,
           profiles: sshProfiles,
@@ -133,13 +131,6 @@ class WorkbenchContentSwitcher extends StatelessWidget {
           onStop: onStopTunnelConfig,
           onEdit: onEditTunnelConfig,
           onDelete: onDeleteTunnelConfig,
-        );
-      case WorkbenchContentMode.tunnelConfigForm:
-        return TunnelConfigFormPage(
-          profiles: sshProfiles,
-          tunnel: editingTunnelConfig,
-          onCancel: onCancelTunnelForm,
-          onSaved: onSaveTunnelConfig,
         );
       case WorkbenchContentMode.terminal:
         return TerminalTabShell(

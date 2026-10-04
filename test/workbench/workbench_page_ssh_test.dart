@@ -922,7 +922,7 @@ void main() {
       await tester.enterText(find.bySemanticsLabel('端口'), '2222');
       await tester.enterText(find.bySemanticsLabel('用户名'), 'root');
       await tester.enterText(find.bySemanticsLabel('密码'), 'secret');
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(DropdownButton<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('xterm-truecolor').last);
       await tester.pumpAndSettle();

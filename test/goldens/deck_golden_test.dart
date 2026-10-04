@@ -13,10 +13,12 @@ import 'dart:io';
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/models/theme_settings.dart';
 import 'package:deepssh/core/models/tunnel_config_item.dart';
+import 'package:deepssh/features/ssh_profiles/ssh_profile_form_drawer.dart';
 import 'package:deepssh/features/ssh_profiles/ssh_profiles_page.dart';
 import 'package:deepssh/features/terminal/terminal_state.dart';
 import 'package:deepssh/features/terminal/terminal_status_bar.dart';
 import 'package:deepssh/features/theme_config/theme_config_page.dart';
+import 'package:deepssh/features/tunnels/tunnel_config_form_drawer.dart';
 import 'package:deepssh/features/tunnels/tunnel_configs_page.dart';
 import 'package:deepssh/workbench/events/workbench_events.dart';
 import 'package:deepssh/workbench/widgets/app_topbar.dart';
@@ -189,6 +191,64 @@ void main() {
         ),
       ),
       'dock-no-memory',
+    );
+  });
+
+  testWidgets('ssh form drawer over the connections list', (tester) async {
+    if (!_enabled) return;
+    await _shoot(
+      tester,
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Stack(
+            children: [
+              SshProfilesPage(
+                profiles: _profiles,
+                errorMessage: null,
+                onAdd: () {},
+                onConnect: (_) {},
+                onEdit: (_) {},
+                onDelete: (_) {},
+              ),
+              SshProfileFormDrawer(onCancel: () {}, onSaved: (_) {}),
+            ],
+          ),
+        ),
+      ),
+      'ssh-drawer',
+    );
+  });
+
+  testWidgets('tunnel form drawer over the tunnels list', (tester) async {
+    if (!_enabled) return;
+    await _shoot(
+      tester,
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Stack(
+            children: [
+              TunnelConfigsPage(
+                tunnels: _tunnels,
+                profiles: _profiles,
+                errorMessage: null,
+                onAdd: () {},
+                onStart: (_) {},
+                onStop: (_) {},
+                onEdit: (_) {},
+                onDelete: (_) {},
+              ),
+              TunnelConfigFormDrawer(
+                profiles: _profiles,
+                onCancel: () {},
+                onSaved: (_) {},
+              ),
+            ],
+          ),
+        ),
+      ),
+      'tunnel-drawer',
     );
   });
 

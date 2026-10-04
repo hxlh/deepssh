@@ -1,6 +1,6 @@
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/widgets/deck_widgets.dart';
-import 'package:deepssh/features/ssh_profiles/ssh_profile_form_page.dart';
+import 'package:deepssh/features/ssh_profiles/ssh_profile_form_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,7 +12,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SshProfileFormPage(
+          body: SshProfileFormDrawer(
             onCancel: () {},
             onSaved: (_) => saved = true,
           ),
@@ -36,7 +36,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SshProfileFormPage(
+          body: SshProfileFormDrawer(
             onCancel: () {},
             onSaved: (draft) => savedDraft = draft,
           ),
@@ -59,7 +59,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SshProfileFormPage(
+          body: SshProfileFormDrawer(
             onCancel: () {},
             onSaved: (draft) => savedDraft = draft,
           ),
@@ -68,7 +68,7 @@ void main() {
     );
 
     await fillRequiredFields(tester);
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.tap(find.byType(DropdownButton<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('xterm-truecolor').last);
     await tester.pumpAndSettle();
@@ -84,7 +84,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SshProfileFormPage(
+          body: SshProfileFormDrawer(
             profile: const SshProfileItem(
               id: 'profile-1',
               name: 'Prod',
@@ -115,14 +115,14 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SshProfileFormPage(onCancel: () {}, onSaved: (_) {}),
+          body: SshProfileFormDrawer(onCancel: () {}, onSaved: (_) {}),
         ),
       ),
     );
 
     final passwordTop = tester.getTopLeft(find.bySemanticsLabel('密码')).dy;
     final terminalTypeTop = tester
-        .getTopLeft(find.byType(DropdownButtonFormField<String>))
+        .getTopLeft(find.byType(DropdownButton<String>))
         .dy;
 
     expect(terminalTypeTop, greaterThan(passwordTop));
@@ -134,7 +134,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SshProfileFormPage(onCancel: () {}, onSaved: (_) {}),
+          body: SshProfileFormDrawer(onCancel: () {}, onSaved: (_) {}),
         ),
       ),
     );
@@ -142,7 +142,7 @@ void main() {
     expect(find.bySemanticsLabel('密码'), findsOneWidget);
     expect(find.bySemanticsLabel('私钥路径'), findsNothing);
 
-    await tester.tap(find.byType(DropdownButtonFormField<SshAuthMode>));
+    await tester.tap(find.byType(DropdownButton<SshAuthMode>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('私钥').last);
     await tester.pumpAndSettle();
@@ -157,7 +157,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SshProfileFormPage(
+          body: SshProfileFormDrawer(
             onCancel: () {},
             onSaved: (draft) => savedDraft = draft,
           ),
@@ -180,7 +180,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SshProfileFormPage(
+          body: SshProfileFormDrawer(
             onCancel: () {},
             onSaved: (draft) => savedDraft = draft,
           ),
@@ -189,7 +189,7 @@ void main() {
     );
 
     await fillBaseFields(tester);
-    await tester.tap(find.byType(DropdownButtonFormField<SshAuthMode>));
+    await tester.tap(find.byType(DropdownButton<SshAuthMode>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('私钥').last);
     await tester.pumpAndSettle();
@@ -217,7 +217,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SshProfileFormPage(onCancel: () {}, onSaved: (_) {}),
+          body: SshProfileFormDrawer(onCancel: () {}, onSaved: (_) {}),
         ),
       ),
     );
@@ -238,7 +238,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SshProfileFormPage(onCancel: () {}, onSaved: (_) {}),
+          body: SshProfileFormDrawer(onCancel: () {}, onSaved: (_) {}),
         ),
       ),
     );
@@ -262,7 +262,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SshProfileFormPage(onCancel: () {}, onSaved: (_) {}),
+          body: SshProfileFormDrawer(onCancel: () {}, onSaved: (_) {}),
         ),
       ),
     );
@@ -299,21 +299,33 @@ Future<void> tapFormButton(WidgetTester tester, String label) async {
   await tester.tap(button);
 }
 
-TextField textFieldByLabel(String label) {
-  return find
-          .byWidgetPredicate(
-            (widget) =>
-                widget is TextField && widget.decoration?.labelText == label,
-          )
-          .evaluate()
-          .single
-          .widget
-      as TextField;
+/// The drawer labels its control with [Semantics] rather than
+/// `decoration.labelText`, so tests reach fields through the same handle
+/// assistive tech reads.
+EditableText textFieldByLabel(String label) {
+  final editable = find.descendant(
+    of: find.bySemanticsLabel(label),
+    matching: find.byType(EditableText),
+    matchRoot: true,
+  );
+  return editable.evaluate().single.widget as EditableText;
 }
 
+/// Nearest labelled [Semantics] ancestor — the drawer's own field label.
 String? primaryFocusLabel() {
   final context = FocusManager.instance.primaryFocus?.context;
   if (context == null) return null;
-  final textField = context.findAncestorWidgetOfExactType<TextField>();
-  return textField?.decoration?.labelText;
+  String? nearest;
+  context.visitAncestorElements((element) {
+    final widget = element.widget;
+    if (widget is Semantics) {
+      final label = widget.properties.label;
+      if (label != null && label.isNotEmpty) {
+        nearest = label;
+        return false;
+      }
+    }
+    return true;
+  });
+  return nearest;
 }

@@ -1,6 +1,6 @@
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/models/tunnel_config_item.dart';
-import 'package:deepssh/features/tunnels/tunnel_config_form_page.dart';
+import 'package:deepssh/features/tunnels/tunnel_config_form_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -22,7 +22,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TunnelConfigFormPage(
+          body: TunnelConfigFormDrawer(
             profiles: profiles,
             onCancel: () {},
             onSaved: (draft) => savedDraft = draft,
@@ -51,7 +51,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TunnelConfigFormPage(
+          body: TunnelConfigFormDrawer(
             profiles: profiles,
             onCancel: () {},
             onSaved: (draft) => savedDraft = draft,
@@ -85,7 +85,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TunnelConfigFormPage(
+          body: TunnelConfigFormDrawer(
             profiles: profiles,
             onCancel: () {},
             onSaved: (draft) => savedDraft = draft,
@@ -115,7 +115,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: TunnelConfigFormPage(
+            body: TunnelConfigFormDrawer(
               profiles: profiles,
               tunnel: const TunnelConfigItem(
                 id: 'tunnel-1',
@@ -134,7 +134,7 @@ void main() {
         ),
       );
 
-      expect(find.text('编辑转发'), findsOneWidget);
+      expect(find.text('编辑端口转发'), findsOneWidget);
       expect(find.text('远程转发（-R）'), findsOneWidget);
       await tester.ensureVisible(find.text('保存'));
       await tester.pumpAndSettle();

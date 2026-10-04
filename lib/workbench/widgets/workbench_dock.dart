@@ -18,7 +18,6 @@ class WorkbenchDock extends StatefulWidget {
     required this.showMemory,
     required this.onToggleCollapsed,
     required this.onHeightChanged,
-    this.onOpenMemoryDetails,
   });
 
   final WorkbenchEvents events;
@@ -32,11 +31,6 @@ class WorkbenchDock extends StatefulWidget {
 
   final VoidCallback onToggleCollapsed;
   final ValueChanged<double> onHeightChanged;
-
-  /// Opens the full diagnostics page. The dock only shows gauges, so the
-  /// allocator controls (mimalloc collect, force GC, CSV log) need somewhere
-  /// to live.
-  final VoidCallback? onOpenMemoryDetails;
 
   @override
   State<WorkbenchDock> createState() => _WorkbenchDockState();
@@ -151,12 +145,7 @@ class _WorkbenchDockState extends State<WorkbenchDock> {
                     _VerticalGrip(
                       onDrag: (details) => _dragEventsWidth(details, maxWidth),
                     ),
-                    Expanded(
-                      child: _MemoryPanel(
-                        snapshot: _snapshot,
-                        onOpenDetails: widget.onOpenMemoryDetails,
-                      ),
-                    ),
+                    Expanded(child: _MemoryPanel(snapshot: _snapshot)),
                   ],
                 ],
               );
@@ -212,7 +201,6 @@ class _DockPanelShell extends StatelessWidget {
     required this.trailing,
     required this.child,
     this.onToggle,
-    this.leading,
   });
 
   final String label;
@@ -220,7 +208,6 @@ class _DockPanelShell extends StatelessWidget {
   final Widget trailing;
   final Widget child;
   final VoidCallback? onToggle;
-  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -259,7 +246,6 @@ class _DockPanelShell extends StatelessWidget {
                     ),
                   ),
                 DeckLabel(label, size: 10.5),
-                if (leading != null) ...[const SizedBox(width: 8), leading!],
                 const Spacer(),
                 trailing,
               ],
@@ -267,36 +253,6 @@ class _DockPanelShell extends StatelessWidget {
           ),
           if (!collapsed) Expanded(child: child),
         ],
-      ),
-    );
-  }
-}
-
-/// Small icon affordance in a dock panel header.
-class _DockHeadButton extends StatelessWidget {
-  const _DockHeadButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: onTap,
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: Icon(icon, size: 13, color: DeckTokens.muted),
-          ),
-        ),
       ),
     );
   }
@@ -468,10 +424,9 @@ class _FeedRow extends StatelessWidget {
 }
 
 class _MemoryPanel extends StatelessWidget {
-  const _MemoryPanel({required this.snapshot, this.onOpenDetails});
+  const _MemoryPanel({required this.snapshot});
 
   final RustMemSnapshot? snapshot;
-  final VoidCallback? onOpenDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -481,15 +436,6 @@ class _MemoryPanel extends StatelessWidget {
       trailing: snapshot == null
           ? DeckLabel('—', size: 10)
           : DeckLabel('RSS ${_mb(snapshot!.currentRss)} MB', size: 10),
-      // Not in the prototype, which has no diagnostics page: the dock only
-      // renders gauges, and the allocator controls still need a home.
-      leading: onOpenDetails == null
-          ? null
-          : _DockHeadButton(
-              icon: Icons.tune,
-              tooltip: '打开内存监控详情',
-              onTap: onOpenDetails!,
-            ),
       child: snapshot == null
           ? const Center(
               child: Text(
