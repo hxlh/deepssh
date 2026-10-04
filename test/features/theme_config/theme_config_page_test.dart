@@ -140,24 +140,30 @@ void main() {
     expect(savedUi?.fontSize, 13);
   });
 
-  testWidgets('applies a built-in preset from the dropdown', (tester) async {
-    UiThemeSettings? savedUi;
-
-    await _pumpPage(tester, onUiSaved: (settings) => savedUi = settings);
+  testWidgets('the preset picker only ships the prototype Command Deck', (
+    tester,
+  ) async {
+    await _pumpPage(tester);
 
     await tester.tap(find.byKey(const ValueKey('preset-trigger-ui')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('VS Code Dark'));
+    expect(find.text('Command Deck'), findsWidgets);
+    expect(find.text('VS Code Dark'), findsNothing);
+
+    // Close the UI menu before opening the terminal one.
+    await tester.tap(find.byKey(const ValueKey('preset-trigger-ui')));
     await tester.pumpAndSettle();
 
-    // The trigger picked up the new scheme…
-    expect(find.text('VS Code Dark'), findsOneWidget);
-    // …and the swatch card did too.
-    expect(find.text('#1E1E1E'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('theme-save')));
-    await tester.pump();
-    expect(savedUi?.panel, const Color(0xFF252526));
+    final terminalTrigger = find.byKey(
+      const ValueKey('preset-trigger-terminal'),
+    );
+    await tester.ensureVisible(terminalTrigger);
+    await tester.pumpAndSettle();
+    await tester.tap(terminalTrigger);
+    await tester.pumpAndSettle();
+    expect(find.text('Command Deck'), findsWidgets);
+    expect(find.text('One Dark'), findsNothing);
+    expect(find.text('Solarized'), findsNothing);
   });
 
   testWidgets('creates and deletes a custom preset', (tester) async {
@@ -190,19 +196,12 @@ void main() {
     expect(find.text('自定义方案 1'), findsNothing);
   });
 
-  testWidgets('switching to One Dark clears the regex rules', (tester) async {
-    await _pumpPage(tester);
+  testWidgets('empty regex list shows the guidance', (tester) async {
+    final terminalSettings = TerminalThemeSettings.commandDeck().copyWith(
+      regexHighlights: const [],
+    );
 
-    // Command Deck ships rules, so the empty-state copy is hidden.
-    expect(find.text('当前预设没有高亮规则'), findsNothing);
-
-    final trigger = find.byKey(const ValueKey('preset-trigger-terminal'));
-    await tester.ensureVisible(trigger);
-    await tester.pumpAndSettle();
-    await tester.tap(trigger);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('One Dark'));
-    await tester.pumpAndSettle();
+    await _pumpPage(tester, terminalSettings: terminalSettings);
 
     expect(find.text('当前预设没有高亮规则'), findsOneWidget);
   });

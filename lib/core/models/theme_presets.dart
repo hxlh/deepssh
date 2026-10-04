@@ -69,6 +69,8 @@ class ThemePreset {
   }
 }
 
+/// The prototype ships a single built-in: Command Deck. Everything else in
+/// the picker is a user-created preset.
 List<ThemePreset> builtInUiPresets() => [
   ThemePreset(
     id: 'deck',
@@ -76,32 +78,15 @@ List<ThemePreset> builtInUiPresets() => [
     swatch: const Color(0xFFFAF9F5),
     ui: UiThemeSettings.commandDeck(),
   ),
-  ThemePreset(
-    id: 'vsc',
-    name: 'VS Code Dark',
-    swatch: const Color(0xFF1E1E1E),
-    ui: UiThemeSettings.vsCodeDark(),
-  ),
 ];
 
+/// Terminal side of the same single built-in.
 List<ThemePreset> builtInTerminalPresets() => [
   ThemePreset(
     id: 'deck',
     name: 'Command Deck',
     swatch: const Color(0xFF17181A),
     terminal: TerminalThemeSettings.commandDeck(),
-  ),
-  ThemePreset(
-    id: 'one',
-    name: 'One Dark',
-    swatch: const Color(0xFF282C34),
-    terminal: TerminalThemeSettings.oneDark(),
-  ),
-  ThemePreset(
-    id: 'solar',
-    name: 'Solarized',
-    swatch: const Color(0xFF002B36),
-    terminal: TerminalThemeSettings.solarized(),
   ),
 ];
 

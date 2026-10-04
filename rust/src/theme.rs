@@ -260,7 +260,7 @@ impl From<RegexHighlightConfig> for RegexHighlight {
     }
 }
 
-const CURRENT_THEME_VERSION: u32 = 1;
+const CURRENT_THEME_VERSION: u32 = 2;
 
 /// Prototype defaults: `design/deepssh-prototype.html` `:root` plus the regex
 /// set the user ships (also mirrored in Dart `TerminalThemeSettings.commandDeck`).
@@ -445,11 +445,24 @@ fn load_theme_from_disk() -> Result<ThemeSettings> {
         .with_context(|| format!("Failed to parse {}", path.display()))?;
     let version = file.version.unwrap_or(0);
     let settings = ThemeSettings::from(file);
-    // An untouched pre-refresh file still carries the old seven-rule set and
-    // the old terminal cursor colours; upgrade it to the prototype defaults
-    // instead of showing rules the user replaced.
-    if version < CURRENT_THEME_VERSION && settings == legacy_default_theme() {
-        return Ok(default_theme());
+    if version < CURRENT_THEME_VERSION {
+        // An untouched pre-refresh file still carries the old seven-rule set
+        // and the old terminal cursor colours; upgrade it to the prototype
+        // defaults instead of showing rules the user replaced.
+        if settings == legacy_default_theme() {
+            return Ok(default_theme());
+        }
+        // The prototype picker only ships Command Deck. Files still sitting on
+        // the removed built-ins fall back to it instead of reappearing as an
+        // unsupported preset.
+        let removed_preset = matches!(settings.ui.preset_name.as_str(), "VS Code Dark")
+            || matches!(
+                settings.terminal.preset_name.as_str(),
+                "One Dark" | "Solarized"
+            );
+        if removed_preset {
+            return Ok(default_theme());
+        }
     }
     Ok(settings)
 }
@@ -654,6 +667,32 @@ mod tests {
 
         assert_eq!(theme, default_theme());
         assert_eq!(theme.terminal.regex_highlights.len(), 10);
+    }
+
+    #[test]
+    fn removed_built_in_presets_fall_back_to_command_deck() {
+        let _guard = clear_theme_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+        fs::create_dir_all(workspace.path().join("config")).unwrap();
+        let mut old = sample_theme();
+        old.ui.preset_name = "VS Code Dark".to_string();
+        old.terminal.preset_name = "One Dark".to_string();
+        let file = ThemeFile {
+            version: None,
+            ui: UiThemeConfig::from(&old.ui),
+            terminal: TerminalThemeConfig::from(&old.terminal),
+        };
+        fs::write(
+            workspace.config_path(),
+            serde_yaml::to_string(&file).unwrap(),
+        )
+        .unwrap();
+
+        let theme = load_theme().unwrap();
+
+        assert_eq!(theme.ui.preset_name, "Command Deck");
+        assert_eq!(theme.terminal.preset_name, "Command Deck");
     }
 
     #[test]
