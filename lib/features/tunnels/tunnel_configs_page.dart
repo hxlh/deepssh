@@ -101,7 +101,8 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
     return DeckPageScaffold(
       eyebrow: 'Port Forwarding',
       title: '端口转发',
-      subtitle: '基于 SSH 配置的本地与远程隧道。共 ${widget.tunnels.length} 条，'
+      subtitle:
+          '基于 SSH 配置的本地与远程隧道。共 ${widget.tunnels.length} 条，'
           '其中 $running 条运行中。',
       actions: [
         DeckButton(
@@ -158,12 +159,18 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                DeckStatusBadge(
-                                  label: _status(tunnel).label,
-                                  color: _status(tunnel).color,
-                                  background: _status(tunnel).background,
-                                  borderColor: _status(tunnel).border,
-                                ),
+                                // The prototype's stopped badge carries no
+                                // status dot — only 在线 / 运行中 / 等待中 do.
+                                if (tunnel.status ==
+                                    TunnelRuntimeStatus.stopped)
+                                  const DeckBadge('已停止')
+                                else
+                                  DeckStatusBadge(
+                                    label: _status(tunnel).label,
+                                    color: _status(tunnel).color,
+                                    background: _status(tunnel).background,
+                                    borderColor: _status(tunnel).border,
+                                  ),
                                 const SizedBox(width: 6),
                                 DeckBadge(
                                   tunnel.type == TunnelForwardType.local
@@ -194,7 +201,9 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
                                     text: '  经  ',
                                     style: TextStyle(color: DeckTokens.muted),
                                   ),
-                                  TextSpan(text: profileName(tunnel.sshProfileId)),
+                                  TextSpan(
+                                    text: profileName(tunnel.sshProfileId),
+                                  ),
                                 ],
                               ),
                               overflow: TextOverflow.ellipsis,

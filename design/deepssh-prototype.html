@@ -1,0 +1,2960 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeepSSH — SSH 工作台原型</title>
+<style>
+/* ============================================================
+   DeepSSH — Design tokens (locked to the archivebate system)
+   ============================================================ */
+:root{
+  --bg:#FAF9F5;
+  --surface:#FFFFFF;
+  --fg:#1F1E1D;
+  --muted:#6B6862;
+  --border:#E9E5DA;
+  --accent:#D97757;
+  --ok:#4E7A4E;
+  --warn:#8A6414;
+  --warn-bar:#C08A2E;
+  --danger:#B0523A;
+  --term-bg:#17181A;
+  --term-fg:#DEDCD6;
+  --term-dim:#86847C;
+  --term-green:#8FBF7F;
+  --term-blue:#7FA8D8;
+  --term-amber:#D9A24B;
+  --term-red:#D98C7A;
+  --term-cyan:#6FB6B0;
+
+  --accent-ink:color-mix(in oklch, var(--accent) 68%, var(--fg));
+  --accent-soft:color-mix(in oklch, var(--accent) 14%, transparent);
+  --ok-soft:color-mix(in oklch, var(--ok) 12%, transparent);
+  --warn-soft:color-mix(in oklch, var(--warn-bar) 20%, transparent);
+  --danger-soft:color-mix(in oklch, var(--danger) 12%, transparent);
+  --fg-soft:color-mix(in oklch, var(--fg) 6%, transparent);
+
+  --shadow-hard:2px 2px 0 color-mix(in oklch, var(--fg) 20%, transparent);
+  --shadow-solid:2px 2px 0 var(--fg);
+
+  --font-display:Georgia,'Iowan Old Style','Charter','Times New Roman',serif;
+  --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei','Noto Sans CJK SC',system-ui,sans-serif;
+  --font-mono:ui-monospace,'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none !important}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--fg);
+  font-family:var(--font-body);font-size:13px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+h1,h2,h3,h4{margin:0;font-family:var(--font-display);font-weight:600;line-height:1.15}
+p{margin:0}
+a{color:inherit}
+button{font:inherit;color:inherit}
+.mono{font-family:var(--font-mono)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+:where(button,input,select,a):focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+/* Buttons — pixel-press, hard edge */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:7px 12px;border:1px solid var(--fg);background:var(--surface);
+  color:var(--fg);font-size:12px;font-weight:600;cursor:pointer;
+  border-radius:0;text-decoration:none;white-space:nowrap;
+  transition:transform 80ms ease, background 120ms ease;
+}
+.btn:hover{background:var(--fg-soft)}
+.btn:active{transform:translate(2px,2px);box-shadow:none}
+.btn .ico{width:14px;height:14px;flex:none}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn-primary:hover{background:var(--accent-ink);border-color:var(--accent-ink)}
+.btn-danger{color:var(--danger);border-color:color-mix(in oklch, var(--danger) 45%, var(--fg))}
+.btn-danger:hover{background:var(--danger-soft)}
+.btn-ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn-ghost:hover{background:var(--fg-soft);color:var(--fg)}
+.btn.sm{padding:5px 9px;font-size:11px}
+.btn.icon{padding:6px;width:30px}
+
+/* Inputs */
+.input{
+  width:100%;padding:8px 10px;border:1px solid var(--border);background:var(--surface);
+  color:var(--fg);font-family:var(--font-mono);font-size:12px;border-radius:0;
+}
+.input::placeholder{color:var(--muted)}
+.input:focus{border-color:var(--fg);outline:none}
+select.input{cursor:pointer;appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:28px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field>label{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.hint{font-size:11px;color:var(--muted)}
+label.check{display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer}
+label.check input{width:14px;height:14px;accent-color:var(--accent);margin:0}
+
+/* Badges / status */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;padding:2px 7px;
+  border:1px solid var(--border);background:var(--bg);
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;color:var(--muted);
+  text-transform:uppercase;white-space:nowrap;
+}
+.badge.ok{color:var(--ok);border-color:color-mix(in oklch, var(--ok) 40%, var(--border));background:var(--ok-soft)}
+.badge.run{color:var(--accent-ink);border-color:color-mix(in oklch, var(--accent) 40%, var(--border));background:var(--accent-soft)}
+.badge.warn{color:var(--warn);border-color:color-mix(in oklch, var(--warn-bar) 45%, var(--border));background:var(--warn-soft)}
+.badge.off{color:var(--muted)}
+.dot{display:inline-block;width:7px;height:7px;background:var(--muted);flex:none}
+.dot.ok{background:var(--ok)}
+.dot.run{background:var(--accent)}
+.dot.warn{background:var(--warn-bar)}
+.dot.off{background:color-mix(in oklch, var(--muted) 55%, var(--bg))}
+.count{
+  display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;
+  background:var(--fg);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:600;
+}
+
+/* App shell / topbar */
+.shell{min-height:100vh;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:40;background:var(--surface);border-bottom:1px solid var(--fg)}
+.topbar-inner{max-width:1360px;margin:0 auto;padding:9px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none}
+.brand-mark{
+  width:30px;height:30px;display:grid;place-items:center;background:var(--accent);color:var(--surface);
+  font-family:var(--font-mono);font-weight:700;font-size:12px;border:1px solid var(--fg);box-shadow:var(--shadow-solid);
+}
+.brand-text{display:flex;flex-direction:column;line-height:1.05}
+.brand-text b{font-family:var(--font-display);font-size:15px;letter-spacing:.02em}
+.brand-text span{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+
+.page-nav{display:flex;align-items:center;gap:2px;margin-left:6px}
+.page-nav button{
+  display:inline-flex;align-items:center;gap:7px;padding:6px 10px;background:transparent;border:1px solid transparent;
+  color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;border-radius:0;
+}
+.page-nav button:hover{color:var(--fg);background:var(--fg-soft)}
+.page-nav button[aria-current="page"]{color:var(--fg);background:var(--bg);border-color:var(--border)}
+.page-nav .ico{width:14px;height:14px}
+.page-nav .count{margin-left:2px}
+
+.pulse{margin-left:auto;display:flex;align-items:center;gap:14px}
+.pulse-item{display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.pulse-item b{color:var(--fg);font-size:12px}
+
+/* dropdown menu */
+.menu-wrap{position:relative}
+.menu{
+  position:absolute;top:calc(100% + 8px);right:0;z-index:50;min-width:220px;
+  background:var(--surface);border:1px solid var(--fg);box-shadow:var(--shadow-solid);
+}
+.menu button{display:flex;width:100%;align-items:center;gap:10px;padding:10px 12px;background:transparent;border:0;
+  border-bottom:1px solid var(--border);text-align:left;cursor:pointer;font-size:12px;color:var(--fg)}
+.menu button:last-child{border-bottom:0}
+.menu button:hover{background:var(--accent-soft)}
+.menu button .ico{width:15px;height:15px;color:var(--muted);flex:none}
+.menu button small{display:block;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:1px}
+
+/* Page scaffolding */
+.main{flex:1;width:100%;max-width:1360px;margin:0 auto;padding:18px 20px 34px}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.eyebrow{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:5px}
+.page-head h1{font-size:23px}
+.page-head .sub{margin-top:5px;color:var(--muted);font-size:12.5px}
+.head-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.toolbar .search{position:relative;flex:1;min-width:220px;max-width:340px}
+.toolbar .search .ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--muted)}
+.toolbar .search .input{padding-left:30px}
+.toolbar .spacer{flex:1}
+
+/* Workbench: resizable panes */
+/* A definite height is what makes the split real: the stage above takes exactly
+   the space the two bottom panels don't use, so the page itself never grows. */
+.bench{
+  display:flex;flex-direction:column;
+  height:calc(100vh - var(--bench-chrome,116px));
+  height:calc(100dvh - var(--bench-chrome,116px));
+  min-height:620px;
+}
+.workbench{
+  display:flex;flex:1 1 auto;min-height:180px;
+  border:1px solid var(--fg);background:var(--surface);box-shadow:var(--shadow-solid);
+}
+.explorer{
+  --grp-1:oklch(.55 .09 235);--grp-2:oklch(.55 .085 62);
+  flex:none;width:var(--sb-w,280px);background:var(--bg);display:flex;flex-direction:column;min-height:0;
+  container-type:inline-size;container-name:ex;
+}
+.ex-head{display:flex;align-items:center;gap:8px;padding:9px 10px 9px 12px;border-bottom:1px solid var(--border)}
+.ex-head .lbl{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.ex-head .sp{margin-left:auto}
+.ex-add{
+  display:inline-flex;align-items:center;gap:6px;padding:5px 9px;background:var(--bg);
+  border:1px solid var(--border);color:var(--fg);font-size:12px;cursor:pointer;white-space:nowrap;
+}
+.ex-add .ico{width:13px;height:13px}
+.ex-add:hover{background:var(--fg-soft);border-color:var(--fg)}
+.ex-add:active{transform:translate(1px,1px)}
+.ex-add:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.ex-head .menu-wrap .menu{top:calc(100% + 6px);right:0;left:auto}
+
+/* splitters */
+.split{position:relative;flex:none;background:transparent;z-index:3}
+.split::after{content:"";position:absolute;background:var(--border);transition:background 120ms ease}
+.split.v{width:7px;cursor:ew-resize}
+.split.v::after{top:0;bottom:0;left:3px;width:1px}
+.split.h{height:20px;display:flex;align-items:center;justify-content:center;gap:9px;cursor:ns-resize}
+.split.h::after{left:0;right:0;top:9px;height:1px}
+.split:hover::after,.split.dragging::after{background:var(--accent)}
+.split:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.split .grip{width:26px;height:3px;background:var(--border);transition:background 120ms ease;pointer-events:none}
+.split .grip.vgrip{width:3px;height:26px;position:absolute;top:50%;left:2px;margin-top:-13px}
+.split.h:hover .grip,.split.v:hover .grip{background:var(--fg)}
+.fold{
+  width:18px;height:18px;display:grid;place-items:center;padding:0;background:var(--bg);
+  border:1px solid var(--border);color:var(--muted);cursor:pointer;
+}
+.fold .ico{width:12px;height:12px;transition:transform 140ms ease}
+.bench[data-dock="collapsed"] .fold .ico{transform:rotate(180deg)}
+.fold:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
+.fold:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* dock auto-collapse + live drag feedback */
+.bench[data-dock="collapsed"] .split.h .grip{display:none}
+.split.dragging::after{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+/* Explorer tree — mirrors host_tree.dart */
+.ex-scroll{flex:1;overflow:auto;padding:6px 8px 10px}
+.ex-sec{margin-bottom:2px}
+.ex-ghead{
+  display:flex;align-items:center;gap:8px;height:32px;padding:0 8px;cursor:default;color:var(--fg);
+}
+.ex-ghead.clickable{cursor:pointer}
+.ex-ghead.clickable:hover{background:var(--fg-soft)}
+.ex-ghead .ico{width:15px;height:15px;flex:none;color:var(--muted)}
+.ex-ghead .caret{width:16px;height:16px;flex:none;color:var(--muted);margin-left:auto;transition:transform 120ms ease}
+.ex-ghead[aria-expanded="false"] .caret{transform:rotate(-90deg)}
+.ex-gname{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ex-gtag{font-family:var(--font-mono);font-size:9.5px;color:var(--muted);border:1px solid var(--border);padding:0 4px;flex:none}
+.ex-gtag.ok{color:var(--ok);border-color:color-mix(in oklch, var(--ok) 40%, var(--border))}
+.ex-items{padding:2px 0}
+.ex-sec.collapsed .ex-items{display:none}
+.ex-row{
+  display:flex;align-items:center;gap:8px;height:32px;margin:2px 8px 2px 24px;padding:0 10px;
+  cursor:pointer;color:var(--fg);
+}
+.ex-row:hover{background:var(--fg-soft)}
+.ex-row .ico{width:15px;height:15px;flex:none;color:var(--muted)}
+.ex-row .name{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ex-row.grp-1{background:color-mix(in oklch, var(--grp-1) 12%, transparent)}
+.ex-row.grp-1.active{background:color-mix(in oklch, var(--grp-1) 30%, transparent)}
+.ex-row.grp-2{background:color-mix(in oklch, var(--grp-2) 12%, transparent)}
+.ex-row.grp-2.active{background:color-mix(in oklch, var(--grp-2) 30%, transparent)}
+.ex-row.local.active{background:var(--accent-soft);color:var(--accent-ink)}
+.ex-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ex-empty{padding:4px 8px 8px 34px;font-family:var(--font-mono);font-size:10.5px;color:var(--muted);letter-spacing:.02em}
+.ex-scroll.empty{display:none}
+
+/* Block reorder — host_tree.dart: the config blocks are the items of a
+   ReorderableListView, each grabbed by its own ReorderableDragStartListener
+   handle (the 6-dot grip, same as _RegexRuleRow). The negative margin keeps the
+   config name aligned with the session names under it. */
+.ex-grip{display:flex;align-items:center;justify-content:center;width:14px;height:26px;margin-left:-6px;
+  flex:none;color:var(--muted);cursor:grab;touch-action:none;border:0;background:none;padding:0}
+.ex-grip:hover{color:var(--fg)}
+.ex-grip:active{cursor:grabbing}
+.ex-grip .ico{width:13px;height:13px;pointer-events:none}
+.ex-grip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.ex-scroll.reordering{position:relative}
+.ex-sec.dragging{position:relative;z-index:6;background:var(--surface);box-shadow:var(--shadow-hard)}
+.ex-sec.dragging .ex-grip{cursor:grabbing;color:var(--accent-ink)}
+.ex-shade{position:absolute;left:0;right:0;border:1px dashed var(--accent);
+  background:color-mix(in oklch, var(--accent) 10%, transparent);pointer-events:none}
+.ex-shade.in-row{left:24px;right:8px}
+
+/* Session reorder inside a block — the same ReorderableDragStartListener grip,
+   but the drop scope is one .ex-items: a session never leaves its config. The
+   negative margins tuck the handle into the row's own left padding, so the
+   icon and name keep the alignment they had without a handle. */
+.ex-sgrip{display:flex;align-items:center;justify-content:center;width:14px;height:22px;
+  margin:0 -8px 0 -14px;flex:none;color:var(--muted);cursor:grab;touch-action:none;
+  border:0;background:none;padding:0}
+.ex-sgrip:hover{color:var(--fg)}
+.ex-sgrip:active{cursor:grabbing}
+.ex-sgrip .ico{width:12px;height:12px;pointer-events:none}
+.ex-sgrip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+/* Session close button — closes the whole session (row + tab + block prune),
+   the same path as the right-click "关闭会话". Hidden until the row is hovered
+   or the button itself holds focus, so the tree stays quiet while the control
+   remains reachable by keyboard. */
+.ex-x{display:flex;align-items:center;justify-content:center;width:22px;height:22px;
+  margin-left:auto;margin-right:-6px;flex:none;color:var(--muted);cursor:pointer;
+  border:0;background:none;padding:0;opacity:0;transition:opacity .12s ease-out}
+.ex-row:hover .ex-x,.ex-row:focus-within .ex-x{opacity:1}
+.ex-x:hover{color:var(--accent-ink)}
+.ex-x .ico{width:13px;height:13px;pointer-events:none}
+.ex-x:focus-visible{outline:2px solid var(--accent);outline-offset:1px;opacity:1}
+.ex-items.reordering{position:relative}
+.ex-items .ex-row.dragging{position:relative;z-index:6;background:var(--surface);box-shadow:var(--shadow-hard)}
+.ex-items .ex-row.dragging .ex-sgrip{cursor:grabbing;color:var(--accent-ink)}
+
+/* Tree empty state — the tree only empties out when every block was closed. */
+.ex-treeempty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  padding:18px 14px;text-align:center;color:var(--muted)}
+.ex-treeempty[hidden]{display:none}
+.ex-treeempty .ico{width:26px;height:26px;margin-bottom:5px}
+.ex-treeempty p{margin:0;max-width:20ch}
+.ex-treeempty .t1{font-family:var(--font-mono);font-size:11px;letter-spacing:.02em;color:var(--fg)}
+.ex-treeempty .t2{font-size:11.5px;line-height:1.55}
+
+/* explorer right-click menu — mirrors HostTree._showStyledMenu */
+.ctx{
+  position:fixed;z-index:80;width:150px;padding:0;background:var(--surface);
+  border:1px solid var(--fg);box-shadow:var(--shadow-solid);
+}
+.ctx button{
+  display:flex;align-items:center;width:100%;height:32px;padding:0;background:transparent;border:0;
+  text-align:left;cursor:pointer;
+}
+.ctx button::before{content:"";width:3px;height:100%;background:transparent;flex:none;margin-right:9px}
+.ctx button:hover{background:var(--fg-soft)}
+.ctx button:hover::before{background:var(--accent)}
+.ctx button:hover span{font-weight:600}
+.ctx button span{padding-right:10px;font-size:12.5px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* the explorer can be dragged narrow — first it sheds labels, then it becomes a rail */
+@container ex (max-width:170px){
+  .ex-head .lbl{display:none}
+  .ex-add span{display:none}
+  .ex-add{padding:5px 7px}
+  .ex-row{margin-left:14px}
+}
+
+/* Minimum state — a 56px icon rail. Every host and every session keeps its icon, so
+   the tree never degrades into empty rows; the name leaves the box but stays in the
+   accessibility tree (clipped, not display:none) and in the native tooltip. Group
+   identity, which the text used to carry, moves onto the icon tint and the left rule. */
+@container ex (max-width:96px){
+  .ex-head{justify-content:center;padding:9px 6px}
+  .ex-add{width:30px;height:28px;justify-content:center;padding:0}
+  .ex-scroll{padding:6px 4px 8px}
+  .ex-ghead{position:relative;justify-content:center;height:34px;padding:0}
+  .ex-ghead .caret,.ex-gtag,.ex-grip,.ex-sgrip,.ex-x{display:none}
+  .ex-ghead .ex-gname,.ex-row .name{
+    position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;
+  }
+  .ex-row{position:relative;justify-content:center;margin:2px 6px;padding:0;height:34px}
+  .ex-row .ico{width:16px;height:16px}
+  .ex-row.grp-1 .ico{color:var(--grp-1)}
+  .ex-row.grp-2 .ico{color:var(--grp-2)}
+  .ex-row.local .ico{color:var(--fg)}
+  .ex-row.active{box-shadow:inset 2px 0 0 var(--accent-ink)}
+  .ex-empty{display:none}
+  .ex-treeempty p{display:none}
+  .ex-foot{padding:6px 4px;gap:3px}
+  .ex-tool{justify-content:center;height:34px;padding:0}
+  .ex-tool .ico{width:15px;height:15px}
+}
+
+.ex-foot{border-top:1px solid var(--border);padding:7px;display:flex;flex-direction:column;gap:2px}
+.ex-tool{display:flex;align-items:center;gap:8px;padding:7px 8px;color:var(--muted);font-size:12px;cursor:pointer;background:transparent;border:0;text-align:left;width:100%}
+.ex-tool:hover{background:var(--fg-soft);color:var(--fg)}
+.ex-tool.on{background:var(--accent-soft);color:var(--accent-ink)}
+.ex-tool .ico{width:14px;height:14px;flex:none}
+
+/* Terminal */
+.term-wrap{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;background:var(--term-bg)}
+.tabs{display:flex;align-items:stretch;background:var(--bg);border-bottom:1px solid var(--fg);overflow-x:auto;scrollbar-width:thin}
+.tab{display:flex;align-items:center;gap:8px;min-height:37px;padding:0 8px 0 12px;border-right:1px solid var(--border);
+  border-top:2px solid transparent;color:var(--muted);font-size:12.5px;cursor:pointer;white-space:nowrap;flex:none;background:transparent}
+.tab:hover{background:var(--fg-soft);color:var(--fg)}
+.tab.active{background:var(--surface);border-top-color:var(--accent);color:var(--fg);font-weight:600}
+.tab:focus-visible,.ex-ghead:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.tab .tlabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px}
+.tab .tico{width:13px;height:13px;flex:none;color:var(--muted)}
+.tab .x{width:17px;height:17px;display:grid;place-items:center;color:var(--muted);border:0;background:transparent;flex:none}
+.tab .x:hover{background:var(--border);color:var(--fg)}
+.tab .x .ico{width:12px;height:12px}
+.terminal{flex:1;min-height:0;margin:0;padding:14px 16px;overflow:auto;color:var(--term-fg);
+  font-family:var(--font-mono);font-size:12.5px;line-height:1.62;white-space:pre-wrap;word-break:break-word}
+.terminal::-webkit-scrollbar{width:10px;height:10px}
+.terminal::-webkit-scrollbar-thumb{background:color-mix(in oklch, var(--term-fg) 22%, var(--term-bg))}
+.t-dim{color:var(--term-dim)}
+.t-g{color:var(--term-green)}
+.t-b{color:var(--term-blue)}
+.t-a{color:var(--term-amber)}
+.t-r{color:var(--term-red)}
+.t-c{color:var(--term-cyan)}
+.t-bold{font-weight:700}
+.cursor{display:inline-block;width:7px;height:14px;background:var(--term-fg);vertical-align:-2px;animation:blink 1.1s steps(1,end) infinite}
+@keyframes blink{0%,50%{opacity:1}50.01%,100%{opacity:0}}
+.term-status{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 12px;background:var(--fg);color:var(--bg);
+  font-family:var(--font-mono);font-size:10.5px}
+.term-status .s{display:flex;align-items:center;gap:6px}
+.term-status .s.right{margin-left:auto;gap:14px;color:color-mix(in oklch, var(--bg) 72%, var(--fg))}
+.term-status .dot.ok{background:var(--term-green)}
+
+/* Docks — 实时事件 / 内存监控 sit on ONE row and split like Explorer ↔ terminal */
+.docks{display:flex;min-height:0;height:var(--dock-h,280px);container-type:inline-size;container-name:dk}
+.dock{background:var(--surface);border:1px solid var(--fg);box-shadow:var(--shadow-hard);display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;container-type:inline-size;container-name:dk}
+#dockEvents{flex:0 0 var(--dock-events-w,60%)}
+#memoryDock{flex:1 1 0}
+.bench[data-dock="collapsed"] .docks{height:37px}
+.bench[data-dock="collapsed"] .dock > *:not(.dock-head){display:none}
+.bench[data-dock="collapsed"] #dockEvents{flex:1 1 auto;min-width:0}
+.bench[data-dock="collapsed"] #dockVSplit{display:none}
+/* 内存监控 toggled off from the Explorer footer — the events panel owns the whole
+   row and the inner splitter has nothing to divide, so it steps out too */
+.bench[data-mem="hidden"] #memoryDock,.bench[data-mem="hidden"] #dockVSplit{display:none}
+.bench[data-mem="hidden"] #dockEvents{flex:1 1 auto;min-width:0}
+/* 最小状态保留内存读数，但收成一个紧凑读数块，不占整块面板 */
+.bench[data-dock="collapsed"] #memoryDock{flex:0 0 auto}
+.bench[data-dock="collapsed"] .dock-head{height:100%;border-bottom:0;padding:0 12px}
+.dock-head{display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:1px solid var(--border);flex:none;min-width:0}
+.dock-head .lbl{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.dock-head .sp{margin-left:auto}
+/* 收起后的最小状态：标题条本身要能读到信息，而不是一条空标签 */
+.dock-head .mini{display:none}
+.bench[data-dock="collapsed"] .dock-head .mini{display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0;
+  padding-left:10px;border-left:1px solid var(--border)}
+.bench[data-dock="collapsed"] .dock-head .sp{display:none}
+.mini-t{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);flex:none}
+.mini-x{font-size:12px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.mini-x em{font-style:normal;color:var(--accent-ink)}
+/* the folded title bar still reports the newest entry, so it has to carry that entry's level */
+.mini-x[data-lv="error"]{color:var(--danger)}
+.mini-x[data-lv="error"] em{color:var(--danger)}
+.mini-mem{display:flex;align-items:center;gap:6px;flex:none;font-family:var(--font-mono);font-size:10.5px;
+  color:var(--muted);padding-left:10px;border-left:1px solid var(--border)}
+.mini-mem b{color:var(--fg);font-weight:400}
+.mini-mem .dot{background:var(--accent)}
+.mini-mem.no-div{border-left:0;padding-left:0}
+/* 收起的读数条很窄：按容器宽度分级降级，而不是溢出 */
+@container dk (max-width:520px){ #dockEvents .mini-t{display:none} }
+@container dk (max-width:330px){ #dockEvents .mini-x em{display:none} }
+.dock-body{padding:6px 0;flex:1;min-height:0;overflow:auto}
+.dock-body.mem{padding:0;display:grid;grid-template-columns:1fr;align-content:start}
+.mem .gauge{border-bottom:1px solid var(--border);padding:12px 15px}
+.mem .gauge:last-child{border-bottom:0}
+/* the memory dock is a narrow side panel — shed decoration instead of overflowing */
+@container dk (max-width:360px){ .dock-head .hint{display:none} }
+@container dk (max-width:290px){
+  .feed-row .lvl{display:none}
+  .mem .gauge{padding:10px 12px}
+}
+.bench[data-dock="expanded"] .dock > div:not(.dock-head){flex:1;min-height:0;overflow:auto}
+.feed-row{display:grid;grid-template-columns:70px 16px minmax(0,1fr);gap:9px;align-items:start;padding:6px 13px;font-size:12px}
+.feed-row:hover{background:var(--bg)}
+.feed-row time{font-family:var(--font-mono);font-size:10.5px;color:var(--muted)}
+.feed-row .ico{width:14px;height:14px;color:var(--muted);margin-top:1px}
+.feed-row .txt{color:var(--fg)}
+.feed-row .txt em{font-style:normal;color:var(--accent-ink)}
+/* error and warn share this feed with normal events — severity is carried by a left
+   rule plus a mono chip, so it survives a narrow panel where the wording is clipped */
+.feed-row.err{background:color-mix(in oklch, var(--danger) 6%, transparent);box-shadow:inset 3px 0 0 var(--danger)}
+.feed-row.err:hover{background:color-mix(in oklch, var(--danger) 11%, transparent)}
+.feed-row.err .ico{color:var(--danger)}
+.feed-row.warn .ico{color:var(--warn)}
+.lvl{display:inline-block;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:0 4px;margin-right:7px;border:1px solid currentColor;vertical-align:1px;white-space:nowrap}
+.lvl.e{color:var(--danger)}
+.lvl.w{color:var(--warn)}
+.gauge{padding:11px 13px;border-bottom:1px solid var(--border)}
+.gauge:last-child{border-bottom:0}
+.gauge-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px}
+.gauge-top span{font-size:12px;color:var(--muted)}
+.gauge-top b{font-family:var(--font-mono);font-size:12px;color:var(--fg)}
+.bar{height:8px;background:var(--border);border:1px solid var(--border);position:relative}
+.bar i{display:block;height:100%;background:var(--fg)}
+.bar i.accent{background:var(--accent)}
+.bar i.ok{background:var(--ok)}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:4px 0;color:var(--muted)}
+.kv b{font-family:var(--font-mono);color:var(--fg);font-weight:600}
+
+/* Lists */
+.list{display:flex;flex-direction:column;border:1px solid var(--fg);background:var(--surface);box-shadow:var(--shadow-solid)}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 210px auto;gap:16px;align-items:center;
+  padding:13px 15px;border-bottom:1px solid var(--border);border-left:3px solid var(--border)}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--bg)}
+.row.up{border-left-color:var(--ok)}
+.row.run{border-left-color:var(--accent)}
+.row.off{border-left-color:var(--border)}
+.r-name{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.r-name strong{font-size:13.5px;font-weight:600}
+.r-sub{margin-top:4px;font-family:var(--font-mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.r-sub .arrow{color:var(--accent-ink)}
+.r-meta{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted)}
+.r-meta b{font-family:var(--font-mono);font-weight:600;color:var(--fg);font-size:11.5px}
+.r-meta b.none{font-family:inherit;font-weight:500;color:var(--muted)}
+.r-acts{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.empty{display:flex;flex-direction:column;align-items:center;gap:9px;padding:48px 20px;text-align:center;border:1px dashed var(--border);color:var(--muted)}
+.empty .ico{width:30px;height:30px;color:var(--muted)}
+.empty b{font-family:var(--font-display);font-size:16px;color:var(--fg)}
+
+/* Theme page */
+.theme-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--fg);box-shadow:var(--shadow-hard);padding:16px 18px;display:flex;flex-direction:column;gap:15px}
+.panel > h3{font-size:16px;display:flex;align-items:center;gap:8px}
+.panel > h3 .ico{width:16px;height:16px;color:var(--accent-ink)}
+.panel .sect{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+  border-bottom:1px solid var(--border);padding-bottom:6px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+/* Preset selector — a dropdown whose rows each carry a delete button.
+   The last row is "新建自定义方案"; right-clicking any row copies it. */
+.psel{position:relative;margin-top:9px}
+.psel-btn{display:flex;align-items:center;gap:9px;width:100%;height:38px;padding:0 10px;
+  border:1px solid var(--border);background:var(--bg);cursor:pointer;color:var(--fg);font-size:12.5px;text-align:left}
+.psel-btn:hover{border-color:color-mix(in oklch, var(--fg) 45%, var(--border));background:var(--surface)}
+.psel-btn[aria-expanded="true"]{border-color:var(--fg);background:var(--surface);box-shadow:var(--shadow-hard)}
+.psel-btn .sw-model{width:16px;height:16px;border:1px solid var(--fg);flex:none}
+.psel-btn .p-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.psel-btn .ico{width:12px;height:12px;color:var(--muted);flex:none;transition:transform .12s ease}
+.psel-btn[aria-expanded="true"] .ico{transform:rotate(180deg);color:var(--fg)}
+.psel-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.p-tag{font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;color:var(--muted);
+  border:1px solid var(--border);padding:1px 4px;line-height:1;flex:none}
+.psel-menu{position:absolute;z-index:46;top:calc(100% + 4px);left:0;right:0;background:var(--surface);
+  border:1px solid var(--fg);box-shadow:var(--shadow-hard);padding:4px;max-height:264px;overflow:auto}
+.psel-menu[hidden]{display:none}
+.psel-row{display:grid;grid-template-columns:minmax(0,1fr) 28px;align-items:center;gap:4px}
+.psel-pick{display:flex;align-items:center;gap:9px;width:100%;height:34px;padding:0 8px;min-width:0;
+  border:0;border-left:3px solid transparent;background:none;cursor:pointer;color:var(--fg);text-align:left}
+.psel-pick:hover{background:var(--bg)}
+.psel-pick.on{border-left-color:var(--accent);background:var(--bg)}
+.psel-pick:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.psel-pick .sw-model{width:14px;height:14px;border:1px solid var(--fg);flex:none}
+.psel-pick .p-name{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.psel-del{display:flex;align-items:center;justify-content:center;width:28px;height:28px;flex:none;
+  border:1px solid transparent;background:none;color:var(--muted);cursor:pointer;padding:0}
+.psel-del .ico{width:13px;height:13px;pointer-events:none}
+.psel-del:hover{border-color:var(--border);background:var(--bg);color:var(--danger)}
+.psel-del:active{transform:translate(1px,1px)}
+.psel-del:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.psel-none{margin:0;padding:12px 8px;font-size:12px;line-height:1.7;color:var(--muted)}
+.psel-foot{border-top:1px solid var(--border);margin-top:4px;padding-top:4px;display:flex;flex-direction:column}
+.psel-add,.psel-restore{display:flex;align-items:center;gap:8px;width:100%;height:32px;padding:0 8px;
+  border:1px dashed transparent;background:none;color:var(--muted);font-size:12px;cursor:pointer;text-align:left}
+.psel-add .ico,.psel-restore .ico{width:14px;height:14px;pointer-events:none}
+.psel-add:hover{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-soft)}
+.psel-add:active,.psel-restore:active{transform:translate(1px,1px)}
+.psel-restore:hover{color:var(--fg);border-color:var(--border);background:var(--bg)}
+.psel-add:focus-visible,.psel-restore:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.swatch{border:1px solid var(--border);background:var(--bg);padding:7px}
+.swatch .chip{height:24px;border:1px solid var(--fg);margin-bottom:5px}
+.swatch .cl{font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.swatch .cv{font-family:var(--font-mono);font-size:11px;color:var(--fg)}
+.mini-term{border:1px solid var(--fg);background:var(--term-bg);color:var(--term-fg);font-family:var(--font-mono);
+  font-size:11.5px;line-height:1.6;padding:12px 13px;white-space:pre-wrap}
+/* Regex highlight rules — mirrors _RegexRuleRow (theme_config_page.dart:965)
+   grip 18 · pattern ≤280 · note ≤150 · compact color · remove 32 · row 40 */
+.rx-list{display:flex;flex-direction:column}
+.rx{display:grid;grid-template-columns:18px minmax(0,280px) minmax(0,150px) auto 32px;gap:8px;align-items:center;height:40px}
+.rx-grip{display:flex;align-items:center;justify-content:center;width:18px;height:32px;color:var(--muted);
+  cursor:grab;touch-action:none;border:0;background:none;padding:0}
+.rx-grip:hover{color:var(--fg)}
+.rx-grip:active{cursor:grabbing}
+.rx-grip .ico{width:15px;height:15px;pointer-events:none}
+.rx-grip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.rx.dragging{z-index:5}
+.rx.dragging .rx-grip{cursor:grabbing;color:var(--accent-ink)}
+.rx-shade{position:absolute;left:0;right:0;border:1px dashed var(--accent);background:color-mix(in oklch, var(--accent) 10%, transparent);pointer-events:none}
+.rx-in{display:flex;align-items:center;height:32px;border:1px solid var(--border);background:var(--bg);min-width:0}
+.rx-in:hover{border-color:color-mix(in oklch, var(--fg) 45%, var(--border))}
+.rx-in:focus-within{border-color:var(--accent);background:var(--surface);box-shadow:inset 0 0 0 1px var(--accent)}
+.rx-in input{flex:1;min-width:0;height:100%;border:0;background:none;padding:0 8px;font-size:12.5px;color:var(--fg)}
+.rx-in input:focus{outline:none}
+.rx-in input::placeholder{color:var(--muted)}
+.rx-in.mono input{font-family:var(--font-mono);font-size:11.5px}
+.rx-del{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid transparent;
+  background:none;color:var(--muted);cursor:pointer;padding:0}
+.rx-del .ico{width:13px;height:13px;pointer-events:none}
+.rx-del:hover{border-color:var(--border);background:var(--bg);color:var(--danger)}
+.rx-del:active{transform:translate(1px,1px)}
+.rx-del:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.rx-color{position:relative}
+.rx-color-btn{display:flex;align-items:center;gap:8px;height:32px;padding:0 8px;border:1px solid var(--border);
+  background:var(--bg);cursor:pointer;color:var(--fg)}
+.rx-color-btn:hover{border-color:color-mix(in oklch, var(--fg) 45%, var(--border))}
+.rx-color-btn[aria-expanded="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--surface)}
+.rx-color-btn .sw{width:24px;height:24px;border:1px solid var(--fg);flex:none}
+.rx-color-btn .hex{font-family:var(--font-mono);font-size:11px}
+.rx-color-btn .ico{width:11px;height:11px;color:var(--muted)}
+.rx-color-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.rx-pop{position:absolute;top:36px;right:0;z-index:40;width:212px;background:var(--surface);border:1px solid var(--fg);
+  box-shadow:var(--shadow-hard);padding:12px;display:flex;flex-direction:column;gap:10px}
+.rx-pop input[type=color]{width:100%;height:32px;padding:0;border:1px solid var(--border);background:none;cursor:pointer}
+.rx-pop .hexrow{display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--bg);height:32px;padding:0 8px}
+.rx-pop .hexrow:focus-within{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.rx-pop .hexrow span{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.rx-pop .hexrow input{flex:1;min-width:0;border:0;background:none;font-family:var(--font-mono);font-size:11.5px;color:var(--fg);text-transform:uppercase}
+.rx-pop .hexrow input:focus{outline:none}
+.rx-presets{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.rx-presets button{aspect-ratio:1;border:1px solid var(--border);cursor:pointer;padding:0}
+.rx-presets button:hover{border-color:var(--fg)}
+.rx-presets button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.rx-empty{border:1px dashed var(--border);padding:16px 12px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
+.rx-empty b{display:block;font-family:var(--font-display);font-size:14px;color:var(--fg);margin-bottom:3px}
+.rx-add{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:1px solid transparent;
+  background:none;color:var(--muted);font-size:12px;cursor:pointer}
+.rx-add .ico{width:13px;height:13px}
+.rx-add:hover{color:var(--fg);border-color:var(--border);background:var(--bg)}
+.rx-add:active{transform:translate(1px,1px)}
+.rx-add:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+/* Dialog / drawer / toast */
+.overlay{position:fixed;inset:0;z-index:80;background:color-mix(in oklch, var(--fg) 42%, transparent);
+  display:flex;align-items:center;justify-content:center;padding:20px}
+.dialog{width:min(440px,100%);background:var(--surface);border:1px solid var(--fg);box-shadow:var(--shadow-solid);padding:20px}
+.dialog h3{font-size:17px;margin-bottom:8px}
+.dialog p{color:var(--muted);font-size:12.5px}
+.dialog .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.drawer-overlay{position:fixed;inset:0;z-index:75;background:color-mix(in oklch, var(--fg) 34%, transparent);display:flex;justify-content:flex-end}
+.drawer{width:min(430px,100%);height:100%;background:var(--surface);border-left:1px solid var(--fg);
+  box-shadow:-2px 0 0 color-mix(in oklch, var(--fg) 20%, transparent);display:flex;flex-direction:column}
+.drawer-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.drawer-head .lbl{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.drawer-head h3{font-size:17px}
+.drawer-head .sp{margin-left:auto}
+.drawer-body{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:15px}
+.drawer-foot{padding:13px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+.toast-wrap{position:fixed;left:0;right:0;bottom:18px;z-index:90;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.toast{display:flex;align-items:center;gap:9px;background:var(--fg);color:var(--bg);padding:9px 14px;font-size:12px;
+  border:1px solid var(--fg);box-shadow:var(--shadow-hard);animation:rise 160ms ease}
+.toast .dot{background:var(--term-green)}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* Responsive */
+@media (max-width:980px){
+  .workbench{flex-direction:column}
+  .explorer{width:auto;max-height:320px;border-bottom:1px solid var(--fg)}
+  .split.v{display:none}
+  .bench{height:auto;min-height:760px}
+  .theme-grid{grid-template-columns:1fr}
+  .docks{flex-direction:column;height:var(--dock-h,280px)}
+  .dock{max-height:none}
+  #dockEvents,#memoryDock{flex:none}
+  #dockVSplit{display:none}
+  .row{grid-template-columns:minmax(0,1fr);gap:10px}
+  .r-acts{justify-content:flex-start}
+  .pulse{display:none}
+}
+@media (max-width:640px){
+  .page-nav{order:3;width:100%;overflow-x:auto}
+  .main{padding:14px 12px 28px}
+  .grid2,.grid3{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar" data-od-id="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#" data-od-id="brand" aria-label="DeepSSH 首页">
+        <span class="brand-mark">DS</span>
+        <span class="brand-text"><b>DeepSSH</b><span>SSH 工作台</span></span>
+      </a>
+
+      <nav class="page-nav" aria-label="主导航">
+        <button type="button" data-page="workbench" aria-current="page">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16"/><path d="m7 9 3 3-3 3M13 15h4"/></svg>
+          工作台
+        </button>
+        <button type="button" data-page="connections">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
+          连接配置 <span class="count">6</span>
+        </button>
+        <button type="button" data-page="tunnels">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg>
+          端口转发 <span class="count">3</span>
+        </button>
+        <button type="button" data-page="theme">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18h1.5a2.5 2.5 0 0 0 0-5H12a2 2 0 0 1 0-4h5a4 4 0 0 0 4-4c0-3-4-5-9-5Z"/><circle cx="8" cy="10" r="1"/></svg>
+          主题配置
+        </button>
+      </nav>
+
+      <div class="pulse" data-od-id="pulse" aria-label="运行概览">
+        <span class="pulse-item"><span class="dot ok"></span> 会话 <b>4</b></span>
+        <span class="pulse-item"><span class="dot run"></span> 转发 <b>2</b></span>
+        <span class="pulse-item">内存 <b>142.6</b> MB</span>
+        <span class="pulse-item">14:32</span>
+      </div>
+
+      </div>
+  </header>
+<main class="main" id="content">
+    <section class="page" id="page-workbench" data-od-id="page-workbench" aria-label="工作台">
+      <div class="bench" id="bench" data-od-id="workbench-shell" data-dock="expanded">
+        <div class="workbench">
+        <aside class="explorer" id="explorer" data-od-id="explorer" aria-label="资源管理器">
+          <div class="ex-head">
+            <span class="lbl">Explorer</span>
+            <span class="sp"></span>
+            <div class="menu-wrap">
+              <button class="ex-add" type="button" id="exAddBtn" aria-haspopup="menu" aria-expanded="false">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                <span>新增连接</span>
+              </button>
+              <div class="menu" id="exAddMenu" role="menu" hidden>
+                <button type="button" role="menuitem" data-new="local">
+                  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg>
+                  <span>本地终端</span>
+                </button>
+                <button type="button" role="menuitem" data-new="ssh">
+                  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
+                  <span>SSH</span>
+                </button>
+                <button type="button" role="menuitem" data-new="tunnel">
+                  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg>
+                  <span>隧道连接</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="ex-scroll" id="exTree">
+            <div class="ex-sec" data-sec>
+              <div class="ex-ghead clickable" role="button" tabindex="0" aria-expanded="true">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
+                <span class="ex-gname">prod-web-01</span>
+                <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
+              <div class="ex-items">
+                <div class="ex-row grp-1 active" data-od-id="ex-row-pipeline" data-session="terminal3" data-title="deploy@prod-web-01:22" data-kind="ssh" data-group="1" data-note="发布流水线" role="button" tabindex="0">
+                  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg>
+                  <span class="name">发布流水线</span>
+                </div>
+                <div class="ex-row grp-1" data-od-id="ex-row-access-log" data-session="terminal5" data-title="deploy@prod-web-01:22" data-kind="ssh" data-group="1" data-note="nginx 日志" role="button" tabindex="0">
+                  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg>
+                  <span class="name">tail -f access.log</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ex-sec" data-sec>
+              <div class="ex-ghead clickable" role="button" tabindex="0" aria-expanded="true">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
+                <span class="ex-gname">staging-db</span>
+                <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
+              <div class="ex-items">
+                <div class="ex-row grp-2" data-od-id="ex-row-db-shell" data-session="terminal4" data-title="deploy@staging-db:22" data-kind="ssh" data-group="2" data-note="运维 shell" role="button" tabindex="0">
+                  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg>
+                  <span class="name">deploy@staging-db:22</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ex-sec" id="localSec" data-sec>
+              <div class="ex-ghead clickable" role="button" tabindex="0" aria-expanded="true">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11"/><path d="M2 20h20"/></svg>
+                <span class="ex-gname">Local</span>
+                <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
+              <div class="ex-items" id="localItems">
+                <div class="ex-row local" data-od-id="ex-row-git-status" data-session="terminal1" data-title="zsh" data-kind="local" data-note="~/dev/deepssh" role="button" tabindex="0">
+                  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg>
+                  <span class="name">git status</span>
+                </div>
+                <div class="ex-row local" data-od-id="ex-row-tmp-listing" data-session="terminal2" data-title="bash" data-kind="local" data-note="bash 5.2" role="button" tabindex="0">
+                  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg>
+                  <span class="name">ls -la /tmp</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ex-treeempty" id="exTreeEmpty" hidden>
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14"/><path d="m8 11 3 3-3 3M14 17h3"/></svg>
+            <p class="t1">暂无已打开的会话</p>
+            <p class="t2">从右上角「新增连接」打开一个终端</p>
+          </div>
+          <div class="ex-foot">
+            <button class="ex-tool" type="button" data-open-page="theme" title="主题配置" aria-label="主题配置">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18h1.5a2.5 2.5 0 0 0 0-5H12a2 2 0 0 1 0-4h5a4 4 0 0 0 4-4c0-3-4-5-9-5Z"/><circle cx="8" cy="10" r="1"/></svg>
+              主题配置
+            </button>
+            <button class="ex-tool on" type="button" id="exMemToggle" aria-pressed="true" aria-controls="memoryDock"
+                    title="隐藏内存监控面板" aria-label="隐藏内存监控面板">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14"/><path d="M8 9h8M8 13h5"/></svg>
+              内存监控
+            </button>
+          </div>
+        </aside>
+        <div class="split v" id="sbSplit" role="separator" tabindex="0" aria-orientation="vertical"
+             aria-label="调整资源管理器宽度" aria-valuemin="56" aria-valuemax="560" aria-valuenow="280">
+          <span class="grip" aria-hidden="true" style="position:absolute;left:2px;top:50%;margin-top:-1.5px"></span>
+        </div>
+        <div class="term-wrap" data-od-id="terminal-area">
+          <div class="tabs" id="tabStrip" role="tablist" aria-label="终端标签">
+            <div class="tab" data-tab="terminal1" role="tab" tabindex="0">
+              <svg class="tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg>
+              <span class="tlabel">git status</span>
+              <button class="x" type="button" aria-label="关闭 git status"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+            </div>
+            <div class="tab active" data-tab="terminal3" role="tab" tabindex="0">
+              <svg class="tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
+              <span class="tlabel">发布流水线</span>
+              <button class="x" type="button" aria-label="关闭 发布流水线"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+            </div>
+            <div class="tab" data-tab="terminal4" role="tab" tabindex="0">
+              <svg class="tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
+              <span class="tlabel">deploy@staging-db:22</span>
+              <button class="x" type="button" aria-label="关闭 deploy@staging-db:22"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+            </div>
+            <div class="tab" data-tab="terminal5" role="tab" tabindex="0">
+              <svg class="tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
+              <span class="tlabel">tail -f access.log</span>
+              <button class="x" type="button" aria-label="关闭 tail -f access.log"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+            </div>
+          </div>
+
+          <pre class="terminal" id="terminal" role="tabpanel" aria-live="polite"></pre>
+
+          <div class="term-status" data-od-id="terminal-status">
+            <span class="s"><span class="dot ok"></span> 已连接 · prod-web-01</span>
+            <span class="s">deploy@10.24.8.11:22</span>
+            <span class="s right"><span>UTF-8</span><span>xterm-256color</span><span>120×32</span><span>延迟 12ms</span></span>
+          </div>
+
+          <template id="src-terminal1"><span class="t-dim">macOS zsh · ~/dev/deepssh</span>
+<span class="t-g">➜</span> <span class="t-b">deepssh</span> <span class="t-a">git:(master)</span> git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+nothing to commit, working tree clean
+<span class="t-g">➜</span> <span class="t-b">deepssh</span> <span class="t-a">git:(master)</span> <span class="cursor"></span></template>
+
+          <template id="src-terminal2"><span class="t-dim">本地终端 · bash 5.2</span>
+<span class="t-g">deep@macbook</span>:<span class="t-b">/tmp</span>$ ls -la
+total 24
+drwxrwxrwt  6 root  wheel   192 Oct  4 14:05 .
+drwxr-xr-x 18 root  wheel   576 Oct  4 09:00 ..
+-rw-r--r--  1 deep  wheel  1024 Oct  4 13:41 notes.md
+<span class="t-g">deep@macbook</span>:<span class="t-b">/tmp</span>$ <span class="cursor"></span></template>
+
+          <template id="src-terminal3"><span class="t-dim">Last login: Sat Oct  4 09:12:44 2026 from 10.24.8.4</span>
+<span class="t-g t-bold">deploy@prod-web-01</span>:<span class="t-b">~</span>$ uptime
+ 14:32:07 up 42 days,  6:18,  3 users,  load average: 0.18, 0.24, 0.21
+<span class="t-g t-bold">deploy@prod-web-01</span>:<span class="t-b">~</span>$ docker ps --format 'table {{.Names}}  {{.Status}}'
+NAMES          STATUS
+web-nginx      Up 3 days (healthy)
+api-gateway    Up 3 days (healthy)
+worker-01      Up 5 hours
+<span class="t-g t-bold">deploy@prod-web-01</span>:<span class="t-b">~</span>$ <span class="cursor"></span></template>
+
+          <template id="src-terminal4"><span class="t-dim">Last login: Fri Oct  3 22:04:10 2026 from 10.24.8.4</span>
+<span class="t-g t-bold">deploy@staging-db</span>:<span class="t-b">~</span>$ systemctl --failed
+0 loaded units listed.
+<span class="t-g t-bold">deploy@staging-db</span>:<span class="t-b">~</span>$ sudo -u postgres psql -c "select count(*) from orders;"
+ count
+--------
+ 184213
+(1 row)
+<span class="t-g t-bold">deploy@staging-db</span>:<span class="t-b">~</span>$ <span class="cursor"></span></template>
+
+          <template id="src-terminal5"><span class="t-g t-bold">deploy@prod-web-01</span>:<span class="t-b">/var/log/nginx</span>$ tail -f access.log
+10.24.8.4 - - [04/Oct/2026:14:31:58 +0800] "GET /api/health HTTP/1.1" 200 15
+10.24.8.9 - - [04/Oct/2026:14:32:00 +0800] "POST /v1/orders HTTP/1.1" 201 512
+10.24.8.9 - - [04/Oct/2026:14:32:03 +0800] "GET /static/app.js HTTP/1.1" 304 0
+<span class="t-a">^C</span>
+<span class="t-g t-bold">deploy@prod-web-01</span>:<span class="t-b">/var/log/nginx</span>$ <span class="cursor"></span></template>
+        </div>
+        </div>
+
+        <div class="split h" id="dockSplit" role="separator" tabindex="0" aria-orientation="horizontal"
+             aria-label="调整终端区与下方双面板的分界高度" aria-valuemin="37" aria-valuemax="420" aria-valuenow="280">
+          <span class="grip" aria-hidden="true"></span>
+          <button class="fold" type="button" id="dockFold" aria-expanded="true" aria-controls="docks">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            <span class="sr" id="dockFoldText">收起下方面板</span>
+          </button>
+        </div>
+
+        <div class="docks" id="docks">
+        <div class="dock" id="dockEvents" data-od-id="dock-events">
+          <div class="dock-head">
+            <span class="lbl">实时事件</span>
+            <span class="mini" aria-hidden="true">
+              <span class="mini-t">最新</span>
+              <span class="mini-x" id="miniEvent" data-lv="error">502 upstream 超时 · <em>api-gateway</em></span>
+            </span>
+            <span class="sp"></span>
+            <span class="hint">示例数据</span>
+          </div>
+          <div class="dock-body">
+            <div class="feed-row err"><time>14:32:11</time><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4M12 17.5v.5"/></svg><span class="txt"><span class="lvl e">Error</span>502 upstream 超时 · <em>api-gateway</em> 访问 <em>prod-web-01</em> 失败</span></div>
+            <div class="feed-row warn"><time>14:31:40</time><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4M12 17.5v.5"/></svg><span class="txt"><span class="lvl w">Warn</span>转发 <em>db-5432</em> 已停止 · 目标端口无响应</span></div>
+            <div class="feed-row"><time>14:31:58</time><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg><span class="txt">已连接 <em>prod-web-01</em> · deploy@10.24.8.11:22</span></div>
+            <div class="feed-row err"><time>14:31:26</time><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4M12 17.5v.5"/></svg><span class="txt"><span class="lvl e">Error</span>SSH 认证被拒绝 · <em>staging-db</em> publickey 未通过</span></div>
+            <div class="feed-row"><time>14:30:12</time><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg><span class="txt">新建本地终端 <em>terminal2</em></span></div>
+            <div class="feed-row"><time>14:29:44</time><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg><span class="txt">转发 <em>web-8080</em> 已启动 · 127.0.0.1:8080 → 10.24.8.11:80</span></div>
+            <div class="feed-row"><time>14:28:03</time><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg><span class="txt">会话 <em>terminal4</em> 已关闭</span></div>
+            <div class="feed-row"><time>14:27:31</time><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="txt">导入 SSH 配置 <em>staging-db</em></span></div>
+          </div>
+        </div>
+
+        <div class="split v" id="dockVSplit" role="separator" tabindex="0" aria-orientation="vertical"
+             aria-label="调整实时事件与内存监控的宽度" aria-valuemin="260" aria-valuemax="900" aria-valuenow="620">
+          <span class="grip vgrip" aria-hidden="true"></span>
+        </div>
+
+        <div class="dock" id="memoryDock" data-od-id="dock-memory">
+          <div class="dock-head">
+            <span class="lbl">内存监控</span>
+            <span class="mini" aria-hidden="true">
+              <span class="mini-mem no-div"><span class="dot"></span>RSS <b>142.6</b> / 512 MB</span>
+            </span>
+            <span class="sp"></span>
+            <span class="hint">示例数据</span>
+          </div>
+          <div class="dock-body mem">
+            <div class="gauge">
+              <div class="gauge-top"><span>常驻内存 (RSS)</span><b>142.6 / 512 MB</b></div>
+              <div class="bar"><i class="accent" style="width:28%"></i></div>
+            </div>
+            <div class="gauge">
+              <div class="gauge-top"><span>会话堆内存</span><b>38.4 MB</b></div>
+              <div class="bar"><i style="width:16%"></i></div>
+            </div>
+            <div class="gauge">
+              <div class="gauge-top"><span>终端回滚缓冲</span><b>12 页</b></div>
+              <div class="kv"><span>空闲页回收</span><b>已启用</b></div>
+              <div class="kv"><span>最近 GC</span><b>2 分钟前</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </section>
+    <section class="page" id="page-connections" data-od-id="page-connections" aria-label="连接配置" hidden>
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">SSH Profiles</div>
+          <h1>连接配置</h1>
+          <p class="sub">管理远程主机凭据、认证方式与终端类型。共 6 个配置，其中 2 个在线。</p>
+        </div>
+        <div class="head-acts">
+          <button class="btn btn-primary" type="button" data-open-drawer="ssh">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            新增 SSH 配置
+          </button>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.5-3.5"/></svg>
+          <input class="input" id="connSearch" type="search" placeholder="搜索名称、主机或用户名…" aria-label="搜索连接配置">
+        </div>
+        <select class="input" id="authFilter" style="max-width:150px" aria-label="按认证方式筛选">
+          <option value="all">全部认证方式</option>
+          <option value="password">密码</option>
+          <option value="key">私钥</option>
+          <option value="agent">Agent</option>
+        </select>
+        <span class="spacer"></span>
+        <span class="hint" id="connCount">6 / 6</span>
+      </div>
+
+      <div class="list" id="connList">
+        <div class="row up" data-name="prod-web-01" data-host="deploy 10.24.8.11" data-auth="key">
+          <div>
+            <div class="r-name"><strong>prod-web-01</strong><span class="badge ok"><span class="dot ok"></span>在线</span><span class="badge">私钥</span><span class="badge">xterm-256color</span></div>
+            <div class="r-sub">deploy@10.24.8.11:22</div>
+          </div>
+          <div class="r-meta"><span>最近使用</span><b>14:31:58</b></div>
+          <div class="r-acts">
+            <button class="btn sm" type="button" data-connect>连接</button>
+            <button class="btn sm btn-ghost" type="button" data-edit-ssh>编辑</button>
+            <button class="btn sm btn-ghost" type="button" data-delete="prod-web-01">删除</button>
+          </div>
+        </div>
+
+        <div class="row up" data-name="staging-db" data-host="deploy 10.24.9.32" data-auth="password">
+          <div>
+            <div class="r-name"><strong>staging-db</strong><span class="badge ok"><span class="dot ok"></span>在线</span><span class="badge">密码</span><span class="badge">xterm-256color</span></div>
+            <div class="r-sub">deploy@10.24.9.32:22</div>
+          </div>
+          <div class="r-meta"><span>最近使用</span><b>14:12:07</b></div>
+          <div class="r-acts">
+            <button class="btn sm" type="button" data-connect>连接</button>
+            <button class="btn sm btn-ghost" type="button" data-edit-ssh>编辑</button>
+            <button class="btn sm btn-ghost" type="button" data-delete="staging-db">删除</button>
+          </div>
+        </div>
+
+        <div class="row off" data-name="bastion" data-host="ops 10.24.9.1" data-auth="agent">
+          <div>
+            <div class="r-name"><strong>bastion</strong><span class="badge off">已停止</span><span class="badge">Agent</span><span class="badge">xterm-256color</span></div>
+            <div class="r-sub">ops@10.24.9.1:2222</div>
+          </div>
+          <div class="r-meta"><span>最近使用</span><b>昨天 21:04</b></div>
+          <div class="r-acts">
+            <button class="btn sm" type="button" data-connect>连接</button>
+            <button class="btn sm btn-ghost" type="button" data-edit-ssh>编辑</button>
+            <button class="btn sm btn-ghost" type="button" data-delete="bastion">删除</button>
+          </div>
+        </div>
+        <div class="row off" data-name="edge-cache" data-host="root 10.24.8.90" data-auth="key">
+          <div>
+            <div class="r-name"><strong>edge-cache</strong><span class="badge off">已停止</span><span class="badge">私钥</span><span class="badge">vt100</span></div>
+            <div class="r-sub">root@10.24.8.90:22</div>
+          </div>
+          <div class="r-meta"><span>最近使用</span><b class="none">从未连接</b></div>
+          <div class="r-acts">
+            <button class="btn sm" type="button" data-connect>连接</button>
+            <button class="btn sm btn-ghost" type="button" data-edit-ssh>编辑</button>
+            <button class="btn sm btn-ghost" type="button" data-delete="edge-cache">删除</button>
+          </div>
+        </div>
+
+        <div class="row off" data-name="build-runner" data-host="ci 10.24.10.7" data-auth="password">
+          <div>
+            <div class="r-name"><strong>build-runner</strong><span class="badge off">已停止</span><span class="badge">密码</span><span class="badge">xterm-256color</span></div>
+            <div class="r-sub">ci@10.24.10.7:22</div>
+          </div>
+          <div class="r-meta"><span>最近使用</span><b>9 月 28 日</b></div>
+          <div class="r-acts">
+            <button class="btn sm" type="button" data-connect>连接</button>
+            <button class="btn sm btn-ghost" type="button" data-edit-ssh>编辑</button>
+            <button class="btn sm btn-ghost" type="button" data-delete="build-runner">删除</button>
+          </div>
+        </div>
+
+        <div class="row off" data-name="legacy-app" data-host="admin 10.24.20.5" data-auth="password">
+          <div>
+            <div class="r-name"><strong>legacy-app</strong><span class="badge off">已停止</span><span class="badge">密码</span><span class="badge">vt100</span></div>
+            <div class="r-sub">admin@10.24.20.5:22</div>
+          </div>
+          <div class="r-meta"><span>最近使用</span><b>9 月 20 日</b></div>
+          <div class="r-acts">
+            <button class="btn sm" type="button" data-connect>连接</button>
+            <button class="btn sm btn-ghost" type="button" data-edit-ssh>编辑</button>
+            <button class="btn sm btn-ghost" type="button" data-delete="legacy-app">删除</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="page" id="page-tunnels" data-od-id="page-tunnels" aria-label="端口转发" hidden>
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Port Forwarding</div>
+          <h1>端口转发</h1>
+          <p class="sub">基于 SSH 配置的本地与远程隧道。共 3 条，其中 2 条运行中。</p>
+        </div>
+        <div class="head-acts">
+          <button class="btn btn-primary" type="button" data-open-drawer="tunnel">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            新增转发
+          </button>
+        </div>
+      </div>
+
+      <div class="list">
+        <div class="row run">
+          <div>
+            <div class="r-name"><strong>web-8080</strong><span class="badge run"><span class="dot run"></span>运行中</span><span class="badge">本地转发</span></div>
+            <div class="r-sub">127.0.0.1:8080 <span class="arrow">→</span> 10.24.8.11:80 <span class="arrow">经</span> prod-web-01</div>
+          </div>
+          <div class="r-meta"><span>监听端口</span><b>8080</b></div>
+          <div class="r-acts">
+            <button class="btn sm" type="button" data-tunnel-toggle>停止</button>
+            <button class="btn sm btn-ghost" type="button" data-edit-tunnel>编辑</button>
+            <button class="btn sm btn-ghost" type="button" data-delete="web-8080">删除</button>
+          </div>
+        </div>
+
+        <div class="row run">
+          <div>
+            <div class="r-name"><strong>redis-6379</strong><span class="badge run"><span class="dot run"></span>运行中</span><span class="badge">本地转发</span></div>
+            <div class="r-sub">127.0.0.1:6379 <span class="arrow">→</span> 10.24.9.32:6379 <span class="arrow">经</span> staging-db</div>
+          </div>
+          <div class="r-meta"><span>监听端口</span><b>自动分配</b></div>
+          <div class="r-acts">
+            <button class="btn sm" type="button" data-tunnel-toggle>停止</button>
+            <button class="btn sm btn-ghost" type="button" data-edit-tunnel>编辑</button>
+            <button class="btn sm btn-ghost" type="button" data-delete="redis-6379">删除</button>
+          </div>
+        </div>
+
+        <div class="row off">
+          <div>
+            <div class="r-name"><strong>debug-remote</strong><span class="badge off">已停止</span><span class="badge">远程转发</span></div>
+            <div class="r-sub">0.0.0.0:9000 <span class="arrow">→</span> 127.0.0.1:3000 <span class="arrow">经</span> bastion</div>
+          </div>
+          <div class="r-meta"><span>监听端口</span><b>9000</b></div>
+          <div class="r-acts">
+            <button class="btn sm" type="button" data-tunnel-toggle>启动</button>
+            <button class="btn sm btn-ghost" type="button" data-edit-tunnel>编辑</button>
+            <button class="btn sm btn-ghost" type="button" data-delete="debug-remote">删除</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="page" id="page-theme" data-od-id="page-theme" aria-label="主题配置" hidden>
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Appearance</div>
+          <h1>主题配置</h1>
+          <p class="sub">分别设置界面外观与终端渲染，并配置基于正则的输出高亮规则。</p>
+        </div>
+        <div class="head-acts">
+          <button class="btn" type="button" id="resetTheme">恢复默认</button>
+          <button class="btn btn-primary" type="button" id="saveTheme">保存主题</button>
+        </div>
+      </div>
+
+      <div class="theme-grid">
+        <div class="panel" data-od-id="theme-ui">
+          <h3><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16"/><path d="M3 9h18M8 4v16"/></svg>界面主题</h3>
+
+          <div>
+            <div class="sect">预设方案</div>
+            <div class="psel" data-presets="ui" data-od-id="preset-select-ui">
+              <button class="psel-btn" type="button" data-preset-toggle="ui" aria-haspopup="menu" aria-expanded="false" aria-controls="pselMenuUi">
+                <span class="sw-model" style="background:#FAF9F5" data-preset-sw></span>
+                <span class="p-name" data-preset-label>Command Deck</span>
+                <span class="p-tag" data-preset-tag hidden>自定义</span>
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div class="psel-menu" id="pselMenuUi" role="menu" aria-label="界面主题预设方案" data-preset-menu="ui" hidden>
+                <div class="psel-list" data-preset-list="ui"></div>
+                <div class="psel-foot">
+                  <button class="psel-add" type="button" data-preset-add="ui">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>新建自定义方案
+                  </button>
+                  <button class="psel-restore" type="button" data-preset-restore="ui" hidden>
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 5v4h4"/></svg><span data-preset-restore-label>恢复内置方案</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="sect">字体</div>
+            <div class="grid2" style="margin-top:9px">
+              <div class="field">
+                <label for="uiFont">界面字体</label>
+                <select class="input" id="uiFont">
+                  <option>系统默认（含中文）</option>
+                  <option>苹方 / PingFang SC</option>
+                  <option>思源黑体 / Noto Sans CJK</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="uiSize">基准字号</label>
+                <select class="input" id="uiSize">
+                  <option>13 px</option>
+                  <option>14 px</option>
+                  <option>15 px</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="sect">配色</div>
+            <div class="grid3" style="margin-top:9px">
+              <div class="swatch"><div class="chip" style="background:#FAF9F5"></div><div class="cl">背景</div><div class="cv">#FAF9F5</div></div>
+              <div class="swatch"><div class="chip" style="background:#FFFFFF"></div><div class="cl">面板</div><div class="cv">#FFFFFF</div></div>
+              <div class="swatch"><div class="chip" style="background:#FAF9F5"></div><div class="cl">侧栏</div><div class="cv">#FAF9F5</div></div>
+              <div class="swatch"><div class="chip" style="background:#D97757"></div><div class="cl">强调</div><div class="cv">#D97757</div></div>
+              <div class="swatch"><div class="chip" style="background:#1F1E1D"></div><div class="cl">主文本</div><div class="cv">#1F1E1D</div></div>
+              <div class="swatch"><div class="chip" style="background:#6B6862"></div><div class="cl">次要文本</div><div class="cv">#6B6862</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel" data-od-id="theme-terminal">
+          <h3><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg>终端主题</h3>
+
+          <div>
+            <div class="sect">预设方案</div>
+            <div class="psel" data-presets="term" data-od-id="preset-select-term">
+              <button class="psel-btn" type="button" data-preset-toggle="term" aria-haspopup="menu" aria-expanded="false" aria-controls="pselMenuTerm">
+                <span class="sw-model" style="background:#17181A" data-preset-sw></span>
+                <span class="p-name" data-preset-label>Command Deck</span>
+                <span class="p-tag" data-preset-tag hidden>自定义</span>
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div class="psel-menu" id="pselMenuTerm" role="menu" aria-label="终端主题预设方案" data-preset-menu="term" hidden>
+                <div class="psel-list" data-preset-list="term"></div>
+                <div class="psel-foot">
+                  <button class="psel-add" type="button" data-preset-add="term">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>新建自定义方案
+                  </button>
+                  <button class="psel-restore" type="button" data-preset-restore="term" hidden>
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 5v4h4"/></svg><span data-preset-restore-label>恢复内置方案</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="sect">实时预览</div>
+            <div class="mini-term" id="termPreview" style="margin-top:9px">$ <span class="t-g">deploy@prod-web-01</span>:<span class="t-b">~</span>$ tail -f app.log
+<span class="t-c">INFO</span>  server listening on :8080
+<span class="t-a">WARN</span>  cache miss for key <span class="t-b">user:184213</span>
+<span class="t-r">ERROR</span> upstream timeout after 3.0s</div>
+          </div>
+
+          <div>
+            <div class="sect">光标</div>
+            <div class="grid2" style="margin-top:9px">
+              <div class="field">
+                <label for="cursorStyle">样式</label>
+                <select class="input" id="cursorStyle">
+                  <option>方块</option>
+                  <option>下划线</option>
+                  <option>竖线</option>
+                </select>
+              </div>
+              <label class="check" style="align-self:end;padding-bottom:8px"><input type="checkbox" checked>光标闪烁</label>
+            </div>
+          </div>
+
+          <div>
+            <div class="sect">终端配色</div>
+            <div class="grid2" style="margin-top:9px">
+              <div class="swatch"><div class="chip" style="background:#DEDCD6"></div><div class="cl">前景</div><div class="cv">#DEDCD6</div></div>
+              <div class="swatch"><div class="chip" style="background:#17181A"></div><div class="cl">背景</div><div class="cv">#17181A</div></div>
+              <div class="swatch"><div class="chip" style="background:#D9A24B"></div><div class="cl">高亮</div><div class="cv">#D9A24B</div></div>
+              <div class="swatch"><div class="chip" style="background:#8FBF7F"></div><div class="cl">光标</div><div class="cv">#8FBF7F</div></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="sect">正则高亮</div>
+            <div class="rx-list" id="rxList" role="list" style="margin-top:8px"></div>
+            <div id="rxEmpty" hidden>
+              <div class="rx-empty">
+                <b>当前预设没有高亮规则</b>
+                One Dark 与 Solarized 的 <code style="font-family:var(--font-mono);font-size:11px">regexHighlights</code> 为空列表，<br>添加规则后按从上到下的顺序逐条匹配，先命中者着色。
+              </div>
+            </div>
+            <div style="margin-top:6px"><button class="rx-add" type="button" id="addRule"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>添加规则</button></div>
+          </div>
+
+          <div class="field">
+            <label for="scrollback">回滚缓冲行数</label>
+            <input class="input" id="scrollback" type="text" value="10000">
+          </div>
+        </div>
+      </div>
+    </section>
+</main>
+</div>
+<div class="overlay" id="dialog" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <h3 id="dlgTitle">确认删除</h3>
+    <p id="dlgText">删除后不可恢复，确定要删除该配置吗？</p>
+    <div class="acts">
+      <button class="btn" type="button" id="dlgCancel">取消</button>
+      <button class="btn btn-danger" type="button" id="dlgConfirm">删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="noteDlg" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="noteTitle">
+    <h3 id="noteTitle">编辑备注</h3>
+    <div class="field" style="margin-top:14px">
+      <label for="noteInput">会话备注</label>
+      <input class="input" id="noteInput" type="text" placeholder="例如 发布流水线">
+    </div>
+    <div class="acts">
+      <button class="btn" type="button" id="noteCancel">取消</button>
+      <button class="btn btn-primary" type="button" id="noteSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="drawer-overlay" id="drawer" hidden>
+  <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+    <div class="drawer-head">
+      <div>
+        <div class="lbl" id="drawerKicker">SSH</div>
+        <h3 id="drawerTitle">新增 SSH 配置</h3>
+      </div>
+      <span class="sp"></span>
+      <button class="btn btn-ghost sm icon" type="button" id="drawerClose" aria-label="关闭">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+
+    <div class="drawer-body">
+      <form data-form="ssh" style="display:flex;flex-direction:column;gap:15px">
+        <div class="field">
+          <label for="sshName">名称</label>
+          <input class="input" id="sshName" type="text" placeholder="例如 prod-web-01" required>
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label for="sshHost">主机</label>
+            <input class="input" id="sshHost" type="text" placeholder="10.24.8.11" required>
+          </div>
+          <div class="field">
+            <label for="sshPort">端口</label>
+            <input class="input" id="sshPort" type="text" value="22" inputmode="numeric">
+          </div>
+        </div>
+        <div class="field">
+          <label for="sshUser">用户名</label>
+          <input class="input" id="sshUser" type="text" placeholder="deploy" required>
+        </div>
+        <div class="field">
+          <label for="sshAuth">认证方式</label>
+          <select class="input" id="sshAuth">
+            <option value="password">密码</option>
+            <option value="key">私钥</option>
+            <option value="agent">Agent</option>
+          </select>
+        </div>
+        <div class="field" id="sshPasswordField">
+          <label for="sshPassword">密码</label>
+          <input class="input" id="sshPassword" type="password" placeholder="••••••••">
+        </div>
+        <div class="field" id="sshKeyField" hidden>
+          <label for="sshKey">私钥路径</label>
+          <input class="input" id="sshKey" type="text" placeholder="~/.ssh/id_ed25519">
+        </div>
+        <div class="field" id="sshAgentField" hidden>
+          <label for="sshAgentKey">密钥标识</label>
+          <input class="input" id="sshAgentKey" type="text" placeholder="留空则使用 agent 中的默认密钥">
+          <p class="hint">凭据由本机 ssh-agent 提供，此处不填写密码或私钥路径。</p>
+        </div>
+        <div class="field">
+          <label for="sshTerm">终端类型</label>
+          <select class="input" id="sshTerm">
+            <option>xterm-256color</option>
+            <option>vt100</option>
+            <option>ansi</option>
+          </select>
+        </div>
+        <p class="hint" id="sshCredHint">凭据仅保存在本机系统钥匙串中，不会写入项目文件。</p>
+      </form>
+
+      <form data-form="tunnel" hidden style="display:flex;flex-direction:column;gap:15px">
+        <div class="field">
+          <label for="tunName">名称</label>
+          <input class="input" id="tunName" type="text" placeholder="例如 web-8080" required>
+        </div>
+        <div class="field">
+          <label for="tunType">转发类型</label>
+          <select class="input" id="tunType">
+            <option value="local">本地转发（-L）</option>
+            <option value="remote">远程转发（-R）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="tunProfile">SSH 配置</label>
+          <select class="input" id="tunProfile">
+            <option>prod-web-01</option>
+            <option>staging-db</option>
+            <option>bastion</option>
+          </select>
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label for="tunHost">监听主机</label>
+            <input class="input" id="tunHost" type="text" value="127.0.0.1">
+          </div>
+          <div class="field">
+            <label for="tunPort">监听端口</label>
+            <input class="input" id="tunPort" type="text" value="8080" inputmode="numeric">
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label for="tunTargetHost">目标主机</label>
+            <input class="input" id="tunTargetHost" type="text" placeholder="10.24.8.11" required>
+          </div>
+          <div class="field">
+            <label for="tunTargetPort">目标端口</label>
+            <input class="input" id="tunTargetPort" type="text" placeholder="80" inputmode="numeric" required>
+          </div>
+        </div>
+        <p class="hint">监听端口填 0 表示由系统自动分配可用端口。</p>
+      </form>
+    </div>
+
+    <div class="drawer-foot">
+      <button class="btn" type="button" id="drawerCancel">取消</button>
+      <button class="btn btn-primary" type="button" id="drawerSubmit">创建</button>
+    </div>
+  </div>
+</div>
+<div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+<script>
+(function(){
+  'use strict';
+  var $ = function(s, el){ return (el||document).querySelector(s); };
+  var $$ = function(s, el){ return Array.prototype.slice.call((el||document).querySelectorAll(s)); };
+  var store = {
+    get: function(k, d){ try{ return localStorage.getItem(k) || d; }catch(e){ return d; } },
+    set: function(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+  };
+
+  var ICON = {
+    term: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg>',
+    ssh: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>',
+    close: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+    check: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>',
+    grip: '<svg class="ico" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>'
+  };
+  var termContent = {};
+  var localSeq = 0;
+
+  /* ---------- Page navigation ---------- */
+  function showPage(name){
+    $$('.page').forEach(function(p){ p.hidden = (p.id !== 'page-' + name); });
+    $$('.page-nav button').forEach(function(b){
+      if(b.dataset.page === name){ b.setAttribute('aria-current', 'page'); }
+      else{ b.removeAttribute('aria-current'); }
+    });
+    store.set('deepssh.page', name);
+    window.scrollTo({ top:0, behavior:'smooth' });
+  }
+  $$('.page-nav button, [data-open-page]').forEach(function(b){
+    b.addEventListener('click', function(){
+      showPage(b.dataset.page || b.dataset.openPage);
+    });
+  });
+
+  /* ---------- Tabs ---------- */
+  function activateTab(id){
+    $$('#tabStrip .tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === id); });
+    $$('#exTree .ex-row').forEach(function(r){ r.classList.toggle('active', r.dataset.session === id); });
+    var tpl = document.getElementById('src-' + id);
+    var term = $('#terminal');
+    if(tpl){ term.innerHTML = tpl.innerHTML; }
+    else if(termContent[id]){ term.innerHTML = termContent[id]; }
+    var active = $('#tabStrip .tab.active');
+    var strip = $('#tabStrip');
+    if(active && strip.scrollWidth > strip.clientWidth){
+      strip.scrollLeft = Math.max(0, active.offsetLeft - (strip.clientWidth - active.offsetWidth) / 2);
+    }
+  }
+
+  function bindTab(tab){
+    tab.addEventListener('click', function(e){
+      if(e.target.closest('.x')){ return; }
+      activateTab(tab.dataset.tab);
+    });
+    var x = $('.x', tab);
+    if(x){ x.addEventListener('click', function(e){ e.stopPropagation(); closeTab(tab); }); }
+  }
+
+  function closeTab(tab){
+    var id = tab.dataset.tab;
+    var wasActive = tab.classList.contains('active');
+    var tabs = $$('#tabStrip .tab');
+    var idx = tabs.indexOf(tab);
+    tab.remove();
+    if(!wasActive){ return; }
+    var next = $$('#tabStrip .tab')[Math.min(idx, $$('#tabStrip .tab').length - 1)];
+    if(next){ activateTab(next.dataset.tab); }
+    else{
+      $('#terminal').innerHTML = '<span class="t-dim">没有活动的会话。请从左侧资源管理器打开一个终端。</span>';
+      $$('#exTree .ex-row').forEach(function(r){ r.classList.remove('active'); });
+    }
+  }
+
+  function createTab(id, label){
+    var strip = $('#tabStrip');
+    var tab = document.createElement('div');
+    tab.className = 'tab';
+    tab.dataset.tab = id;
+    tab.setAttribute('role', 'tab');
+    tab.tabIndex = 0;
+    tab.innerHTML = '<span class="tico">' + (id.indexOf('local') === 0 ? ICON.term : ICON.ssh) + '</span>' +
+      '<span class="tlabel"></span>' +
+      '<button class="x" type="button"><span class="sr">关闭 </span>' + ICON.close + '</button>';
+    tab.querySelector('.tlabel').textContent = label || id;
+    tab.querySelector('.x').setAttribute('aria-label', '关闭 ' + (label || id));
+    strip.appendChild(tab);
+    bindTab(tab);
+    return tab;
+  }
+
+  function tabLabel(id){
+    var tab = $('#tabStrip .tab[data-tab="' + id + '"]');
+    var lab = tab && tab.querySelector('.tlabel');
+    return lab ? lab.textContent : id;
+  }
+
+  function openSession(id){
+    if(!$('#tabStrip .tab[data-tab="' + id + '"]')){ createTab(id, tabLabel(id)); }
+    activateTab(id);
+  }
+
+  $$('#tabStrip .tab').forEach(bindTab);
+
+  /* ---------- Explorer rows: open + right-click menu ---------- */
+  function bindRow(row){
+    if(!$('.ex-sgrip', row)){
+      var grip = document.createElement('button');
+      grip.type = 'button';
+      grip.className = 'ex-sgrip';
+      grip.innerHTML = ICON.grip;
+      row.insertBefore(grip, row.firstChild);
+    }
+    if(!$('.ex-x', row)){
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'ex-x';
+      x.innerHTML = ICON.close;
+      x.title = (row.dataset.kind === 'ssh' ? '关闭 SSH 会话' : '关闭终端');
+      x.setAttribute('aria-label', x.title);
+      row.appendChild(x);
+    }
+    row.addEventListener('click', function(e){
+      if(e.target.closest('.ex-sgrip, .ex-x')){ return; }
+      openSession(row.dataset.session);
+    });
+    row.addEventListener('keydown', function(e){
+      if(e.target !== row){ return; }
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openSession(row.dataset.session); }
+    });
+    row.addEventListener('contextmenu', function(e){ e.preventDefault(); openRowMenu(row, e.clientX, e.clientY); });
+  }
+  $$('#exTree .ex-row').forEach(bindRow);
+  $$('#exTree .ex-items').forEach(renumberRows);
+
+  /* Delegated so that rows cloned by duplicateSession() keep a working button:
+     cloneNode copies the markup but never the listener. */
+  $('#exTree').addEventListener('click', function(e){
+    var btn = e.target.closest('.ex-x');
+    if(!btn){ return; }
+    var target = btn.closest('.ex-row');
+    if(!target){ return; }
+    e.stopPropagation();
+    closeSession(target, target.dataset.kind === 'ssh' ? 'SSH 会话' : '本地终端');
+  });
+
+  /* ---------- Explorer config blocks (host_tree.dart) ----------
+     A block is one config plus the sessions opened under it. It only exists
+     while it holds at least one session, and its header carries the reorder
+     handle the Flutter tree uses: a ReorderableDragStartListener grip. */
+  var exTree = $('#exTree');
+  var exEmpty = $('#exTreeEmpty');
+
+  function bindSection(head){
+    if(head.dataset.bound === '1'){ return; }
+    head.dataset.bound = '1';
+    if(!$('.ex-grip', head)){
+      var grip = document.createElement('button');
+      grip.type = 'button';
+      grip.className = 'ex-grip';
+      grip.innerHTML = ICON.grip;
+      head.insertBefore(grip, head.firstChild);
+    }
+    function toggle(){
+      var open = head.getAttribute('aria-expanded') === 'true';
+      head.setAttribute('aria-expanded', String(!open));
+      head.parentElement.classList.toggle('collapsed', open);
+    }
+    head.addEventListener('click', function(e){
+      if(e.target.closest('.ex-grip')){ return; }
+      toggle();
+    });
+    head.addEventListener('keydown', function(e){
+      if(e.target !== head){ return; }
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); }
+    });
+  }
+  $$('.ex-ghead', exTree).forEach(bindSection);
+
+  function sectionName(sec){ return $('.ex-gname', sec).textContent; }
+
+  function renumberSections(){
+    var secs = $$('.ex-sec', exTree);
+    secs.forEach(function(sec, i){
+      var grip = $('.ex-grip', sec);
+      if(!grip){ return; }
+      grip.setAttribute('aria-label', '拖动调整顺序，「' + sectionName(sec) + '」当前第 ' + (i+1) + ' 项，共 ' + secs.length + ' 项');
+      grip.title = '拖动调整顺序 · 第 ' + (i+1) + ' 项（Alt+↑ / Alt+↓ 键盘移动）';
+    });
+  }
+
+  function syncTreeEmpty(){
+    var any = $$('.ex-sec', exTree).length > 0;
+    exTree.classList.toggle('empty', !any);
+    exEmpty.hidden = any;
+  }
+
+  /* Closing the last session under a config takes the config block with it, so
+     the tree never keeps a header with nothing under it. Returns the removed
+     name so the toast can name the block that went away. */
+  function pruneSection(sec){
+    if(!sec || $$('.ex-row', sec).length){ return ''; }
+    var name = sectionName(sec);
+    sec.remove();
+    syncTreeEmpty();
+    renumberSections();
+    syncRail();
+    return name;
+  }
+
+  function moveSection(from, to){
+    var secs = $$('.ex-sec', exTree);
+    if(to < 0 || to >= secs.length || from === to){ return; }
+    var sec = secs[from], name = sectionName(sec);
+    if(to > from){ secs[to].parentNode.insertBefore(sec, secs[to].nextSibling); }
+    else { secs[to].parentNode.insertBefore(sec, secs[to]); }
+    renumberSections();
+    var grip = $$('.ex-grip', exTree)[to];
+    if(grip){ grip.focus(); }
+    toast('已把「' + name + '」移到第 ' + (to+1) + ' 位');
+  }
+
+  /* ---------- Session reorder inside a block ----------
+     Same grip and same drag model as the blocks, but the drop scope is one
+     block's .ex-items — a session can be reordered among its siblings, never
+     lifted into another config. */
+  function sessionRows(list){ return $$('.ex-row', list); }
+
+  function renumberRows(list){
+    if(!list){ return; }
+    var all = sessionRows(list);
+    all.forEach(function(row, i){
+      var grip = $('.ex-sgrip', row);
+      if(!grip){ return; }
+      grip.setAttribute('aria-label', '拖动调整顺序，「' + $('.name', row).textContent + '」当前第 ' + (i+1) + ' 项，共 ' + all.length + ' 项');
+      grip.title = '拖动调整顺序 · 第 ' + (i+1) + ' 项（Alt+↑ / Alt+↓ 键盘移动）';
+    });
+  }
+
+  function moveSession(list, from, to){
+    var all = sessionRows(list);
+    if(to < 0 || to >= all.length || from === to){ return; }
+    var row = all[from], name = $('.name', row).textContent;
+    if(to > from){ all[to].parentNode.insertBefore(row, all[to].nextSibling); }
+    else { all[to].parentNode.insertBefore(row, all[to]); }
+    renumberRows(list);
+    var moved = $('.ex-sgrip', sessionRows(list)[to]);
+    if(moved){ moved.focus(); }
+    toast('已把「' + name + '」移到第 ' + (to+1) + ' 位');
+  }
+
+  (function(){
+    var drag = null, shade = null;
+
+    function update(y){
+      var list = drag.list;
+      drag.row.style.transform = 'translateY(' + ((y - drag.startY) + (list.scrollTop - drag.startScroll)) + 'px)';
+      var rest = sessionRows(list).filter(function(r){ return r !== drag.row; });
+      var to = 0;
+      rest.forEach(function(r, k){
+        var b = r.getBoundingClientRect();
+        if(y > b.top + b.height / 2){ to = k + 1; }
+      });
+      drag.to = to;
+      var base = list.getBoundingClientRect().top - list.scrollTop;
+      var top;
+      if(to < rest.length){
+        var b = rest[to].getBoundingClientRect();
+        top = b.top - base + (to > drag.from ? b.height : 0);
+      }else{
+        var last = rest[rest.length - 1].getBoundingClientRect();
+        top = last.bottom - base;
+      }
+      shade.style.top = top + 'px';
+    }
+
+    exTree.addEventListener('pointerdown', function(e){
+      var grip = e.target.closest('.ex-sgrip');
+      if(!grip || e.button !== 0){ return; }
+      var row = grip.closest('.ex-row');
+      var list = row && row.parentElement;
+      if(!row || !list.classList.contains('ex-items')){ return; }
+      e.preventDefault();
+      drag = { row: row, list: list, from: sessionRows(list).indexOf(row),
+        startY: e.clientY, startScroll: list.scrollTop, id: e.pointerId, to: null };
+      row.classList.add('dragging');
+      if(grip.setPointerCapture){ grip.setPointerCapture(e.pointerId); }
+      list.classList.add('reordering');
+      shade = document.createElement('div');
+      shade.className = 'ex-shade in-row';
+      shade.setAttribute('aria-hidden', 'true');
+      shade.style.height = row.offsetHeight + 'px';
+      list.insertBefore(shade, list.firstChild);
+      update(e.clientY);
+    });
+
+    exTree.addEventListener('pointermove', function(e){
+      if(!drag || e.pointerId !== drag.id){ return; }
+      update(e.clientY);
+    });
+
+    function end(e){
+      if(!drag || (e && e.pointerId !== drag.id)){ return; }
+      var from = drag.from, to = drag.to, row = drag.row, list = drag.list;
+      row.classList.remove('dragging');
+      row.removeAttribute('style');
+      list.classList.remove('reordering');
+      if(shade){ shade.remove(); shade = null; }
+      drag = null;
+      if(typeof to === 'number' && to !== from){ moveSession(list, from, to); }
+      else { renumberRows(list); }
+    }
+
+    exTree.addEventListener('pointerup', end);
+    exTree.addEventListener('pointercancel', end);
+  })();
+
+  /* Keyboard equivalent of both drags — a prototype enhancement, the Flutter
+     source ships the pointer handle only. */
+  exTree.addEventListener('keydown', function(e){
+    if(!(e.altKey || e.ctrlKey || e.metaKey)){ return; }
+    var sgrip = e.target.closest('.ex-sgrip');
+    if(sgrip){
+      var list = sgrip.closest('.ex-items');
+      var si = sessionRows(list).indexOf(sgrip.closest('.ex-row'));
+      if(si < 0){ return; }
+      if(e.key === 'ArrowUp'){ e.preventDefault(); moveSession(list, si, si - 1); }
+      else if(e.key === 'ArrowDown'){ e.preventDefault(); moveSession(list, si, si + 1); }
+      return;
+    }
+    var grip = e.target.closest('.ex-grip');
+    if(!grip){ return; }
+    var i = $$('.ex-sec', exTree).indexOf(grip.closest('.ex-sec'));
+    if(i < 0){ return; }
+    if(e.key === 'ArrowUp'){ e.preventDefault(); moveSection(i, i - 1); }
+    else if(e.key === 'ArrowDown'){ e.preventDefault(); moveSection(i, i + 1); }
+  });
+
+  renumberSections();
+  syncTreeEmpty();
+
+  /* Pointer reorder — the block follows the cursor and a dashed slot marks the
+     landing position, the same model as the regex rules. Pointer Events +
+     setPointerCapture with a capability check, plus edge auto-scroll for a long
+     block list. No scrollIntoView: it would scroll the embedded preview. */
+  (function(){
+    var drag = null, shade = null, frame = 0;
+
+    function update(y){
+      var secs = $$('.ex-sec', exTree).filter(function(s){ return s !== drag.sec; });
+      drag.sec.style.transform = 'translateY(' + ((y - drag.startY) + (exTree.scrollTop - drag.startScroll)) + 'px)';
+      var to = 0;
+      secs.forEach(function(s, k){
+        var r = s.getBoundingClientRect();
+        if(y > r.top + r.height / 2){ to = k + 1; }
+      });
+      drag.to = to;
+      var base = exTree.getBoundingClientRect().top - exTree.scrollTop;
+      var top;
+      if(to < secs.length){
+        var r = secs[to].getBoundingClientRect();
+        top = r.top - base + (to > drag.from ? r.height : 0);
+      }else{
+        var last = secs[secs.length - 1].getBoundingClientRect();
+        top = last.bottom - base;
+      }
+      shade.style.top = top + 'px';
+    }
+
+    function step(){
+      frame = 0;
+      if(!drag){ return; }
+      var box = exTree.getBoundingClientRect(), v = 0;
+      if(drag.y < box.top + 28){ v = -5; }
+      else if(drag.y > box.bottom - 28){ v = 5; }
+      if(v && exTree.scrollHeight > exTree.clientHeight){
+        var max = exTree.scrollHeight - exTree.clientHeight;
+        var next = Math.max(0, Math.min(exTree.scrollTop + v, max));
+        if(next !== exTree.scrollTop){ exTree.scrollTop = next; update(drag.y); }
+      }
+      if(drag && v){ frame = requestAnimationFrame(step); }
+    }
+
+    exTree.addEventListener('pointerdown', function(e){
+      var grip = e.target.closest('.ex-grip');
+      if(!grip || e.button !== 0){ return; }
+      var sec = grip.closest('.ex-sec');
+      e.preventDefault();
+      drag = { sec: sec, from: $$('.ex-sec', exTree).indexOf(sec),
+               startY: e.clientY, startScroll: exTree.scrollTop, y: e.clientY,
+               id: e.pointerId, to: null };
+      sec.classList.add('dragging');
+      if(grip.setPointerCapture){ grip.setPointerCapture(e.pointerId); }
+      exTree.classList.add('reordering');
+      shade = document.createElement('div');
+      shade.className = 'ex-shade';
+      shade.setAttribute('aria-hidden', 'true');
+      shade.style.height = sec.offsetHeight + 'px';
+      exTree.insertBefore(shade, exTree.firstChild);
+      update(e.clientY);
+    });
+
+    exTree.addEventListener('pointermove', function(e){
+      if(!drag || e.pointerId !== drag.id){ return; }
+      drag.y = e.clientY;
+      update(e.clientY);
+    });
+
+    function end(e){
+      if(!drag || (e && e.pointerId !== drag.id)){ return; }
+      var from = drag.from, to = drag.to;
+      drag.sec.classList.remove('dragging');
+      drag.sec.removeAttribute('style');
+      exTree.classList.remove('reordering');
+      if(shade){ shade.remove(); shade = null; }
+      if(frame){ cancelAnimationFrame(frame); frame = 0; }
+      drag = null;
+      if(typeof to === 'number' && to !== from){ moveSection(from, to); }
+      else { renumberSections(); }
+    }
+
+    exTree.addEventListener('pointerup', end);
+    exTree.addEventListener('pointercancel', end);
+  })();
+
+  /* ---------- New-connection menu (explorer) ---------- */
+  var MENUS = [
+    { btn: $('#exAddBtn'), menu: $('#exAddMenu') }
+  ].filter(function(m){ return m.btn && m.menu; });
+  function setMenu(m, open){
+    m.menu.hidden = !open;
+    m.btn.setAttribute('aria-expanded', String(open));
+  }
+  function closeMenus(){ MENUS.forEach(function(m){ setMenu(m, false); }); }
+  MENUS.forEach(function(m){
+    m.btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      var open = m.menu.hidden;
+      closeMenus();
+      setMenu(m, open);
+    });
+    m.menu.addEventListener('click', function(e){ e.stopPropagation(); });
+  });
+  document.addEventListener('click', closeMenus);
+
+  /* The Local block leaves the tree with its last terminal like any other
+     config, so opening a new local terminal has to be able to bring it back. */
+  function ensureLocalSec(){
+    var sec = $('#localSec');
+    if(sec){ return sec; }
+    sec = document.createElement('div');
+    sec.className = 'ex-sec';
+    sec.id = 'localSec';
+    sec.setAttribute('data-sec', '');
+    sec.innerHTML = '<div class="ex-ghead clickable" role="button" tabindex="0" aria-expanded="true">' +
+      '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11"/><path d="M2 20h20"/></svg>' +
+      '<span class="ex-gname">Local</span>' +
+      '<svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>' +
+      '</div><div class="ex-items" id="localItems"></div>';
+    exTree.appendChild(sec);
+    bindSection($('.ex-ghead', sec));
+    renumberSections();
+    syncTreeEmpty();
+    syncRail();
+    return sec;
+  }
+
+  function addLocalTerminal(){
+    localSeq += 1;
+    var id = 'local' + localSeq;
+    termContent[id] = '<span class="t-dim">本地终端 · bash 5.2</span>\n' +
+      '<span class="t-g">deep@macbook</span>:<span class="t-b">~</span>$ <span class="cursor"></span>';
+    var sec = ensureLocalSec();
+    var head = $('.ex-ghead', sec);
+    head.setAttribute('aria-expanded', 'true');
+    sec.classList.remove('collapsed');
+    var row = document.createElement('div');
+    row.className = 'ex-row local';
+    row.dataset.session = id;
+    row.dataset.kind = 'local';
+    row.setAttribute('role', 'button');
+    row.tabIndex = 0;
+    row.innerHTML = ICON.term + '<span class="name"></span>';
+    $('.name', row).textContent = id;
+    bindRow(row);
+    $('#localItems').appendChild(row);
+    renumberRows($('#localItems'));
+    createTab(id, id);
+    activateTab(id);
+    closeMenus();
+    showPage('workbench');
+    toast('已打开本地终端 ' + id);
+  }
+
+  $$('[data-new]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      closeMenus();
+      var kind = btn.dataset.new;
+      if(kind === 'local'){ addLocalTerminal(); }
+      else if(kind === 'ssh'){ showPage('connections'); openDrawer('ssh', false); }
+      else if(kind === 'tunnel'){ showPage('tunnels'); openDrawer('tunnel', false); }
+    });
+  });
+
+  /* ---------- Explorer context menu (host_tree.dart) ---------- */
+  var ctxEl = null;
+  function closeCtx(){ if(ctxEl){ ctxEl.remove(); ctxEl = null; } }
+  function openCtx(x, y, items){
+    closeCtx();
+    var el = document.createElement('div');
+    el.className = 'ctx';
+    el.setAttribute('role', 'menu');
+    items.forEach(function(it){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'menuitem');
+      var t = document.createElement('span');
+      t.textContent = it.label;
+      b.appendChild(t);
+      b.addEventListener('click', function(e){ e.stopPropagation(); closeCtx(); it.run(); });
+      el.appendChild(b);
+    });
+    document.body.appendChild(el);
+    ctxEl = el;
+    var w = el.offsetWidth, h = el.offsetHeight;
+    el.style.left = Math.max(8, Math.min(x, window.innerWidth - w - 8)) + 'px';
+    el.style.top = Math.max(8, Math.min(y, window.innerHeight - h - 8)) + 'px';
+  }
+  document.addEventListener('click', closeCtx);
+  document.addEventListener('scroll', closeCtx, true);
+  window.addEventListener('resize', closeCtx);
+
+  function openRowMenu(row, x, y){
+    var name = row.querySelector('.name').textContent;
+    if(row.dataset.kind === 'ssh'){
+      openCtx(x, y, [
+        { label: '编辑备注', run: function(){ editSessionNote(row); } },
+        { label: '复制', run: function(){ duplicateSession(row); } },
+        { label: '关闭 SSH 会话', run: function(){ closeSession(row, 'SSH 会话'); } }
+      ]);
+    } else {
+      openCtx(x, y, [
+        { label: '关闭终端', run: function(){ closeSession(row, '本地终端'); } }
+      ]);
+    }
+  }
+
+  var noteSeq = 0;
+  var noteTarget = null;
+  function editSessionNote(row){
+    noteTarget = row;
+    $('#noteInput').value = row.dataset.note || '';
+    $('#noteDlg').hidden = false;
+    setTimeout(function(){ $('#noteInput').focus(); }, 30);
+  }
+  function closeNoteDlg(){ $('#noteDlg').hidden = true; noteTarget = null; }
+  $('#noteCancel').addEventListener('click', closeNoteDlg);
+  $('#noteDlg').addEventListener('click', function(e){ if(e.target === $('#noteDlg')){ closeNoteDlg(); } });
+  $('#noteSave').addEventListener('click', function(){
+    if(noteTarget){
+      var v = $('#noteInput').value.trim();
+      var fallback = noteTarget.dataset.title;
+      noteTarget.dataset.note = v;
+      $('.name', noteTarget).textContent = v || fallback;
+      var tab = $('#tabStrip .tab[data-tab="' + noteTarget.dataset.session + '"]');
+      if(tab){
+        $('.tlabel', tab).textContent = v || fallback;
+        $('.x', tab).setAttribute('aria-label', '关闭 ' + (v || fallback));
+      }
+      toast(v ? '已更新会话备注 ' + v : '已清除会话备注');
+    }
+    closeNoteDlg();
+  });
+
+  function duplicateSession(row){
+    noteSeq += 1;
+    var id = row.dataset.session + '-copy' + noteSeq;
+    var title = row.dataset.title || row.querySelector('.name').textContent;
+    var clone = row.cloneNode(true);
+    clone.removeAttribute('data-od-id');
+    clone.dataset.session = id;
+    clone.dataset.title = title;
+    clone.dataset.note = '';
+    clone.classList.remove('active');
+    $('.name', clone).textContent = title;
+    bindRow(clone);
+    row.parentElement.appendChild(clone);
+    renumberRows(row.parentElement);
+    var tpl = document.getElementById('src-' + row.dataset.session);
+    if(tpl){ termContent[id] = tpl.innerHTML; }
+    createTab(id, title);
+    activateTab(id);
+    toast('已复制会话 ' + title);
+  }
+
+  function closeSession(row, kind){
+    var id = row.dataset.session;
+    var name = $('.name', row).textContent;
+    var tab = $('#tabStrip .tab[data-tab="' + id + '"]');
+    var sec = row.closest('.ex-sec');
+    var list = row.parentElement;
+    row.remove();
+    renumberRows(list);
+    if(tab){ closeTab(tab); }
+    delete termContent[id];
+    var gone = pruneSection(sec);
+    toast(gone ? '已关闭' + kind + ' ' + name + '，配置「' + gone + '」已从 Explorer 移除' : '已关闭' + kind + ' ' + name);
+  }
+
+  /* ---------- Resizable panes (workbench_page.dart + resize_handle.dart) ---------- */
+  /* SB_MIN is the icon rail's width, not Flutter's 120: at the minimum the explorer
+     must still show one icon per host and per session. */
+  var SB_MIN = 56, SB_MAX = 560;
+  var RAIL_MAX = 96;
+  var DOCK_DEF = 280, DOCK_MIN = 96, DOCK_MAX = 420, DOCK_FOLDED = 37, DOCK_COLLAPSE_AT = 96;
+  var DVE_MIN = 260, DVE_MEM_MIN = 220;
+  var bench = $('#bench');
+  var explorer = $('.explorer');
+  var sbSplit = $('#sbSplit');
+  var dockSplit = $('#dockSplit');
+  var dockVSplit = $('#dockVSplit');
+  var dockFold = $('#dockFold');
+  var memBtn = $('#exMemToggle');
+  var dockCollapsed = store.get('deepssh.dockCollapsed', '0') === '1';
+  var memHidden = store.get('deepssh.memHidden', '0') === '1';
+
+  function setSbWidth(px, persist){
+    var w = Math.max(SB_MIN, Math.min(SB_MAX, Math.round(px)));
+    bench.style.setProperty('--sb-w', w + 'px');
+    sbSplit.setAttribute('aria-valuenow', String(w));
+    if(persist){ store.set('deepssh.sbW', String(w)); }
+  }
+
+  function setDockHeight(px, persist){
+    var h = Math.max(DOCK_MIN, Math.min(DOCK_MAX, Math.round(px)));
+    bench.style.setProperty('--dock-h', h + 'px');
+    if(!dockCollapsed){ dockSplit.setAttribute('aria-valuenow', String(h)); }
+    if(persist){ store.set('deepssh.dockH', String(h)); }
+  }
+
+  function setDockCollapsed(collapsed, persist){
+    dockCollapsed = !!collapsed;
+    bench.setAttribute('data-dock', dockCollapsed ? 'collapsed' : 'expanded');
+    dockFold.setAttribute('aria-expanded', String(!dockCollapsed));
+    $('#dockFoldText').textContent = dockCollapsed ? '展开下方面板' : '收起下方面板';
+    dockSplit.setAttribute('aria-valuenow', dockCollapsed ? String(DOCK_FOLDED) : String(parseInt(store.get('deepssh.dockH', String(DOCK_DEF)), 10) || DOCK_DEF));
+    if(persist){ store.set('deepssh.dockCollapsed', dockCollapsed ? '1' : '0'); }
+  }
+
+  setSbWidth(parseInt(store.get('deepssh.sbW', '280'), 10) || 280, false);
+  setDockHeight(parseInt(store.get('deepssh.dockH', String(DOCK_DEF)), 10) || DOCK_DEF, false);
+  setDockCollapsed(dockCollapsed, false);
+
+  /* 实时事件 ↔ 内存监控 — same drag model as Explorer ↔ terminal. With 内存监控
+     hidden there is no second panel, so the events panel may take the whole row. */
+  function dveMax(){
+    var avail = Math.round($('#docks').clientWidth);
+    return memHidden ? avail : Math.max(DVE_MIN, avail - DVE_MEM_MIN);
+  }
+  function setDockEventWidth(px, persist){
+    var max = dveMax();
+    var w = Math.max(DVE_MIN, Math.min(max, Math.round(px)));
+    bench.style.setProperty('--dock-events-w', w + 'px');
+    dockVSplit.setAttribute('aria-valuemin', String(DVE_MIN));
+    dockVSplit.setAttribute('aria-valuemax', String(max));
+    dockVSplit.setAttribute('aria-valuenow', String(w));
+    if(persist){ store.set('deepssh.dockEventsW', String(w)); }
+  }
+  setDockEventWidth(parseInt(store.get('deepssh.dockEventsW', ''), 10) || $('#dockEvents').getBoundingClientRect().width || 620, false);
+
+  /* 内存监控 — the Explorer footer button owns the panel's visibility. Hiding it
+     takes the panel and the inner splitter out of the row, so 实时事件 fills the
+     space instead of leaving a hole. */
+  function setMemHidden(hidden, persist){
+    memHidden = !!hidden;
+    bench.setAttribute('data-mem', memHidden ? 'hidden' : 'shown');
+    memBtn.classList.toggle('on', !memHidden);
+    memBtn.setAttribute('aria-pressed', String(!memHidden));
+    memBtn.setAttribute('aria-label', memHidden ? '显示内存监控面板' : '隐藏内存监控面板');
+    memBtn.setAttribute('title', memHidden ? '显示内存监控面板' : '隐藏内存监控面板');
+    setDockEventWidth(parseInt(dockVSplit.getAttribute('aria-valuenow'), 10) || DVE_MIN, false);
+    if(persist){ store.set('deepssh.memHidden', memHidden ? '1' : '0'); }
+  }
+  setMemHidden(memHidden, false);
+  memBtn.addEventListener('click', function(){
+    setMemHidden(!memHidden, true);
+    toast(memHidden ? '已隐藏内存监控面板' : '已显示内存监控面板');
+  });
+
+  /* Minimum state is an icon rail: the labels are clipped out of the box, so the
+     name moves into the native tooltip — and back out again on the way up, where
+     the visible label is better. */
+  function syncRail(){
+    var rail = explorer.clientWidth <= RAIL_MAX;
+    $$('#exTree .ex-ghead, #exTree .ex-row').forEach(function(el){
+      /* Queried live, not cached: blocks and rows come and go with their sessions. */
+      if(!rail){ el.removeAttribute('title'); return; }
+      var name = el.querySelector('.ex-gname, .name');
+      el.setAttribute('title', name ? name.textContent.trim() : el.textContent.trim());
+    });
+  }
+  syncRail();
+  if(window.ResizeObserver){ new ResizeObserver(syncRail).observe(explorer); }
+  else { window.addEventListener('resize', syncRail); }
+
+  dockFold.addEventListener('click', function(e){
+    e.stopPropagation();
+    setDockCollapsed(!dockCollapsed, true);
+  });
+
+  function dragHandle(el, onMove, onEnd){
+    el.addEventListener('pointerdown', function(e){
+      if(e.button !== 0){ return; }
+      if(e.target.closest('button')){ return; }
+      e.preventDefault();
+      el.classList.add('dragging');
+      if(el.setPointerCapture){ el.setPointerCapture(e.pointerId); }
+      var ctx = { startX: e.clientX, startY: e.clientY };
+      function move(ev){ onMove(ev, ctx); }
+      function up(){
+        el.classList.remove('dragging');
+        el.removeEventListener('pointermove', move);
+        el.removeEventListener('pointerup', up);
+        el.removeEventListener('pointercancel', up);
+        if(onEnd){ onEnd(); }
+      }
+      el.addEventListener('pointermove', move);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+    });
+  }
+
+  dragHandle(sbSplit, function(e){ setSbWidth(e.clientX - bench.getBoundingClientRect().left, false); }, function(){
+    store.set('deepssh.sbW', sbSplit.getAttribute('aria-valuenow'));
+  });
+
+  dragHandle(dockVSplit, function(e){
+    setDockEventWidth(e.clientX - $('#docks').getBoundingClientRect().left, false);
+  }, function(){
+    store.set('deepssh.dockEventsW', dockVSplit.getAttribute('aria-valuenow'));
+  });
+
+  dockVSplit.addEventListener('keydown', function(e){
+    var cur = parseInt(dockVSplit.getAttribute('aria-valuenow'), 10) || 620;
+    if(e.key === 'ArrowLeft'){ setDockEventWidth(cur - 16, true); e.preventDefault(); }
+    else if(e.key === 'ArrowRight'){ setDockEventWidth(cur + 16, true); e.preventDefault(); }
+    else if(e.key === 'Home'){ setDockEventWidth(DVE_MIN, true); e.preventDefault(); }
+    else if(e.key === 'End'){ setDockEventWidth(dveMax(), true); e.preventDefault(); }
+  });
+
+  /* Shrinking the dock past the threshold collapses it to its title bar; dragging
+     it back down re-opens it. Threshold logic lives in the same move handler so
+     the expand/collapse order can never race itself. */
+
+  /* The bench is pinned to the viewport so that the space below the divider is
+     the only thing that changes size: push the divider down and the bottom pair
+     loses that space to the terminal above. Without a definite height the flex
+     split has nothing to divide — the dock simply grew and pushed the page down.
+     The offset is measured, not guessed: the topbar wraps to two rows on narrow
+     viewports. */
+  var topbar = $('.topbar');
+  var mainEl = $('#content');
+  function syncBenchChrome(){
+    var cs = getComputedStyle(mainEl);
+    var pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    bench.style.setProperty('--bench-chrome', Math.round(topbar.offsetHeight + pad) + 'px');
+  }
+  syncBenchChrome();
+  window.addEventListener('resize', syncBenchChrome);
+  if(window.ResizeObserver){ new ResizeObserver(syncBenchChrome).observe(topbar); }
+
+  /* The handle belongs to the stage above it: push it down and the terminal loses
+     that space to the two bottom panels, pull it up and the terminal takes it
+     back. The pointer's absolute Y maps to the panel height, so the divider
+     stays glued to the cursor — no drift, no jump when it folds or unfolds. */
+  function dockHeightAt(clientY){
+    return bench.getBoundingClientRect().bottom - clientY - dockSplit.offsetHeight / 2;
+  }
+  dragHandle(dockSplit, function(e){
+    var h = dockHeightAt(e.clientY);
+    if(dockCollapsed){
+      if(h > DOCK_COLLAPSE_AT){ setDockCollapsed(false, false); setDockHeight(h, false); }
+      return;
+    }
+    if(h < DOCK_COLLAPSE_AT){ setDockCollapsed(true, false); return; }
+    setDockHeight(h, false);
+  }, function(){
+    store.set('deepssh.dockH', String(parseInt(bench.style.getPropertyValue('--dock-h'), 10) || DOCK_DEF));
+    store.set('deepssh.dockCollapsed', dockCollapsed ? '1' : '0');
+  });
+
+  sbSplit.addEventListener('keydown', function(e){
+    var cur = parseInt(sbSplit.getAttribute('aria-valuenow'), 10) || 280;
+    if(e.key === 'ArrowLeft'){ setSbWidth(cur - 16, true); e.preventDefault(); }
+    else if(e.key === 'ArrowRight'){ setSbWidth(cur + 16, true); e.preventDefault(); }
+    else if(e.key === 'Home'){ setSbWidth(SB_MIN, true); e.preventDefault(); }
+    else if(e.key === 'End'){ setSbWidth(SB_MAX, true); e.preventDefault(); }
+  });
+
+  /* Arrow keys move the divider the same way the pointer does: ArrowUp raises it
+     (the bottom pair grows), ArrowDown lowers it (the terminal gains the space). */
+  dockSplit.addEventListener('keydown', function(e){
+    var cur = dockCollapsed ? DOCK_FOLDED : (parseInt(bench.style.getPropertyValue('--dock-h'), 10) || DOCK_DEF);
+    if(e.key === 'ArrowUp'){ setDockCollapsed(false, false); setDockHeight(cur + 16, true); e.preventDefault(); }
+    else if(e.key === 'ArrowDown'){
+      if(cur - 16 < DOCK_COLLAPSE_AT){ setDockCollapsed(true, true); }
+      else { setDockHeight(cur - 16, true); }
+      e.preventDefault();
+    }
+    else if(e.key === 'Home'){ setDockCollapsed(true, true); e.preventDefault(); }
+    else if(e.key === 'End'){ setDockCollapsed(false, false); setDockHeight(DOCK_MAX, true); e.preventDefault(); }
+  });
+
+  /* ---------- Toast ---------- */
+  function toast(msg){
+    var wrap = $('#toastWrap');
+    var el = document.createElement('div');
+    el.className = 'toast';
+    el.innerHTML = '<span class="dot"></span>' + msg;
+    wrap.appendChild(el);
+    setTimeout(function(){ el.remove(); }, 2600);
+  }
+
+  /* ---------- Confirm dialog ---------- */
+  var pendingConfirm = null;
+  function confirmDialog(title, text, okLabel, onOk){
+    $('#dlgTitle').textContent = title;
+    $('#dlgText').textContent = text;
+    $('#dlgConfirm').textContent = okLabel || '删除';
+    pendingConfirm = onOk;
+    $('#dialog').hidden = false;
+  }
+  $('#dlgCancel').addEventListener('click', function(){ $('#dialog').hidden = true; pendingConfirm = null; });
+  $('#dlgConfirm').addEventListener('click', function(){
+    if(pendingConfirm){ pendingConfirm(); }
+    $('#dialog').hidden = true;
+    pendingConfirm = null;
+  });
+  $('#dialog').addEventListener('click', function(e){ if(e.target === $('#dialog')){ $('#dialog').hidden = true; } });
+
+  function removeRow(btn, name){
+    var row = btn.closest('.row');
+    if(row){ row.remove(); }
+    toast('已删除 ' + name);
+  }
+
+  $$('[data-delete]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var name = btn.dataset.delete;
+      confirmDialog('删除配置', '将删除「' + name + '」，此操作不可恢复。', '删除', function(){ removeRow(btn, name); });
+    });
+  });
+
+  /* ---------- Drawer forms ---------- */
+  var drawerKind = 'ssh';
+  function openDrawer(kind, edit){
+    drawerKind = kind;
+    var isSsh = kind === 'ssh';
+    var isTunnel = kind === 'tunnel';
+    $('#drawerKicker').textContent = isSsh ? 'SSH Profile' : 'Port Forwarding';
+    $('#drawerTitle').textContent = isTunnel
+      ? ((edit ? '编辑' : '新增') + '端口转发')
+      : ((edit ? '编辑' : '新增') + ' SSH 配置');
+    $$('.drawer-body form').forEach(function(f){ f.hidden = (f.dataset.form !== kind); });
+    $('#drawerSubmit').textContent = edit ? '保存' : '创建';
+    $('#drawer').hidden = false;
+    setTimeout(function(){ var i = $('.drawer-body form:not([hidden]) input'); if(i){ i.focus(); } }, 40);
+  }
+  function closeDrawer(){ $('#drawer').hidden = true; }
+
+  $$('[data-open-drawer]').forEach(function(btn){
+    btn.addEventListener('click', function(){ openDrawer(btn.dataset.openDrawer, false); });
+  });
+  $('#drawerClose').addEventListener('click', closeDrawer);
+  $('#drawerCancel').addEventListener('click', closeDrawer);
+  $('#drawer').addEventListener('click', function(e){ if(e.target === $('#drawer')){ closeDrawer(); } });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ closeDrawer(); $('#dialog').hidden = true; closeNoteDlg(); closeCtx(); closeMenus(); }
+  });
+
+  var SSH_CRED_HINTS = {
+    password: '凭据仅保存在本机系统钥匙串中，不会写入项目文件。',
+    key: '私钥路径只保存在本机，不会随配置同步到其他设备。',
+    agent: '凭据由本机 ssh-agent 提供，本应用不接触也不保存任何私钥。'
+  };
+  $('#sshAuth').addEventListener('change', function(){
+    var mode = this.value;
+    $('#sshPasswordField').hidden = (mode !== 'password');
+    $('#sshKeyField').hidden = (mode !== 'key');
+    $('#sshAgentField').hidden = (mode !== 'agent');
+    $('#sshCredHint').textContent = SSH_CRED_HINTS[mode];
+  });
+
+  $('#drawerSubmit').addEventListener('click', function(){
+    var form = $('.drawer-body form:not([hidden])');
+    var nameEl = form.dataset.form === 'ssh' ? $('#sshName') : $('#tunName');
+    if(!nameEl.value.trim()){
+      nameEl.focus();
+      toast('请先填写名称');
+      return;
+    }
+    var label = nameEl.value.trim();
+    closeDrawer();
+    toast((drawerKind === 'ssh' ? '已保存 SSH 配置 ' : '已保存端口转发 ') + label);
+    nameEl.value = '';
+  });
+
+  /* ---------- Connections: search + filter ---------- */
+  var connSearch = $('#connSearch');
+  var authFilter = $('#authFilter');
+  function applyFilter(){
+    if(!connSearch){ return; }
+    var q = connSearch.value.trim().toLowerCase();
+    var auth = authFilter.value;
+    var shown = 0;
+    var total = 0;
+    $$('#connList .row').forEach(function(row){
+      total += 1;
+      var hay = (row.dataset.name + ' ' + row.dataset.host).toLowerCase();
+      var okQ = !q || hay.indexOf(q) !== -1;
+      var okA = (auth === 'all') || (row.dataset.auth === auth);
+      var visible = okQ && okA;
+      row.hidden = !visible;
+      if(visible){ shown += 1; }
+    });
+    var count = $('#connCount');
+    if(count){ count.textContent = shown + ' / ' + total; }
+  }
+  if(connSearch){
+    connSearch.addEventListener('input', applyFilter);
+    authFilter.addEventListener('change', applyFilter);
+  }
+
+  /* ---------- Connections: connect / edit ---------- */
+  $$('[data-connect]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var row = btn.closest('.row');
+      var name = row.dataset.name;
+      showPage('workbench');
+      toast('正在连接 ' + name + '…');
+      var target = $('#tabStrip .tab.active');
+      setTimeout(function(){
+        if(!$('#tabStrip .tab[data-tab="terminal3"]')){ createTab('terminal3'); }
+/* ---------- Boot ---------- */
+  applyFilter();
+  activateTab('terminal3');
+        toast(name + ' 已连接');
+      }, 700);
+    });
+  });
+  $$('[data-edit-ssh]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var name = btn.closest('.row').dataset.name;
+      openDrawer('ssh', true);
+      $('#drawerTitle').textContent = '编辑 SSH 配置';
+      toast('正在编辑 ' + name);
+    });
+  });
+
+  /* ---------- Tunnels: toggle / edit ---------- */
+  $$('[data-tunnel-toggle]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var row = btn.closest('.row');
+      var running = row.classList.contains('run');
+      if(running){
+        row.classList.remove('run');
+        row.classList.add('off');
+        btn.textContent = '启动';
+        toast('已停止转发 ' + row.querySelector('strong').textContent);
+      } else {
+        row.classList.remove('off');
+        row.classList.add('run');
+        btn.textContent = '停止';
+        toast('已启动转发 ' + row.querySelector('strong').textContent);
+      }
+      var badge = row.querySelector('.r-name .badge');
+      if(badge){
+        badge.className = running ? 'badge off' : 'badge run';
+        badge.innerHTML = '<span class="dot ' + (running ? 'off' : 'run') + '"></span>' + (running ? '已停止' : '运行中');
+      }
+    });
+  });
+  $$('[data-edit-tunnel]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      openDrawer('tunnel', true);
+      $('#drawerTitle').textContent = '编辑端口转发';
+    });
+  });
+
+  /* ---------- Regex highlight rules ----------
+     Data mirrors theme_settings.dart: commandDeck() ships 7 rules,
+     oneDark() / solarized() ship an empty list. */
+  var RX_DECK = [
+    {p:'ERROR|FATAL|Exception|Traceback', n:'错误日志', c:'#F14C4C'},
+    {p:'WARN|WARNING',                    n:'警告日志', c:'#F5F543'},
+    {p:'SUCCESS|OK|DONE',                 n:'成功状态', c:'#23D18B'},
+    {p:'\\b[45]\\d\\d\\b',                  n:'HTTP 错误', c:'#F14C4C'},
+    {p:'\\b\\d+ms\\b|\\b\\d+\\.\\d+s\\b',    n:'耗时',     c:'#29B8DB'},
+    {p:'\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b',   n:'IP 地址',  c:'#D670D6'},
+    {p:'\\b[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\\b', n:'UUID', c:'#3B8EEA'}
+  ];
+  var RX_SWATCHES = ['#F14C4C','#F5F543','#23D18B','#29B8DB','#D670D6','#3B8EEA','#FFFFFF'];
+  var RX_LINES = [
+    '$ deploy@prod-web-01:~$ tail -f app.log',
+    'INFO  server listening on 0.0.0.0:8080',
+    'WARN  cache miss for key user:184213',
+    'ERROR upstream timeout after 3.0s',
+    'GET /api/orders 504 gateway timeout in 1.4s',
+    'request 7f3a9c2e-51b8-4d77-9a0f-2c6e1b3d4a55 done in 812ms',
+    'client 10.24.8.11 disconnected'
+  ];
+  var rxRules = RX_DECK.map(function(r){ return {p:r.p, n:r.n, c:r.c}; });
+
+  function rxEsc(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function rxHex(v){
+    var s = String(v || '').trim();
+    if(/^#?[0-9a-fA-F]{6}$/.test(s)) return (s[0]==='#'?s:'#'+s).toUpperCase();
+    return null;
+  }
+  /* Paint every match of every rule; earlier rules win overlapping spans. */
+  function rxPaint(text){
+    var spans = [];
+    rxRules.forEach(function(r){
+      if(!r.p) return;
+      var re;
+      try{ re = new RegExp(r.p, 'g'); }catch(err){ return; }
+      var m;
+      while((m = re.exec(text)) !== null){
+        if(!m[0].length){ re.lastIndex++; continue; }
+        spans.push({s:m.index, e:m.index + m[0].length, c:r.c});
+      }
+    });
+    spans.sort(function(a,b){ return a.s - b.s; });
+    var out = '', pos = 0;
+    spans.forEach(function(sp){
+      if(sp.s < pos) return;
+      if(sp.s > pos) out += rxEsc(text.slice(pos, sp.s));
+      out += '<span style="color:' + rxEsc(sp.c) + '">' + rxEsc(text.slice(sp.s, sp.e)) + '</span>';
+      pos = sp.e;
+    });
+    return out + rxEsc(text.slice(pos));
+  }
+  function rxRefreshPreview(){
+    var box = $('#termPreview');
+    if(!box) return;
+    box.innerHTML = RX_LINES.map(rxPaint).join('\n');
+  }
+  function rxGrip(rank){
+    return '<button class="rx-grip" type="button" role="button" aria-label="拖动调整优先级，当前第 ' + (rank+1) + ' 条" title="拖动调整优先级 · 第 ' + (rank+1) + ' 条（Alt+↑ / Alt+↓ 键盘移动）">' +
+      '<svg class="ico" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>' +
+      '</button>';
+  }
+  function rxRow(r, i){
+    var hex = rxHex(r.c) || '#FFFFFF';
+    return '<div class="rx" role="listitem" data-i="' + i + '">' +
+      rxGrip(i) +
+      '<div class="rx-in mono"><input type="text" value="' + rxEsc(r.p) + '" placeholder="正则表达式" aria-label="第 ' + (i+1) + ' 条规则的正则表达式" data-k="p"></div>' +
+      '<div class="rx-in"><input type="text" value="' + rxEsc(r.n) + '" placeholder="备注" aria-label="第 ' + (i+1) + ' 条规则的备注" data-k="n"></div>' +
+      '<div class="rx-color"><button class="rx-color-btn" type="button" aria-expanded="false" aria-haspopup="dialog" aria-label="选择第 ' + (i+1) + ' 条规则的颜色" data-hex="' + hex + '">' +
+        '<span class="sw" style="background:' + hex + '"></span><span class="hex">' + hex + '</span>' +
+        '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>' +
+      '</button></div>' +
+      '<button class="rx-del" type="button" aria-label="移除第 ' + (i+1) + ' 条规则" title="移除正则规则">' +
+        '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>' +
+      '</button>' +
+    '</div>';
+  }
+  function rxRender(){
+    var list = $('#rxList');
+    list.innerHTML = rxRules.map(rxRow).join('');
+    $('#rxEmpty').hidden = rxRules.length > 0;
+    rxRefreshPreview();
+  }
+  function rxMove(from, to){
+    if(to < 0 || to >= rxRules.length || from === to) return;
+    var item = rxRules.splice(from, 1)[0];
+    rxRules.splice(to, 0, item);
+    rxRender();
+    var g = $$('.rx-grip', $('#rxList'))[to];
+    if(g) g.focus();
+    toast('已把「' + (item.n || item.p || '未命名规则') + '」移到第 ' + (to+1) + ' 位');
+  }
+  $('#rxList').addEventListener('input', function(e){
+    var inp = e.target.closest('input[data-k]');
+    if(!inp) return;
+    var row = inp.closest('.rx');
+    rxRules[+row.dataset.i][inp.dataset.k] = inp.value;
+    rxRefreshPreview();
+  });
+  $('#rxList').addEventListener('click', function(e){
+    var row = e.target.closest('.rx');
+    if(!row) return;
+    var i = +row.dataset.i;
+    if(e.target.closest('.rx-del')){
+      var gone = rxRules.splice(i, 1)[0];
+      rxRender();
+      toast('已移除规则「' + (gone.n || gone.p || '未命名规则') + '」');
+      return;
+    }
+    var cbtn = e.target.closest('.rx-color-btn');
+    if(cbtn) rxOpenColor(cbtn, i);
+  });
+  $('#rxList').addEventListener('keydown', function(e){
+    var grip = e.target.closest('.rx-grip');
+    if(!grip) return;
+    var i = +grip.closest('.rx').dataset.i;
+    if(e.key === 'ArrowUp' && (e.altKey || e.ctrlKey || e.metaKey)){ e.preventDefault(); rxMove(i, i - 1); }
+    else if(e.key === 'ArrowDown' && (e.altKey || e.ctrlKey || e.metaKey)){ e.preventDefault(); rxMove(i, i + 1); }
+  });
+
+  /* Pointer drag reorder — the row follows the cursor, an outline marks the slot. */
+  (function(){
+    var list = $('#rxList'), drag = null, shade = null;
+    list.addEventListener('pointerdown', function(e){
+      var grip = e.target.closest('.rx-grip');
+      if(!grip || e.button !== 0) return;
+      var row = grip.closest('.rx');
+      e.preventDefault();
+      drag = {row:row, from:+row.dataset.i, startY:e.clientY, id:e.pointerId};
+      row.classList.add('dragging');
+      if(grip.setPointerCapture) grip.setPointerCapture(e.pointerId);
+      shade = document.createElement('div');
+      shade.className = 'rx-shade';
+      shade.style.height = row.offsetHeight + 'px';
+      list.parentElement.style.position = 'relative';
+      list.parentElement.insertBefore(shade, list);
+      row.style.background = 'var(--surface)';
+      row.style.boxShadow = 'var(--shadow-hard)';
+      row.style.position = 'relative';
+      row.style.zIndex = '6';
+    });
+    list.addEventListener('pointermove', function(e){
+      if(!drag || e.pointerId !== drag.id) return;
+      var dy = e.clientY - drag.startY;
+      drag.row.style.transform = 'translateY(' + dy + 'px)';
+      var others = $$('.rx', list).filter(function(r){ return r !== drag.row; });
+      var to = 0;
+      others.forEach(function(r, k){
+        var b = r.getBoundingClientRect();
+        if(e.clientY > b.top + b.height / 2) to = k + 1;
+      });
+      drag.to = to;
+      var slot = others[to];
+      if(slot){
+        shade.style.top = (slot.offsetTop + (to > drag.from ? slot.offsetHeight : 0)) + 'px';
+      }else{
+        shade.style.top = others.length ? (others[others.length-1].offsetTop + others[others.length-1].offsetHeight) + 'px' : '0px';
+      }
+    });
+    function end(){
+      if(!drag) return;
+      var from = drag.from, to = drag.to;
+      drag.row.classList.remove('dragging');
+      drag.row.removeAttribute('style');
+      if(shade) shade.remove();
+      shade = null; drag = null;
+      if(typeof to === 'number' && to !== from) rxMove(from, to);
+      else rxRender();
+    }
+    list.addEventListener('pointerup', end);
+    list.addEventListener('pointercancel', end);
+  })();
+
+  /* Compact color picker — mirrors ColorPickerField(compact: true) */
+  var rxPop = null;
+  function rxCloseColor(){
+    if(!rxPop) return;
+    rxPop.remove();
+    rxPop = null;
+    $$('.rx-color-btn').forEach(function(b){ b.setAttribute('aria-expanded', 'false'); });
+  }
+  function rxOpenColor(btn, i){
+    if(rxPop){ rxCloseColor(); if(rxPopPrev === btn) return; }
+    rxPopPrev = btn;
+    btn.setAttribute('aria-expanded', 'true');
+    var cur = rxHex(rxRules[i].c) || '#FFFFFF';
+    rxPop = document.createElement('div');
+    rxPop.className = 'rx-pop';
+    rxPop.setAttribute('role', 'dialog');
+    rxPop.setAttribute('aria-label', '选择高亮颜色');
+    rxPop.innerHTML =
+      '<input type="color" value="' + cur + '" aria-label="取色器">' +
+      '<div class="hexrow"><span>Hex</span><input type="text" value="' + cur + '" maxlength="7" spellcheck="false" aria-label="十六进制颜色值"></div>' +
+      '<div class="rx-presets">' + RX_SWATCHES.map(function(c){
+        return '<button type="button" style="background:' + c + '" data-c="' + c + '" aria-label="使用 ' + c + '"></button>';
+      }).join('') + '</div>';
+    btn.parentElement.appendChild(rxPop);
+    var picker = rxPop.querySelector('input[type=color]');
+    var hexIn = rxPop.querySelector('.hexrow input');
+    function apply(v){
+      var hex = rxHex(v);
+      if(!hex) return;
+      rxRules[i].c = hex;
+      btn.querySelector('.sw').style.background = hex;
+      btn.querySelector('.hex').textContent = hex;
+      btn.dataset.hex = hex;
+      picker.value = hex;
+      if(hexIn.value.toUpperCase() !== hex) hexIn.value = hex;
+      rxRefreshPreview();
+    }
+    picker.addEventListener('input', function(){ apply(picker.value); });
+    hexIn.addEventListener('input', function(){
+      if(rxHex(hexIn.value)) apply(hexIn.value);
+    });
+    rxPop.addEventListener('click', function(e){
+      var sw = e.target.closest('button[data-c]');
+      if(sw) apply(sw.dataset.c);
+    });
+    rxPop.addEventListener('keydown', function(e){ if(e.key === 'Escape'){ rxCloseColor(); btn.focus(); } });
+    hexIn.focus();
+    hexIn.select();
+  }
+  var rxPopPrev = null;
+  document.addEventListener('click', function(e){
+    if(!rxPop || !e.target || !e.target.closest) return;
+    if(!e.target.closest('.rx-pop') && !e.target.closest('.rx-color-btn')) rxCloseColor();
+  });
+
+  $('#addRule').addEventListener('click', function(){
+    rxRules.push({p:'', n:'', c:'#FFFFFF'});
+    rxRender();
+    var rows = $$('.rx', $('#rxList'));
+    var last = rows[rows.length - 1];
+    if(last) last.querySelector('input[data-k="p"]').focus();
+    toast('已添加一条空规则');
+  });
+
+/* ---------- Theme presets ----------
+     Dropdown selector (mirrors _PresetSelector in theme_config_page.dart: a trigger plus a
+     list of options). Every row carries its own delete button; the last row is
+     "新建自定义方案"; right-clicking a row copies it. Built-ins can be hidden from the
+     list and brought back from "恢复内置方案". */
+  var PRESET = {
+    ui:   { attr:'data-ui-preset',   sw:'#FAF9F5', store:'deepssh.uiPresets',
+            hide:'deepssh.uiHiddenPresets', label:'界面主题' },
+    term: { attr:'data-term-preset', sw:'#17181A', store:'deepssh.termPresets',
+            hide:'deepssh.termHiddenPresets', label:'终端主题' }
+  };
+  var BUILTIN = {
+    ui:   [ {id:'deck', name:'Command Deck', sw:'#FAF9F5'},
+            {id:'vsc',  name:'VS Code Dark', sw:'#1E1E1E'} ],
+    term: [ {id:'deck',  name:'Command Deck', sw:'#17181A'},
+            {id:'one',   name:'One Dark', sw:'#282C34'},
+            {id:'solar', name:'Solarized',  sw:'#002B36'} ]
+  };
+  var PRESET_SEL = { ui:'deck', term:'deck' };
+  var TRASH_ICO = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+    'stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>';
+  var openPresetMenu = null;
+
+  function jsonOf(key, dflt){
+    try{ return JSON.parse(store.get(key, dflt)) || dflt; }catch(e){ return dflt; }
+  }
+  function customList(kind){ return jsonOf(PRESET[kind].store, []); }
+  function saveCustom(kind, list){ store.set(PRESET[kind].store, JSON.stringify(list)); }
+  function hiddenList(kind){ return jsonOf(PRESET[kind].hide, []); }
+  function saveHidden(kind, list){ store.set(PRESET[kind].hide, JSON.stringify(list)); }
+
+  /* built-ins first (minus hidden), then custom presets in creation order */
+  function presetItems(kind){
+    var hidden = hiddenList(kind);
+    var out = BUILTIN[kind].filter(function(p){ return hidden.indexOf(p.id) < 0; })
+      .map(function(p){ return { id:p.id, name:p.name, sw:p.sw, custom:false }; });
+    return out.concat(customList(kind).map(function(p){
+      return { id:p.id, name:p.name, sw:p.sw, custom:true };
+    }));
+  }
+  function findItem(kind, pid){
+    return presetItems(kind).filter(function(p){ return p.id === pid; })[0] || null;
+  }
+
+  function presetRow(kind, p){
+    var row = document.createElement('div');
+    row.className = 'psel-row';
+    row.setAttribute('role', 'none');
+
+    var pick = document.createElement('button');
+    pick.type = 'button';
+    pick.className = 'psel-pick';
+    pick.setAttribute('role', 'menuitemradio');
+    pick.setAttribute('aria-checked', 'false');
+    pick.setAttribute(PRESET[kind].attr, p.id);
+    pick.tabIndex = -1;
+    pick.dataset.pid = p.id;
+    pick.dataset.name = p.name;
+    pick.dataset.sw = p.sw;
+    if(p.custom){ pick.dataset.custom = '1'; }
+    pick.title = '应用此方案';
+    var sw = document.createElement('span');
+    sw.className = 'sw-model';
+    sw.style.background = p.sw;
+    var nm = document.createElement('span');
+    nm.className = 'p-name';
+    nm.textContent = p.name;
+    pick.appendChild(sw);
+    pick.appendChild(nm);
+    if(p.custom){
+      var tg = document.createElement('span');
+      tg.className = 'p-tag';
+      tg.textContent = '自定义';
+      pick.appendChild(tg);
+    }
+    row.appendChild(pick);
+
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'psel-del';
+    del.setAttribute('role', 'menuitem');
+    del.setAttribute('data-preset-del', '');
+    del.setAttribute('aria-label', '删除方案 ' + p.name);
+    del.title = p.custom ? '删除此自定义方案' : '从列表中移除此内置方案';
+    del.dataset.pid = p.id;
+    del.dataset.name = p.name;
+    del.innerHTML = TRASH_ICO;
+    row.appendChild(del);
+    return row;
+  }
+
+  function pselRender(kind){
+    var host = $('[data-preset-list="' + kind + '"]');
+    if(!host){ return; }
+    host.textContent = '';
+    var list = presetItems(kind);
+    if(!list.length){
+      var none = document.createElement('p');
+      none.className = 'psel-none';
+      none.textContent = '暂无方案，可从下方新建。';
+      host.appendChild(none);
+    }
+    list.forEach(function(p){ host.appendChild(presetRow(kind, p)); });
+    var hidden = hiddenList(kind);
+    var rst = $('[data-preset-restore="' + kind + '"]');
+    if(rst){
+      rst.hidden = hidden.length === 0;
+      $('[data-preset-restore-label]', rst).textContent =
+        '恢复内置方案（' + hidden.length + '）';
+    }
+    pselSync(kind);
+  }
+
+  /* mirror the selection onto the trigger and the row states */
+  function pselSync(kind){
+    var box = $('[data-presets="' + kind + '"]');
+    var cur = findItem(kind, PRESET_SEL[kind]);
+    $$('.psel-pick', box).forEach(function(b){
+      var on = !!cur && b.dataset.pid === cur.id;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      b.tabIndex = on ? 0 : -1;
+    });
+    var btn = $('[data-preset-toggle="' + kind + '"]', box);
+    $('[data-preset-label]', btn).textContent = cur ? cur.name : '暂无方案';
+    $('[data-preset-sw]', btn).style.background = cur ? cur.sw : 'transparent';
+    $('[data-preset-tag]', btn).hidden = !(cur && cur.custom);
+  }
+
+  function applyPreset(kind, pid, quiet){
+    var p = findItem(kind, pid);
+    if(!p){ return null; }
+    PRESET_SEL[kind] = pid;
+    pselSync(kind);
+    /* 自定义方案保存的就是当前高亮规则，不做替换 */
+    if(kind === 'term' && !p.custom){
+      rxCloseColor();
+      /* theme_settings.dart: oneDark() / solarized() ship regexHighlights: [] */
+      rxRules = p.id === 'deck' ? RX_DECK.map(function(r){ return {p:r.p, n:r.n, c:r.c}; }) : [];
+      rxRender();
+    }
+    if(!quiet){
+      toast(PRESET[kind].label + '已切换为 ' + p.name +
+        (kind === 'term' && !p.custom ? '，高亮规则共 ' + rxRules.length + ' 条' : ''));
+    }
+    return p;
+  }
+
+  /* Copy placement: a copy of a custom preset lands directly after it; a copy of a built-in
+     lands at the head of the custom block, i.e. immediately after the built-in group. */
+  function addCustom(kind, name, sw, afterId){
+    var list = customList(kind);
+    var p = { id: kind + '-c' + (list.length + 1) + '-' + Date.now().toString(36),
+              name: name, sw: sw };
+    var isBuiltin = BUILTIN[kind].some(function(x){ return x.id === afterId; });
+    if(afterId && !isBuiltin){
+      var i = -1;
+      list.forEach(function(x, n){ if(x.id === afterId){ i = n; } });
+      if(i < 0){ list.push(p); } else { list.splice(i + 1, 0, p); }
+    } else if(afterId){
+      list.splice(0, 0, p);
+    } else {
+      list.push(p);
+    }
+    saveCustom(kind, list);
+    pselRender(kind);
+    applyPreset(kind, p.id, true);
+    return p;
+  }
+
+  function delPreset(kind, pid){
+    var target = findItem(kind, pid);
+    if(!target){ return; }
+    var fallback = null;
+    var customs = customList(kind);
+    var isCustom = customs.some(function(x){ return x.id === pid; });
+    if(isCustom){
+      saveCustom(kind, customs.filter(function(x){ return x.id !== pid; }));
+    } else {
+      var hidden = hiddenList(kind);
+      if(hidden.indexOf(pid) < 0){ hidden.push(pid); }
+      saveHidden(kind, hidden);
+    }
+    if(PRESET_SEL[kind] === pid){
+      var rest = presetItems(kind);
+      PRESET_SEL[kind] = rest.length ? rest[0].id : null;
+      fallback = PRESET_SEL[kind] ? findItem(kind, PRESET_SEL[kind]).name : null;
+    }
+    pselRender(kind);
+    if(PRESET_SEL[kind]){ applyPreset(kind, PRESET_SEL[kind], true); } else { pselSync(kind); }
+    toast('已删除方案「' + target.name + '」' +
+      (isCustom ? '' : '，可从「恢复内置方案」取回') +
+      (fallback ? '，已切换到「' + fallback + '」' : ''));
+  }
+
+  function restoreBuiltins(kind){
+    var n = hiddenList(kind).length;
+    if(!n){ return; }
+    saveHidden(kind, []);
+    if(!findItem(kind, PRESET_SEL[kind])){ PRESET_SEL[kind] = BUILTIN[kind][0].id; }
+    pselRender(kind);
+    toast('已恢复 ' + n + ' 个内置方案');
+  }
+
+  function copyName(name){
+    var base = name.replace(/( 副本)+$/, '');
+    var n = (name.match(/ 副本/g) || []).length;
+    return base + new Array(n + 2).join(' 副本');
+  }
+
+  function pselClose(){
+    if(!openPresetMenu){ return; }
+    openPresetMenu.menu.hidden = true;
+    openPresetMenu.trigger.setAttribute('aria-expanded', 'false');
+    openPresetMenu = null;
+  }
+  function pselFocusFirst(kind, pid){
+    var menu = $('[data-preset-menu="' + kind + '"]');
+    if(!menu || menu.hidden){ return; }
+    var target = pid ? $('.psel-pick[data-pid="' + pid + '"]', menu) : null;
+    (target || $('.psel-pick', menu) || $('.psel-add', menu) || $('[data-preset-toggle="' + kind + '"]')).focus();
+  }
+  function pselOpen(kind){
+    var box = $('[data-presets="' + kind + '"]');
+    var menu = $('[data-preset-menu="' + kind + '"]', box);
+    var trigger = $('[data-preset-toggle="' + kind + '"]', box);
+    if(openPresetMenu && openPresetMenu.menu === menu){ pselClose(); return; }
+    pselClose();
+    menu.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    openPresetMenu = { menu: menu, trigger: trigger, kind: kind };
+    pselFocusFirst(kind, PRESET_SEL[kind]);
+  }
+  function pselItems(menu){
+    var out = $$('.psel-pick, .psel-del', menu);
+    var add = $('.psel-add', menu);
+    if(add){ out.push(add); }
+    var rst = $('[data-preset-restore]', menu);
+    if(rst && !rst.hidden){ out.push(rst); }
+    return out;
+  }
+
+  ['ui','term'].forEach(function(kind){
+    var box = $('[data-presets="' + kind + '"]');
+    var menu = $('[data-preset-menu="' + kind + '"]', box);
+    var trigger = $('[data-preset-toggle="' + kind + '"]', box);
+
+    trigger.addEventListener('click', function(){ pselOpen(kind); });
+
+    menu.addEventListener('click', function(e){
+      var del = e.target.closest('[data-preset-del]');
+      if(del){
+        e.stopPropagation();
+        delPreset(kind, del.dataset.pid);
+        pselFocusFirst(kind, PRESET_SEL[kind]);
+        return;
+      }
+      var add = e.target.closest('[data-preset-add]');
+      if(add){
+        var name = '自定义方案 ' + (customList(kind).length + 1);
+        addCustom(kind, name, PRESET[kind].sw, null);
+        toast('已把当前设置存为「' + name + '」');
+        pselFocusFirst(kind, PRESET_SEL[kind]);
+        return;
+      }
+      var rst = e.target.closest('[data-preset-restore]');
+      if(rst){
+        restoreBuiltins(kind);
+        pselFocusFirst(kind, PRESET_SEL[kind]);
+        return;
+      }
+      var pick = e.target.closest('.psel-pick');
+      if(pick){
+        applyPreset(kind, pick.dataset.pid);
+        pselClose();
+        trigger.focus();
+      }
+    });
+
+    menu.addEventListener('contextmenu', function(e){
+      var row = e.target.closest('.psel-pick');
+      if(!row){ return; }
+      e.preventDefault();
+      openCtx(e.clientX, e.clientY, [{
+        label: '复制方案',
+        run: function(){
+          var src = row.dataset.name;
+          var name = copyName(src);
+          var p = addCustom(kind, name, row.dataset.sw || PRESET[kind].sw, row.dataset.pid);
+          toast('已复制「' + src + '」为「' + p.name + '」');
+          pselFocusFirst(kind, p.id);
+        }
+      }]);
+    });
+
+    menu.addEventListener('keydown', function(e){
+      if(e.key === 'Escape'){ e.preventDefault(); pselClose(); trigger.focus(); return; }
+      if(e.key === 'Tab'){ pselClose(); return; }
+      var fwd = ['ArrowDown','ArrowRight'], back = ['ArrowUp','ArrowLeft'];
+      if(fwd.indexOf(e.key) < 0 && back.indexOf(e.key) < 0 && e.key !== 'Home' && e.key !== 'End'){ return; }
+      var seq = pselItems(menu);
+      if(!seq.length){ return; }
+      e.preventDefault();
+      var i = seq.indexOf(document.activeElement);
+      var n = seq.length;
+      var next = i < 0 ? 0
+        : e.key === 'Home' ? 0
+        : e.key === 'End' ? n - 1
+        : fwd.indexOf(e.key) >= 0 ? (i + 1) % n
+        : (i - 1 + n) % n;
+      seq[next].focus();
+    });
+
+    pselRender(kind);
+  });
+
+  document.addEventListener('click', function(e){
+    if(openPresetMenu && !e.target.closest('[data-presets]')){ pselClose(); }
+  });
+  $('#resetTheme').addEventListener('click', function(){ toast('已恢复默认主题'); });
+  $('#saveTheme').addEventListener('click', function(){ toast('主题已保存'); });
+
+  /* ---------- Misc actions ---------- */
+
+  rxRender();
+  activateTab('terminal3');
+  var saved = store.get('deepssh.page', 'workbench');
+  showPage(saved);
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    document.documentElement.style.scrollBehavior = 'auto';
+  }
+})();
+</script>
+</body>
+</html>

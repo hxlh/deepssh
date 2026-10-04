@@ -24,7 +24,7 @@ void main() {
     expect(find.text('machine1'), findsNothing);
     expect(find.text('machine2'), findsNothing);
     expect(find.text('terminal1'), findsNothing);
-    expect(find.text('Open a terminal from the sidebar'), findsOneWidget);
+    expect(find.text('没有活动的会话。请从左侧资源管理器打开一个终端。'), findsOneWidget);
   });
 
   testWidgets('closes the active local tab and returns to empty state', (
@@ -34,12 +34,14 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.localTerminal)));
+    await tester.tap(
+      find.byKey(addConnectionMenuKey(AddConnectionAction.localTerminal)),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Close local · terminal1'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Open a terminal from the sidebar'), findsOneWidget);
+    expect(find.text('没有活动的会话。请从左侧资源管理器打开一个终端。'), findsOneWidget);
   });
 }

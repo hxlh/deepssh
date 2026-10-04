@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../core/widgets/deck_widgets.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/models/ssh_profile_item.dart';
@@ -116,7 +118,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
 
   String? requiredText(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Required';
+      return '必填';
     }
     return null;
   }
@@ -126,7 +128,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
     if (requiredError != null) return requiredError;
     final port = int.tryParse(value!.trim());
     if (port == null || port < 1 || port > 65535) {
-      return 'Invalid port';
+      return '端口无效';
     }
     return null;
   }
@@ -156,18 +158,34 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
         key: formKey,
         child: ListView(
           children: [
-            Text(
-              isEdit ? 'Edit SSH Profile' : 'New SSH Profile',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const DeckEyebrow('SSH'),
+                      DeckTitle(isEdit ? '编辑 SSH 配置' : '新增 SSH 配置'),
+                    ],
+                  ),
+                ),
+                DeckButton(
+                  label: '返回',
+                  style: DeckButtonStyle.ghost,
+                  icon: Icons.arrow_back,
+                  onPressed: widget.onCancel,
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
             Focus(
               onKeyEvent: (_, event) =>
                   handleFieldKey(event, null, hostFocusNode),
               child: TextFormField(
                 focusNode: nameFocusNode,
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
+                decoration: const InputDecoration(labelText: '名称'),
                 enableSuggestions: false,
                 autocorrect: false,
                 textInputAction: TextInputAction.next,
@@ -182,7 +200,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
               child: TextFormField(
                 focusNode: hostFocusNode,
                 controller: hostController,
-                decoration: const InputDecoration(labelText: 'Host'),
+                decoration: const InputDecoration(labelText: '主机'),
                 enableSuggestions: false,
                 autocorrect: false,
                 textInputAction: TextInputAction.next,
@@ -197,7 +215,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
               child: TextFormField(
                 focusNode: portFocusNode,
                 controller: portController,
-                decoration: const InputDecoration(labelText: 'Port'),
+                decoration: const InputDecoration(labelText: '端口'),
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.next,
                 onFieldSubmitted: (_) => usernameFocusNode.requestFocus(),
@@ -211,7 +229,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
               child: TextFormField(
                 focusNode: usernameFocusNode,
                 controller: usernameController,
-                decoration: const InputDecoration(labelText: 'Username'),
+                decoration: const InputDecoration(labelText: '用户名'),
                 enableSuggestions: false,
                 autocorrect: false,
                 textInputAction: TextInputAction.next,
@@ -231,15 +249,15 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
               child: DropdownButtonFormField<SshAuthMode>(
                 focusNode: authModeFocusNode,
                 initialValue: selectedAuthMode,
-                decoration: const InputDecoration(labelText: 'Authentication'),
+                decoration: const InputDecoration(labelText: '认证方式'),
                 items: const [
                   DropdownMenuItem(
                     value: SshAuthMode.password,
-                    child: Text('Password'),
+                    child: Text('密码'),
                   ),
                   DropdownMenuItem(
                     value: SshAuthMode.privateKey,
-                    child: Text('Private Key'),
+                    child: Text('私钥'),
                   ),
                 ],
                 onChanged: (value) {
@@ -258,7 +276,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
                 child: TextFormField(
                   focusNode: passwordFocusNode,
                   controller: passwordController,
-                  decoration: const InputDecoration(labelText: 'Password'),
+                  decoration: const InputDecoration(labelText: '密码'),
                   obscureText: true,
                   textInputAction: TextInputAction.next,
                   onFieldSubmitted: (_) => termTypeFocusNode.requestFocus(),
@@ -271,9 +289,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
                 child: TextFormField(
                   focusNode: privateKeyPathFocusNode,
                   controller: privateKeyPathController,
-                  decoration: const InputDecoration(
-                    labelText: 'Private Key Path',
-                  ),
+                  decoration: const InputDecoration(labelText: '私钥路径'),
                   enableSuggestions: false,
                   autocorrect: false,
                   textInputAction: TextInputAction.next,
@@ -293,7 +309,7 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
               child: DropdownButtonFormField<String>(
                 focusNode: termTypeFocusNode,
                 initialValue: selectedTermType,
-                decoration: const InputDecoration(labelText: 'Terminal Type'),
+                decoration: const InputDecoration(labelText: '终端类型'),
                 items: [
                   for (final option in SshProfileItem.termTypeOptions)
                     DropdownMenuItem(value: option, child: Text(option)),
@@ -308,15 +324,14 @@ class _SshProfileFormPageState extends State<SshProfileFormPage> {
             ),
             const SizedBox(height: 24),
             Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                TextButton(
-                  onPressed: widget.onCancel,
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton(
+                DeckButton(label: '取消', onPressed: widget.onCancel),
+                const SizedBox(width: 8),
+                DeckButton(
+                  label: isEdit ? '保存' : '创建',
+                  style: DeckButtonStyle.solid,
                   onPressed: save,
-                  child: Text(isEdit ? 'Update' : 'Create'),
                 ),
               ],
             ),

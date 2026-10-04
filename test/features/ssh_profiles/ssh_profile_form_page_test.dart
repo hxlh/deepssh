@@ -1,4 +1,5 @@
 import 'package:deepssh/core/models/ssh_profile_item.dart';
+import 'package:deepssh/core/widgets/deck_widgets.dart';
 import 'package:deepssh/features/ssh_profiles/ssh_profile_form_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,11 +20,11 @@ void main() {
       ),
     );
 
-    await tester.enterText(find.bySemanticsLabel('Port'), '');
-    await tapFormButton(tester, 'Create');
+    await tester.enterText(find.bySemanticsLabel('端口'), '');
+    await tapFormButton(tester, '创建');
     await tester.pumpAndSettle();
 
-    expect(find.text('Required'), findsWidgets);
+    expect(find.text('必填'), findsWidgets);
     expect(saved, isFalse);
   });
 
@@ -44,7 +45,7 @@ void main() {
     );
 
     await fillRequiredFields(tester);
-    await tapFormButton(tester, 'Create');
+    await tapFormButton(tester, '创建');
     await tester.pumpAndSettle();
 
     expect(savedDraft?.termType, 'xterm-256color');
@@ -71,7 +72,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('xterm-truecolor').last);
     await tester.pumpAndSettle();
-    await tapFormButton(tester, 'Create');
+    await tapFormButton(tester, '创建');
     await tester.pumpAndSettle();
 
     expect(savedDraft?.termType, 'xterm-truecolor');
@@ -102,7 +103,7 @@ void main() {
 
     expect(find.text('xterm-color'), findsOneWidget);
 
-    await tapFormButton(tester, 'Update');
+    await tapFormButton(tester, '保存');
     await tester.pumpAndSettle();
 
     expect(savedDraft?.termType, 'xterm-color');
@@ -119,7 +120,7 @@ void main() {
       ),
     );
 
-    final passwordTop = tester.getTopLeft(find.bySemanticsLabel('Password')).dy;
+    final passwordTop = tester.getTopLeft(find.bySemanticsLabel('密码')).dy;
     final terminalTypeTop = tester
         .getTopLeft(find.byType(DropdownButtonFormField<String>))
         .dy;
@@ -138,16 +139,16 @@ void main() {
       ),
     );
 
-    expect(find.bySemanticsLabel('Password'), findsOneWidget);
-    expect(find.bySemanticsLabel('Private Key Path'), findsNothing);
+    expect(find.bySemanticsLabel('密码'), findsOneWidget);
+    expect(find.bySemanticsLabel('私钥路径'), findsNothing);
 
     await tester.tap(find.byType(DropdownButtonFormField<SshAuthMode>));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Private Key').last);
+    await tester.tap(find.text('私钥').last);
     await tester.pumpAndSettle();
 
-    expect(find.bySemanticsLabel('Password'), findsNothing);
-    expect(find.bySemanticsLabel('Private Key Path'), findsOneWidget);
+    expect(find.bySemanticsLabel('密码'), findsNothing);
+    expect(find.bySemanticsLabel('私钥路径'), findsOneWidget);
   });
 
   testWidgets('password auth allows saving an empty password', (tester) async {
@@ -165,7 +166,7 @@ void main() {
     );
 
     await fillBaseFields(tester);
-    await tapFormButton(tester, 'Create');
+    await tapFormButton(tester, '创建');
     await tester.pumpAndSettle();
 
     expect(savedDraft?.authMode, SshAuthMode.password);
@@ -190,19 +191,19 @@ void main() {
     await fillBaseFields(tester);
     await tester.tap(find.byType(DropdownButtonFormField<SshAuthMode>));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Private Key').last);
+    await tester.tap(find.text('私钥').last);
     await tester.pumpAndSettle();
-    await tapFormButton(tester, 'Create');
+    await tapFormButton(tester, '创建');
     await tester.pumpAndSettle();
 
-    expect(find.text('Required'), findsOneWidget);
+    expect(find.text('必填'), findsOneWidget);
     expect(savedDraft, isNull);
 
     await tester.enterText(
-      find.bySemanticsLabel('Private Key Path'),
+      find.bySemanticsLabel('私钥路径'),
       '/home/root/.ssh/id_ed25519',
     );
-    await tapFormButton(tester, 'Create');
+    await tapFormButton(tester, '创建');
     await tester.pumpAndSettle();
 
     expect(savedDraft?.authMode, SshAuthMode.privateKey);
@@ -221,14 +222,14 @@ void main() {
       ),
     );
 
-    await tester.tap(find.bySemanticsLabel('Name'));
+    await tester.tap(find.bySemanticsLabel('名称'));
     await tester.pump();
-    expect(primaryFocusLabel(), 'Name');
+    expect(primaryFocusLabel(), '名称');
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.tab);
     await tester.pump();
 
-    expect(primaryFocusLabel(), 'Host');
+    expect(primaryFocusLabel(), '主机');
   });
 
   testWidgets('moves focus to previous SSH profile field on single Shift Tab', (
@@ -242,9 +243,9 @@ void main() {
       ),
     );
 
-    await tester.tap(find.bySemanticsLabel('Host'));
+    await tester.tap(find.bySemanticsLabel('主机'));
     await tester.pump();
-    expect(primaryFocusLabel(), 'Host');
+    expect(primaryFocusLabel(), '主机');
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.tab);
@@ -252,7 +253,7 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.tab);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
 
-    expect(primaryFocusLabel(), 'Name');
+    expect(primaryFocusLabel(), '名称');
   });
 
   testWidgets('disables text suggestions on SSH profile text fields', (
@@ -266,29 +267,29 @@ void main() {
       ),
     );
 
-    expect(textFieldByLabel('Name').enableSuggestions, isFalse);
-    expect(textFieldByLabel('Name').autocorrect, isFalse);
-    expect(textFieldByLabel('Host').enableSuggestions, isFalse);
-    expect(textFieldByLabel('Host').autocorrect, isFalse);
-    expect(textFieldByLabel('Username').enableSuggestions, isFalse);
-    expect(textFieldByLabel('Username').autocorrect, isFalse);
+    expect(textFieldByLabel('名称').enableSuggestions, isFalse);
+    expect(textFieldByLabel('名称').autocorrect, isFalse);
+    expect(textFieldByLabel('主机').enableSuggestions, isFalse);
+    expect(textFieldByLabel('主机').autocorrect, isFalse);
+    expect(textFieldByLabel('用户名').enableSuggestions, isFalse);
+    expect(textFieldByLabel('用户名').autocorrect, isFalse);
   });
 }
 
 Future<void> fillRequiredFields(WidgetTester tester) async {
   await fillBaseFields(tester);
-  await tester.enterText(find.bySemanticsLabel('Password'), 'secret');
+  await tester.enterText(find.bySemanticsLabel('密码'), 'secret');
 }
 
 Future<void> fillBaseFields(WidgetTester tester) async {
-  await tester.enterText(find.bySemanticsLabel('Name'), 'Prod');
-  await tester.enterText(find.bySemanticsLabel('Host'), 'example.com');
-  await tester.enterText(find.bySemanticsLabel('Port'), '22');
-  await tester.enterText(find.bySemanticsLabel('Username'), 'root');
+  await tester.enterText(find.bySemanticsLabel('名称'), 'Prod');
+  await tester.enterText(find.bySemanticsLabel('主机'), 'example.com');
+  await tester.enterText(find.bySemanticsLabel('端口'), '22');
+  await tester.enterText(find.bySemanticsLabel('用户名'), 'root');
 }
 
 Future<void> tapFormButton(WidgetTester tester, String label) async {
-  final button = find.widgetWithText(ElevatedButton, label).first;
+  final button = find.widgetWithText(DeckButton, label).last;
   await tester.scrollUntilVisible(
     button,
     100,

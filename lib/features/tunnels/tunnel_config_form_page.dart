@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 
 import '../../core/models/ssh_profile_item.dart';
 import '../../core/models/tunnel_config_item.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/deck_widgets.dart';
 
 class TunnelConfigFormPage extends StatefulWidget {
   const TunnelConfigFormPage({
@@ -120,7 +123,7 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
 
   String? requiredText(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Required';
+      return '必填';
     }
     return null;
   }
@@ -133,7 +136,7 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
     if (requiredError != null) return requiredError;
     final port = int.tryParse(value!.trim());
     if (port == null || port < (allowAuto ? 0 : 1) || port > 65535) {
-      return 'Invalid port';
+      return '端口无效';
     }
     return null;
   }
@@ -168,30 +171,61 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                isEdit ? 'Edit Tunnel Connection' : 'New Tunnel Connection',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const DeckEyebrow('Port Forwarding'),
+                        DeckTitle(isEdit ? '编辑转发' : '新增转发', size: 20),
+                        const SizedBox(height: 4),
+                        Text(
+                          '监听端口填 0 表示由系统自动分配可用端口。',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  DeckButton(
+                    label: '返回',
+                    style: DeckButtonStyle.ghost,
+                    icon: Icons.arrow_back,
+                    onPressed: widget.onCancel,
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              const Text('Create local or remote SSH port forwarding.'),
               if (widget.profiles.isEmpty) ...[
-                const SizedBox(height: 6),
-                const Text(
-                  'Create an SSH profile before adding a tunnel.',
-                  style: TextStyle(color: Colors.redAccent),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: DeckTokens.dangerSoft,
+                    border: const Border(
+                      left: BorderSide(color: DeckTokens.danger, width: 3),
+                    ),
+                  ),
+                  child: const Text(
+                    '请先创建一个 SSH 配置，再新增转发。',
+                    style: TextStyle(fontSize: 12, color: DeckTokens.danger),
+                  ),
                 ),
               ],
-              const SizedBox(height: 8),
+              const SizedBox(height: 18),
               Focus(
                 onKeyEvent: (_, event) =>
                     handleFieldKey(event, null, typeFocusNode),
                 child: TextFormField(
                   focusNode: nameFocusNode,
                   controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
+                  decoration: const InputDecoration(labelText: '名称'),
                   enableSuggestions: false,
                   autocorrect: false,
                   textInputAction: TextInputAction.next,
@@ -206,15 +240,15 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
                 child: DropdownButtonFormField<TunnelForwardType>(
                   focusNode: typeFocusNode,
                   initialValue: selectedType,
-                  decoration: const InputDecoration(labelText: 'Type'),
+                  decoration: const InputDecoration(labelText: '转发类型'),
                   items: const [
                     DropdownMenuItem(
                       value: TunnelForwardType.local,
-                      child: Text('Local Forward'),
+                      child: Text('本地转发（-L）'),
                     ),
                     DropdownMenuItem(
                       value: TunnelForwardType.remote,
-                      child: Text('Remote Forward'),
+                      child: Text('远程转发（-R）'),
                     ),
                   ],
                   onChanged: (value) {
@@ -232,7 +266,7 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
                 child: DropdownButtonFormField<String>(
                   focusNode: profileFocusNode,
                   initialValue: selectedProfileId,
-                  decoration: const InputDecoration(labelText: 'SSH Profile'),
+                  decoration: const InputDecoration(labelText: 'SSH 配置'),
                   items: [
                     for (final profile in widget.profiles)
                       DropdownMenuItem(
@@ -259,7 +293,7 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
                 child: TextFormField(
                   focusNode: listenHostFocusNode,
                   controller: listenHostController,
-                  decoration: const InputDecoration(labelText: 'Listen Host'),
+                  decoration: const InputDecoration(labelText: '监听主机'),
                   enableSuggestions: false,
                   autocorrect: false,
                   textInputAction: TextInputAction.next,
@@ -277,7 +311,7 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
                 child: TextFormField(
                   focusNode: listenPortFocusNode,
                   controller: listenPortController,
-                  decoration: const InputDecoration(labelText: 'Listen Port'),
+                  decoration: const InputDecoration(labelText: '监听端口'),
                   keyboardType: TextInputType.number,
                   textInputAction: TextInputAction.next,
                   onFieldSubmitted: (_) => targetHostFocusNode.requestFocus(),
@@ -301,7 +335,7 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
                 child: TextFormField(
                   focusNode: targetHostFocusNode,
                   controller: targetHostController,
-                  decoration: const InputDecoration(labelText: 'Target Host'),
+                  decoration: const InputDecoration(labelText: '目标主机'),
                   enableSuggestions: false,
                   autocorrect: false,
                   textInputAction: TextInputAction.next,
@@ -316,22 +350,21 @@ class _TunnelConfigFormPageState extends State<TunnelConfigFormPage> {
                 child: TextFormField(
                   focusNode: targetPortFocusNode,
                   controller: targetPortController,
-                  decoration: const InputDecoration(labelText: 'Target Port'),
+                  decoration: const InputDecoration(labelText: '目标端口'),
                   keyboardType: TextInputType.number,
                   validator: validatePort,
                 ),
               ),
               const SizedBox(height: 8),
               Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
-                    onPressed: widget.onCancel,
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
+                  DeckButton(label: '取消', onPressed: widget.onCancel),
+                  const SizedBox(width: 8),
+                  DeckButton(
+                    label: isEdit ? '保存' : '创建',
+                    style: DeckButtonStyle.solid,
                     onPressed: canSave ? save : null,
-                    child: Text(isEdit ? 'Update' : 'Create'),
                   ),
                 ],
               ),

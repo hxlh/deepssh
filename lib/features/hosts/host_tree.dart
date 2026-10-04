@@ -31,8 +31,8 @@ class HostTree extends StatelessWidget {
     required this.onCloseLocalTerminal,
     required this.onOpenThemeConfig,
     required this.themeConfigActive,
-    required this.onOpenDiagnostics,
-    required this.diagnosticsActive,
+    required this.onToggleMemoryDock,
+    required this.memoryDockVisible,
     this.onReorderSessions,
     this.onReorderLocalTerminals,
     this.sectionOrder = const [],
@@ -57,8 +57,10 @@ class HostTree extends StatelessWidget {
   final Future<void> Function(LocalTerminalItem) onCloseLocalTerminal;
   final VoidCallback onOpenThemeConfig;
   final bool themeConfigActive;
-  final VoidCallback onOpenDiagnostics;
-  final bool diagnosticsActive;
+
+  /// Shows/hides the dock's 内存监控 panel (prototype `exMemToggle`).
+  final VoidCallback onToggleMemoryDock;
+  final bool memoryDockVisible;
   final void Function(String profileId, int oldIndex, int newIndex)?
   onReorderSessions;
   final void Function(int oldIndex, int newIndex)? onReorderLocalTerminals;
@@ -249,7 +251,9 @@ class HostTree extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 12.5,
-                  color: isSelected ? AppColors.textPrimary : AppColors.textPrimary,
+                  color: isSelected
+                      ? AppColors.textPrimary
+                      : AppColors.textPrimary,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
@@ -290,11 +294,7 @@ class HostTree extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              Icons.terminal,
-              size: 15,
-              color: AppColors.textMuted,
-            ),
+            Icon(Icons.terminal, size: 15, color: AppColors.textMuted),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -323,10 +323,7 @@ class HostTree extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           border: Border(
-            left: BorderSide(
-              color: _groupColor(profile.id),
-              width: 3,
-            ),
+            left: BorderSide(color: _groupColor(profile.id), width: 3),
           ),
         ),
         child: Row(
@@ -490,11 +487,29 @@ class HostTree extends StatelessWidget {
             ),
           ),
         ),
-        _DiagnosticsButton(
-          active: diagnosticsActive,
-          onTap: onOpenDiagnostics,
+        Container(
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: DeckTokens.border)),
+          ),
+          padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
+          child: Column(
+            children: [
+              _FooterTool(
+                label: '主题配置',
+                icon: Icons.palette_outlined,
+                active: themeConfigActive,
+                onTap: onOpenThemeConfig,
+              ),
+              _FooterTool(
+                label: '内存监控',
+                icon: Icons.memory,
+                active: memoryDockVisible,
+                tooltip: memoryDockVisible ? '隐藏内存监控面板' : '显示内存监控面板',
+                onTap: onToggleMemoryDock,
+              ),
+            ],
+          ),
         ),
-        _ThemeConfigButton(active: themeConfigActive, onTap: onOpenThemeConfig),
       ],
     );
   }
@@ -548,61 +563,56 @@ class _HostContextMenuItemState extends State<_HostContextMenuItem> {
   }
 }
 
-class _ThemeConfigButton extends StatefulWidget {
-  const _ThemeConfigButton({required this.active, required this.onTap});
+/// Explorer footer tool row, matching the prototype's `.ex-foot` / `.ex-tool`.
+class _FooterTool extends StatefulWidget {
+  const _FooterTool({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.onTap,
+    this.tooltip,
+  });
 
+  final String label;
+  final IconData icon;
   final bool active;
   final VoidCallback onTap;
+  final String? tooltip;
 
   @override
-  State<_ThemeConfigButton> createState() => _ThemeConfigButtonState();
+  State<_FooterTool> createState() => _FooterToolState();
 }
 
-class _ThemeConfigButtonState extends State<_ThemeConfigButton> {
-  bool hovered = false;
-
-  static const Color _activeBg = Color(0xFF592E17);
-  static const Color _activeBorder = Color(0xFFFFB280);
-  static const Color _activeText = Color(0xFFFFF2D9);
-  static const Color _hoverBg = Color(0xFF1A1B1C);
-  static const Color _hoverBorder = Color(0xFF3A3A3A);
+class _FooterToolState extends State<_FooterTool> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    final active = widget.active;
-    final Color bg = active
-        ? _activeBg
-        : (hovered ? _hoverBg : Colors.transparent);
-    final Color borderColor = active
-        ? _activeBorder
-        : (hovered ? _hoverBorder : Colors.transparent);
-    final Color foreground = active ? _activeText : AppColors.textMuted;
-    return MouseRegion(
+    final background = widget.active
+        ? DeckTokens.accentSoft
+        : (_hovered ? DeckTokens.fgSoft : Colors.transparent);
+    final foreground = widget.active ? DeckTokens.accentInk : DeckTokens.muted;
+    final body = MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => hovered = true),
-      onExit: (_) => setState(() => hovered = false),
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         onTap: widget.onTap,
         behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: AppSpacing.itemHeight,
-          margin: const EdgeInsets.fromLTRB(8, 2, 8, 8),
+        child: Container(
+          height: 32,
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(AppSpacing.radius),
-            border: Border.all(color: borderColor),
-          ),
+          color: background,
           child: Row(
             children: [
-              Icon(Icons.settings, size: 16, color: foreground),
+              Icon(widget.icon, size: 14, color: foreground),
               const SizedBox(width: 8),
               Text(
-                '主题配置',
+                widget.label,
                 style: TextStyle(
+                  fontSize: 12,
                   color: foreground,
-                  fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: widget.active ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
             ],
@@ -610,70 +620,7 @@ class _ThemeConfigButtonState extends State<_ThemeConfigButton> {
         ),
       ),
     );
-  }
-}
-
-class _DiagnosticsButton extends StatefulWidget {
-  const _DiagnosticsButton({required this.active, required this.onTap});
-
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  State<_DiagnosticsButton> createState() => _DiagnosticsButtonState();
-}
-
-class _DiagnosticsButtonState extends State<_DiagnosticsButton> {
-  bool hovered = false;
-
-  static const Color _activeBg = Color(0xFF592E17);
-  static const Color _activeBorder = Color(0xFFFFB280);
-  static const Color _activeText = Color(0xFFFFF2D9);
-  static const Color _hoverBg = Color(0xFF1A1B1C);
-  static const Color _hoverBorder = Color(0xFF3A3A3A);
-
-  @override
-  Widget build(BuildContext context) {
-    final active = widget.active;
-    final Color bg = active
-        ? _activeBg
-        : (hovered ? _hoverBg : Colors.transparent);
-    final Color borderColor = active
-        ? _activeBorder
-        : (hovered ? _hoverBorder : Colors.transparent);
-    final Color foreground = active ? _activeText : AppColors.textMuted;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => hovered = true),
-      onExit: (_) => setState(() => hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: AppSpacing.itemHeight,
-          margin: const EdgeInsets.fromLTRB(8, 2, 8, 2),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(AppSpacing.radius),
-            border: Border.all(color: borderColor),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.memory, size: 16, color: foreground),
-              const SizedBox(width: 8),
-              Text(
-                '内存监控',
-                style: TextStyle(
-                  color: foreground,
-                  fontWeight: active ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    final tip = widget.tooltip;
+    return tip == null ? body : Tooltip(message: tip, child: body);
   }
 }

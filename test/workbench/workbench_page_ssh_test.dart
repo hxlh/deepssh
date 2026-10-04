@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:deepssh/core/models/ssh_profile_item.dart';
+import 'package:deepssh/core/widgets/deck_widgets.dart';
 import 'package:deepssh/workbench/widgets/add_connection_button.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/ssh/ssh_zmodem_session.dart';
@@ -384,7 +385,9 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
+      await tester.tap(
+        find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pump();
@@ -395,7 +398,9 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
+      await tester.tap(
+        find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pump();
@@ -513,7 +518,9 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
+      await tester.tap(
+        find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pumpAndSettle();
@@ -535,68 +542,70 @@ void main() {
     },
   );
 
-  testWidgets(
-    'SSH session label prefers note then preview then title',
-    (tester) async {
-      final bridge = FakeSshBridgeClient();
-      bridge.profiles.add(
-        const SshProfileItem(
-          id: 'profile-1',
-          name: 'Prod',
-          host: 'example.com',
-          port: 22,
-          username: 'root',
-          password: 'secret',
-        ),
-      );
+  testWidgets('SSH session label prefers note then preview then title', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
 
-      await tester.pumpWidget(
-        MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('新增连接'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('连接'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('连接'));
+    await tester.pumpAndSettle();
 
-      final terminalWidget = tester.widget<app_terminal.TerminalView>(
-        find.byType(app_terminal.TerminalView),
-      );
-      terminalWidget.tab.terminal!.write('npm run dev');
-      await tester.pump();
+    final terminalWidget = tester.widget<app_terminal.TerminalView>(
+      find.byType(app_terminal.TerminalView),
+    );
+    terminalWidget.tab.terminal!.write('npm run dev');
+    await tester.pump();
 
-      expect(find.text('npm run dev'), findsWidgets);
-      expect(find.text('terminal1'), findsNothing);
+    expect(find.text('npm run dev'), findsWidgets);
+    expect(find.text('terminal1'), findsNothing);
 
-      await tester.tap(find.text('npm run dev').first, buttons: kSecondaryMouseButton);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('编辑备注'));
-      await tester.pumpAndSettle();
+    await tester.tap(
+      find.text('npm run dev').first,
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('编辑备注'));
+    await tester.pumpAndSettle();
 
-      await tester.enterText(find.bySemanticsLabel('会话备注'), '生产发布');
-      await tester.tap(find.text('保存'));
-      await tester.pumpAndSettle();
+    await tester.enterText(find.bySemanticsLabel('会话备注'), '生产发布');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('生产发布'), findsWidgets);
-      expect(find.text('npm run dev'), findsNothing);
+    expect(find.text('生产发布'), findsWidgets);
+    expect(find.text('npm run dev'), findsNothing);
 
-      await tester.tap(find.text('生产发布').first, buttons: kSecondaryMouseButton);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('编辑备注'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('生产发布').first, buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('编辑备注'));
+    await tester.pumpAndSettle();
 
-      await tester.enterText(find.bySemanticsLabel('会话备注'), '');
-      await tester.tap(find.text('保存'));
-      await tester.pumpAndSettle();
+    await tester.enterText(find.bySemanticsLabel('会话备注'), '');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('npm run dev'), findsWidgets);
-      expect(find.text('生产发布'), findsNothing);
-      expect(find.text('terminal1'), findsNothing);
-    },
-  );
+    expect(find.text('npm run dev'), findsWidgets);
+    expect(find.text('生产发布'), findsNothing);
+    expect(find.text('terminal1'), findsNothing);
+  });
 
   testWidgets(
     'SSH session keeps note edited while connect is pending after connect completes',
@@ -622,14 +631,19 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
+      await tester.tap(
+        find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pump();
 
       expect(find.text('terminal1'), findsWidgets);
 
-      await tester.tap(find.text('terminal1').first, buttons: kSecondaryMouseButton);
+      await tester.tap(
+        find.text('terminal1').first,
+        buttons: kSecondaryMouseButton,
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('编辑备注'));
       await tester.pumpAndSettle();
@@ -676,14 +690,19 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
+      await tester.tap(
+        find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pump();
 
       expect(find.text('terminal1'), findsWidgets);
 
-      await tester.tap(find.text('terminal1').first, buttons: kSecondaryMouseButton);
+      await tester.tap(
+        find.text('terminal1').first,
+        buttons: kSecondaryMouseButton,
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('关闭 SSH 会话'));
       await tester.pumpAndSettle();
@@ -731,7 +750,10 @@ void main() {
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('terminal1').first, buttons: kSecondaryMouseButton);
+    await tester.tap(
+      find.text('terminal1').first,
+      buttons: kSecondaryMouseButton,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('关闭 SSH 会话'));
     await tester.pumpAndSettle();
@@ -768,7 +790,10 @@ void main() {
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('terminal1').first, buttons: kSecondaryMouseButton);
+    await tester.tap(
+      find.text('terminal1').first,
+      buttons: kSecondaryMouseButton,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('关闭 SSH 会话'));
     await tester.pumpAndSettle();
@@ -884,22 +909,24 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
+      await tester.tap(
+        find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('新增 SSH 配置'));
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.bySemanticsLabel('Name'), 'Prod');
-      await tester.enterText(find.bySemanticsLabel('Host'), 'example.com');
-      await tester.enterText(find.bySemanticsLabel('Port'), '2222');
-      await tester.enterText(find.bySemanticsLabel('Username'), 'root');
-      await tester.enterText(find.bySemanticsLabel('Password'), 'secret');
+      await tester.enterText(find.bySemanticsLabel('名称'), 'Prod');
+      await tester.enterText(find.bySemanticsLabel('主机'), 'example.com');
+      await tester.enterText(find.bySemanticsLabel('端口'), '2222');
+      await tester.enterText(find.bySemanticsLabel('用户名'), 'root');
+      await tester.enterText(find.bySemanticsLabel('密码'), 'secret');
       await tester.tap(find.byType(DropdownButtonFormField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('xterm-truecolor').last);
       await tester.pumpAndSettle();
-      final createButton = find.widgetWithText(ElevatedButton, 'Create');
+      final createButton = find.widgetWithText(DeckButton, '创建').last;
       await tester.scrollUntilVisible(
         createButton,
         100,
@@ -974,7 +1001,9 @@ void main() {
     expect(find.text('example.com · terminal1'), findsNothing);
   });
 
-  testWidgets('SSH note still overrides captured preview label', (tester) async {
+  testWidgets('SSH note still overrides captured preview label', (
+    tester,
+  ) async {
     final bridge = FakeSshBridgeClient();
     bridge.profiles.add(
       const SshProfileItem(
@@ -1005,7 +1034,10 @@ void main() {
     terminalWidget.tab.terminal!.write('npm run dev');
     await tester.pump();
 
-    await tester.tap(find.text('npm run dev').first, buttons: kSecondaryMouseButton);
+    await tester.tap(
+      find.text('npm run dev').first,
+      buttons: kSecondaryMouseButton,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('编辑备注'));
     await tester.pumpAndSettle();
@@ -1050,7 +1082,10 @@ void main() {
     terminalWidget.tab.terminal!.write('npm run dev');
     await tester.pump();
 
-    await tester.tap(find.text('npm run dev').first, buttons: kSecondaryMouseButton);
+    await tester.tap(
+      find.text('npm run dev').first,
+      buttons: kSecondaryMouseButton,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('编辑备注'));
     await tester.pumpAndSettle();

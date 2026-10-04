@@ -35,6 +35,8 @@ class AppTopBar extends StatelessWidget {
     required this.onAddConnection,
     this.sessionCount = 0,
     this.tunnelCount = 0,
+    this.memoryRssMb,
+    this.clock,
   });
 
   final AppSection current;
@@ -42,6 +44,14 @@ class AppTopBar extends StatelessWidget {
   final ValueChanged<AddConnectionAction> onAddConnection;
   final int sessionCount;
   final int tunnelCount;
+
+  /// Right-hand run summary. Null until a memory sample lands, and the clock
+  /// is only filled on the workbench page, so either part can drop out.
+  final double? memoryRssMb;
+  final DateTime? clock;
+
+  /// Prototype `@media (max-width:980px){ .pulse{display:none} }`.
+  static const double _pulseBreakpoint = 980;
 
   @override
   Widget build(BuildContext context) {
@@ -52,28 +62,114 @@ class AppTopBar extends StatelessWidget {
         border: Border(bottom: BorderSide(color: DeckTokens.fg)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          const _Brand(),
-          const SizedBox(width: 18),
-          for (final section in AppSection.values) ...[
-            _NavButton(
-              key: appNavKey(section),
-              section: section,
-              selected: section == current,
-              badge: switch (section) {
-                AppSection.workbench => sessionCount,
-                AppSection.tunnels => tunnelCount,
-                _ => 0,
-              },
-              onTap: () => onNavigate(section),
-            ),
-            const SizedBox(width: 2),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Row(
+          children: [
+            const _Brand(),
+            const SizedBox(width: 18),
+            for (final section in AppSection.values) ...[
+              _NavButton(
+                key: appNavKey(section),
+                section: section,
+                selected: section == current,
+                badge: switch (section) {
+                  AppSection.workbench => sessionCount,
+                  AppSection.tunnels => tunnelCount,
+                  _ => 0,
+                },
+                onTap: () => onNavigate(section),
+              ),
+              const SizedBox(width: 2),
+            ],
+            const Spacer(),
+            // The prototype drops the run summary below 980px rather than let it
+            // squeeze the nav.
+            if (constraints.maxWidth > _pulseBreakpoint)
+              _Pulse(
+                sessionCount: sessionCount,
+                tunnelCount: tunnelCount,
+                rssMb: memoryRssMb,
+                clock: clock,
+              ),
+            if (constraints.maxWidth > _pulseBreakpoint)
+              const SizedBox(width: 14),
+            AddConnectionButton(onSelected: onAddConnection),
           ],
-          const Spacer(),
-          AddConnectionButton(onSelected: onAddConnection),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+/// The prototype's run summary: live session/tunnel counts, RSS and a clock.
+class _Pulse extends StatelessWidget {
+  const _Pulse({
+    required this.sessionCount,
+    required this.tunnelCount,
+    required this.rssMb,
+    required this.clock,
+  });
+
+  final int sessionCount;
+  final int tunnelCount;
+  final double? rssMb;
+  final DateTime? clock;
+
+  static const _mono = TextStyle(
+    fontFamily: 'JetBrains Mono',
+    fontFamilyFallback: DeckTokens.fontMono,
+    fontSize: 11,
+    color: DeckTokens.muted,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _PulseItem(dot: DeckTokens.ok, label: '会话', value: '$sessionCount'),
+        _PulseItem(dot: DeckTokens.accent, label: '转发', value: '$tunnelCount'),
+        if (rssMb != null)
+          _PulseItem(label: '内存', value: '${rssMb!.toStringAsFixed(1)} MB'),
+        if (clock != null) _PulseItem(label: '', value: _hms(clock!)),
+      ],
+    );
+  }
+
+  static String _hms(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:'
+      '${t.minute.toString().padLeft(2, '0')}';
+}
+
+class _PulseItem extends StatelessWidget {
+  const _PulseItem({required this.label, required this.value, this.dot});
+
+  final String label;
+  final String value;
+  final Color? dot;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (dot != null) ...[
+          Container(width: 7, height: 7, color: dot),
+          const SizedBox(width: 6),
+        ],
+        Text(label, style: _Pulse._mono),
+        const SizedBox(width: 5),
+        Text(
+          value,
+          style: const TextStyle(
+            fontFamily: 'JetBrains Mono',
+            fontFamilyFallback: DeckTokens.fontMono,
+            fontSize: 12,
+            color: DeckTokens.fg,
+          ),
+        ),
+        const SizedBox(width: 14),
+      ],
     );
   }
 }
@@ -121,7 +217,7 @@ class _Brand extends StatelessWidget {
                 color: DeckTokens.fg,
               ),
             ),
-            DeckLabel('SSH Workbench', size: 9.5, spacing: 0.14),
+            DeckLabel('SSH 工作台', size: 9.5, spacing: 0.14),
           ],
         ),
       ],

@@ -63,3 +63,5 @@ skills-lock.json
 .mcp.json
 figma-plugin
 .localtest/goldens/goldens/
+# Opt-in deck goldens are font-dependent; regenerate locally, never commit them.
+test/goldens/goldens/

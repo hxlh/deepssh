@@ -31,15 +31,15 @@ void main() {
       ),
     );
 
-    await tester.enterText(find.bySemanticsLabel('Name'), '');
-    await tester.enterText(find.bySemanticsLabel('Listen Port'), '');
-    await tester.enterText(find.bySemanticsLabel('Target Port'), '');
-    await tester.ensureVisible(find.text('Create'));
+    await tester.enterText(find.bySemanticsLabel('名称'), '');
+    await tester.enterText(find.bySemanticsLabel('监听端口'), '');
+    await tester.enterText(find.bySemanticsLabel('目标端口'), '');
+    await tester.ensureVisible(find.text('创建'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Create'));
+    await tester.tap(find.text('创建'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Required'), findsWidgets);
+    expect(find.text('必填'), findsWidgets);
     expect(savedDraft, isNull);
   });
 
@@ -60,14 +60,14 @@ void main() {
       ),
     );
 
-    await tester.enterText(find.bySemanticsLabel('Name'), 'Dev API');
-    await tester.enterText(find.bySemanticsLabel('Listen Host'), '127.0.0.1');
-    await tester.enterText(find.bySemanticsLabel('Listen Port'), '18080');
-    await tester.enterText(find.bySemanticsLabel('Target Host'), '127.0.0.1');
-    await tester.enterText(find.bySemanticsLabel('Target Port'), '8080');
-    await tester.ensureVisible(find.text('Create'));
+    await tester.enterText(find.bySemanticsLabel('名称'), 'Dev API');
+    await tester.enterText(find.bySemanticsLabel('监听主机'), '127.0.0.1');
+    await tester.enterText(find.bySemanticsLabel('监听端口'), '18080');
+    await tester.enterText(find.bySemanticsLabel('目标主机'), '127.0.0.1');
+    await tester.enterText(find.bySemanticsLabel('目标端口'), '8080');
+    await tester.ensureVisible(find.text('创建'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Create'));
+    await tester.tap(find.text('创建'));
     await tester.pumpAndSettle();
 
     expect(savedDraft?.name, 'Dev API');
@@ -94,13 +94,13 @@ void main() {
       ),
     );
 
-    await tester.enterText(find.bySemanticsLabel('Name'), 'Dev API');
-    await tester.enterText(find.bySemanticsLabel('Listen Port'), '');
-    await tester.enterText(find.bySemanticsLabel('Target Host'), '127.0.0.1');
-    await tester.enterText(find.bySemanticsLabel('Target Port'), '8080');
-    await tester.ensureVisible(find.text('Create'));
+    await tester.enterText(find.bySemanticsLabel('名称'), 'Dev API');
+    await tester.enterText(find.bySemanticsLabel('监听端口'), '');
+    await tester.enterText(find.bySemanticsLabel('目标主机'), '127.0.0.1');
+    await tester.enterText(find.bySemanticsLabel('目标端口'), '8080');
+    await tester.ensureVisible(find.text('创建'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Create'));
+    await tester.tap(find.text('创建'));
     await tester.pumpAndSettle();
 
     expect(savedDraft?.listenPort, 0);
@@ -134,11 +134,11 @@ void main() {
         ),
       );
 
-      expect(find.text('Edit Tunnel Connection'), findsOneWidget);
-      expect(find.text('Remote Forward'), findsOneWidget);
-      await tester.ensureVisible(find.text('Update'));
+      expect(find.text('编辑转发'), findsOneWidget);
+      expect(find.text('远程转发（-R）'), findsOneWidget);
+      await tester.ensureVisible(find.text('保存'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Update'));
+      await tester.tap(find.text('保存'));
       await tester.pumpAndSettle();
 
       expect(savedDraft?.type, TunnelForwardType.remote);
