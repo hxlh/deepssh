@@ -50,4 +50,32 @@ abstract final class AppColors {
   }
 
   static void applyTerminal(TerminalThemeSettings settings) {}
+
+  // Derived tones, recomputed from the live settings so a non-default preset
+  // stays coherent. Widgets must read these rather than [DeckTokens]: the
+  // tokens are the palette definition, not the current theme.
+  static Color get accentInk => DeckTokens.mix(accent, textPrimary, 0.68);
+  static Color get accentSoft => DeckTokens.wash(accent, 0.14);
+  static Color get okSoft => DeckTokens.wash(DeckTokens.ok, 0.12);
+  static Color get warnSoft => DeckTokens.wash(DeckTokens.warnBar, 0.20);
+  static Color get dangerSoft => DeckTokens.wash(DeckTokens.danger, 0.12);
+  static Color get fgSoft => DeckTokens.wash(textPrimary, 0.06);
+
+  /// The shadow ink: a hard offset edge in the current text colour, so it
+  /// flips with a dark preset instead of staying grey-on-dark.
+  static Color get shadowInk => DeckTokens.wash(textPrimary, 0.20);
+
+  /// Fully opaque hard shadow (dialogs, drawers, floating layers).
+  static Color get shadowSolidInk => textPrimary;
+
+  static List<BoxShadow> get shadowHard => <BoxShadow>[
+    BoxShadow(color: shadowInk, offset: const Offset(2, 2)),
+  ];
+
+  static List<BoxShadow> get shadowSolid => <BoxShadow>[
+    BoxShadow(color: shadowSolidInk, offset: const Offset(2, 2)),
+  ];
+
+  /// Chrome that stays put whatever the preset: status colours, the terminal
+  /// stage and the font stacks all read [DeckTokens] directly.
 }

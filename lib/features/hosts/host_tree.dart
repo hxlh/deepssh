@@ -67,7 +67,8 @@ class HostTree extends StatelessWidget {
   final List<String> sectionOrder;
   final ValueChanged<List<String>>? onSectionOrderChanged;
 
-  static const Color _menuAccent = DeckTokens.accent;
+  /// Read through a getter so it follows the live theme.
+  static Color get _menuAccent => AppColors.accent;
   static const double _menuItemHeight = 32;
   static const double _menuWidth = 150;
   static const String _localSectionId = 'local';
@@ -124,16 +125,16 @@ class HostTree extends StatelessWidget {
     return showMenu<String>(
       context: context,
       position: _menuPosition(context, position),
-      color: DeckTokens.surface,
+      color: AppColors.panel,
       elevation: 0,
       shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       menuPadding: EdgeInsets.zero,
       constraints: const BoxConstraints.tightFor(width: _menuWidth),
       clipBehavior: Clip.none,
-      shape: const RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.zero,
-        side: BorderSide(color: DeckTokens.fg),
+        side: BorderSide(color: AppColors.textPrimary),
       ),
       items: items,
     );
@@ -283,7 +284,7 @@ class HostTree extends StatelessWidget {
           border: Border(
             left: BorderSide(
               color: selectedTerminalId == terminal.id
-                  ? DeckTokens.accent
+                  ? AppColors.accent
                   : Colors.transparent,
               width: 3,
             ),
@@ -303,7 +304,7 @@ class HostTree extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12.5,
                   color: selectedTerminalId == terminal.id
-                      ? DeckTokens.accentInk
+                      ? AppColors.accentInk
                       : AppColors.textPrimary,
                 ),
               ),
@@ -334,10 +335,10 @@ class HostTree extends StatelessWidget {
               child: Text(
                 profile.name,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
-                  color: DeckTokens.fg,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -392,22 +393,22 @@ class HostTree extends StatelessWidget {
               height: 32,
               margin: const EdgeInsets.fromLTRB(4, 2, 4, 2),
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(
-                  left: BorderSide(color: DeckTokens.accent, width: 3),
+                  left: BorderSide(color: AppColors.accent, width: 3),
                 ),
               ),
               child: Row(
                 children: [
                   Icon(Icons.laptop, size: 15, color: AppColors.textMuted),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Local',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
-                        color: DeckTokens.fg,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ),
@@ -488,8 +489,8 @@ class HostTree extends StatelessWidget {
           ),
         ),
         Container(
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: DeckTokens.border)),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: AppColors.border)),
           ),
           padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
           child: Column(
@@ -536,7 +537,7 @@ class _HostContextMenuItemState extends State<_HostContextMenuItem> {
       child: Container(
         width: HostTree._menuWidth,
         height: HostTree._menuItemHeight,
-        color: _hovered ? DeckTokens.fgSoft : Colors.transparent,
+        color: _hovered ? AppColors.fgSoft : Colors.transparent,
         child: Row(
           children: [
             Container(
@@ -589,9 +590,11 @@ class _FooterToolState extends State<_FooterTool> {
   @override
   Widget build(BuildContext context) {
     final background = widget.active
-        ? DeckTokens.accentSoft
-        : (_hovered ? DeckTokens.fgSoft : Colors.transparent);
-    final foreground = widget.active ? DeckTokens.accentInk : DeckTokens.muted;
+        ? AppColors.accentSoft
+        : (_hovered ? AppColors.fgSoft : Colors.transparent);
+    final foreground = widget.active
+        ? AppColors.accentInk
+        : AppColors.textMuted;
     final body = MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/models/ssh_profile_item.dart';
 import '../../core/models/tunnel_config_item.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/widgets/deck_drawer.dart';
 import '../../core/widgets/deck_fields.dart';
 import '../../core/widgets/deck_widgets.dart';
@@ -195,7 +196,7 @@ class _TunnelConfigFormDrawerState extends State<TunnelConfigFormDrawer> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: DeckTokens.dangerSoft,
+                    color: AppColors.dangerSoft,
                     border: const Border(
                       left: BorderSide(color: DeckTokens.danger, width: 3),
                     ),
@@ -296,9 +297,9 @@ class _TunnelConfigFormDrawerState extends State<TunnelConfigFormDrawer> {
                 ],
               ),
               const SizedBox(height: 15),
-              const Text(
+              Text(
                 '监听端口填 0 表示由系统自动分配可用端口。',
-                style: TextStyle(fontSize: 11, color: DeckTokens.muted),
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
               ),
             ],
           ),

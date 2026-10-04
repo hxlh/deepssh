@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_colors.dart';
 
 enum AddConnectionAction { localTerminal, ssh, tunnel }
 
@@ -10,7 +11,7 @@ Key addConnectionMenuKey(AddConnectionAction action) =>
     ValueKey('add-connection-${action.name}');
 
 const Map<AddConnectionAction, ({String label, IconData icon, String hint})>
-    addConnectionMenuItems = {
+addConnectionMenuItems = {
   AddConnectionAction.localTerminal: (
     label: '本地终端',
     icon: Icons.terminal,
@@ -46,13 +47,13 @@ class AddConnectionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopupMenuButton<AddConnectionAction>(
       tooltip: '新增连接',
-      color: DeckTokens.surface,
+      color: AppColors.panel,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       position: PopupMenuPosition.under,
-      shape: const RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.zero,
-        side: BorderSide(color: DeckTokens.fg),
+        side: BorderSide(color: AppColors.textPrimary),
       ),
       onSelected: onSelected,
       itemBuilder: (context) => [
@@ -63,7 +64,7 @@ class AddConnectionButton extends StatelessWidget {
             height: 44,
             child: Row(
               children: [
-                Icon(entry.value.icon, size: 15, color: DeckTokens.muted),
+                Icon(entry.value.icon, size: 15, color: AppColors.textMuted),
                 const SizedBox(width: 10),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,18 +72,18 @@ class AddConnectionButton extends StatelessWidget {
                   children: [
                     Text(
                       entry.value.label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
-                        color: DeckTokens.fg,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     Text(
                       entry.value.hint,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'JetBrains Mono',
                         fontFamilyFallback: DeckTokens.fontMono,
                         fontSize: 10,
-                        color: DeckTokens.muted,
+                        color: AppColors.textMuted,
                       ),
                     ),
                   ],
@@ -120,21 +121,23 @@ class _AddConnectionTriggerState extends State<_AddConnectionTrigger> {
           vertical: 5,
         ),
         decoration: BoxDecoration(
-          color: _hovered ? DeckTokens.fgSoft : DeckTokens.bg,
-          border: Border.all(color: _hovered ? DeckTokens.fg : DeckTokens.border),
+          color: _hovered ? AppColors.fgSoft : AppColors.background,
+          border: Border.all(
+            color: _hovered ? AppColors.textPrimary : AppColors.border,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.add, size: 13, color: DeckTokens.fg),
+            Icon(Icons.add, size: 13, color: AppColors.textPrimary),
             if (!widget.compact) ...[
               const SizedBox(width: 6),
-              const Text(
+              Text(
                 '新增连接',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: DeckTokens.fg,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],

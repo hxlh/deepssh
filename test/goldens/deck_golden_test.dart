@@ -12,6 +12,8 @@ import 'dart:io';
 
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/models/theme_settings.dart';
+import 'package:deepssh/core/theme/app_colors.dart';
+import 'package:deepssh/core/theme/app_theme.dart';
 import 'package:deepssh/core/models/tunnel_config_item.dart';
 import 'package:deepssh/features/ssh_profiles/ssh_profile_form_drawer.dart';
 import 'package:deepssh/features/ssh_profiles/ssh_profiles_page.dart';
@@ -96,7 +98,44 @@ Future<void> _shoot(WidgetTester tester, Widget app, String name) async {
   );
 }
 
+/// Applies a UI preset for the duration of one render, then restores the deck
+/// defaults. [AppColors] is process-global, so this has to be undone or the
+/// next golden inherits the previous one's palette.
+Future<void> _withUiTheme(
+  WidgetTester tester,
+  UiThemeSettings settings,
+  Future<void> Function(WidgetTester) body,
+) async {
+  addTearDown(() => AppColors.applyUi(UiThemeSettings.commandDeck()));
+  AppColors.applyUi(settings);
+  await body(tester);
+}
+
 void main() {
+  testWidgets('connections page under a dark preset', (tester) async {
+    if (!_enabled) return;
+    await _withUiTheme(tester, UiThemeSettings.vsCodeDark(), (tester) async {
+      await _shoot(
+        tester,
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.deck(),
+          home: Scaffold(
+            body: SshProfilesPage(
+              profiles: _profiles,
+              errorMessage: null,
+              onAdd: () {},
+              onConnect: (_) {},
+              onEdit: (_) {},
+              onDelete: (_) {},
+            ),
+          ),
+        ),
+        'connections-dark',
+      );
+    });
+  });
+
   testWidgets('connections page', (tester) async {
     if (!_enabled) return;
     await _shoot(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_tokens.dart';
+import '../theme/app_colors.dart';
 
 /// Shared primitives for the deck's visual language: zero radius, hard offset
 /// shadows, pixel press, square status marks. Every interactive surface in the
@@ -33,7 +34,7 @@ class DeckLabel extends StatelessWidget {
         height: 1.2,
         letterSpacing: spacing,
         fontWeight: FontWeight.w600,
-        color: color ?? DeckTokens.muted,
+        color: color ?? AppColors.textMuted,
       ),
     );
   }
@@ -56,7 +57,7 @@ class DeckTitle extends StatelessWidget {
         fontSize: size,
         height: 1.2,
         fontWeight: FontWeight.w700,
-        color: DeckTokens.fg,
+        color: AppColors.textPrimary,
       ),
     );
   }
@@ -72,7 +73,7 @@ class DeckEyebrow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
-      child: DeckLabel(text, color: DeckTokens.accentInk, spacing: 0.16),
+      child: DeckLabel(text, color: AppColors.accentInk, spacing: 0.16),
     );
   }
 }
@@ -98,7 +99,9 @@ class DeckStatusSquare extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         color: color,
-        border: outlined ? Border.all(color: DeckTokens.fg, width: 1) : null,
+        border: outlined
+            ? Border.all(color: AppColors.textPrimary, width: 1)
+            : null,
       ),
     );
   }
@@ -144,17 +147,19 @@ class _DeckButtonState extends State<DeckButton> {
     final Color foreground;
     final Color borderColor;
     if (widget.style == DeckButtonStyle.solid) {
-      background = _pressed ? DeckTokens.darken(DeckTokens.fg, 0.04) : DeckTokens.fg;
-      foreground = DeckTokens.bg;
-      borderColor = DeckTokens.fg;
+      background = _pressed
+          ? DeckTokens.darken(AppColors.textPrimary, 0.04)
+          : AppColors.textPrimary;
+      foreground = AppColors.background;
+      borderColor = AppColors.textPrimary;
     } else if (widget.style == DeckButtonStyle.ghost) {
-      background = _hovered ? DeckTokens.fgSoft : Colors.transparent;
-      foreground = destructive ? DeckTokens.danger : DeckTokens.fg;
+      background = _hovered ? AppColors.fgSoft : Colors.transparent;
+      foreground = destructive ? DeckTokens.danger : AppColors.textPrimary;
       borderColor = Colors.transparent;
     } else {
-      background = _hovered ? DeckTokens.fgSoft : DeckTokens.surface;
-      foreground = destructive ? DeckTokens.danger : DeckTokens.fg;
-      borderColor = _hovered ? DeckTokens.fg : DeckTokens.border;
+      background = _hovered ? AppColors.fgSoft : AppColors.panel;
+      foreground = destructive ? DeckTokens.danger : AppColors.textPrimary;
+      borderColor = _hovered ? AppColors.textPrimary : AppColors.border;
     }
 
     final content = Row(
@@ -169,7 +174,7 @@ class _DeckButtonState extends State<DeckButton> {
           style: TextStyle(
             fontSize: widget.dense ? 11.5 : 12,
             fontWeight: FontWeight.w600,
-            color: enabled ? foreground : DeckTokens.muted,
+            color: enabled ? foreground : AppColors.textMuted,
           ),
         ),
       ],
@@ -180,9 +185,7 @@ class _DeckButtonState extends State<DeckButton> {
       enabled: enabled,
       label: widget.label,
       child: MouseRegion(
-        cursor: enabled
-            ? SystemMouseCursors.click
-            : SystemMouseCursors.basic,
+        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) {
           setState(() {
@@ -207,9 +210,7 @@ class _DeckButtonState extends State<DeckButton> {
             decoration: BoxDecoration(
               color: background,
               border: Border.all(color: borderColor),
-              boxShadow: _pressed || !enabled
-                  ? null
-                  : DeckTokens.shadowSolid,
+              boxShadow: _pressed || !enabled ? null : AppColors.shadowSolid,
             ),
             child: content,
           ),
@@ -239,9 +240,9 @@ class DeckPanel extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: DeckTokens.surface,
-        border: Border.all(color: borderColor ?? DeckTokens.fg),
-        boxShadow: solid ? DeckTokens.shadowSolid : DeckTokens.shadowHard,
+        color: AppColors.panel,
+        border: Border.all(color: borderColor ?? AppColors.textPrimary),
+        boxShadow: solid ? AppColors.shadowSolid : AppColors.shadowHard,
       ),
       child: child,
     );
@@ -267,12 +268,12 @@ class DeckBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = foreground ?? DeckTokens.muted;
+    final fg = foreground ?? AppColors.textMuted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: background ?? DeckTokens.bg,
-        border: Border.all(color: borderColor ?? DeckTokens.border),
+        color: background ?? AppColors.background,
+        border: Border.all(color: borderColor ?? AppColors.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -346,23 +347,23 @@ class DeckEmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
       decoration: BoxDecoration(
         border: Border.all(
-          color: dashed ? DeckTokens.border : DeckTokens.fg,
+          color: dashed ? AppColors.border : AppColors.textPrimary,
         ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 30, color: DeckTokens.muted),
+          Icon(icon, size: 30, color: AppColors.textMuted),
           const SizedBox(height: 10),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Georgia',
               fontFamilyFallback: DeckTokens.fontDisplay,
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: DeckTokens.fg,
+              color: AppColors.textPrimary,
             ),
           ),
           if (hint != null) ...[
@@ -370,10 +371,10 @@ class DeckEmptyState extends StatelessWidget {
             Text(
               hint!,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 height: 1.55,
-                color: DeckTokens.muted,
+                color: AppColors.textMuted,
               ),
             ),
           ],
@@ -394,35 +395,35 @@ InputDecorationTheme deckInputTheme() {
 
   return InputDecorationTheme(
     filled: true,
-    fillColor: DeckTokens.surface,
+    fillColor: AppColors.panel,
     isDense: true,
     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-    border: border(DeckTokens.border),
-    enabledBorder: border(DeckTokens.border),
-    focusedBorder: border(DeckTokens.fg),
+    border: border(AppColors.border),
+    enabledBorder: border(AppColors.border),
+    focusedBorder: border(AppColors.textPrimary),
     errorBorder: border(DeckTokens.danger),
     focusedErrorBorder: border(DeckTokens.danger),
-    labelStyle: const TextStyle(
+    labelStyle: TextStyle(
       fontFamily: 'JetBrains Mono',
       fontFamilyFallback: DeckTokens.fontMono,
       fontSize: 10,
       letterSpacing: 0.1,
-      color: DeckTokens.muted,
+      color: AppColors.textMuted,
     ),
-    floatingLabelStyle: const TextStyle(
+    floatingLabelStyle: TextStyle(
       fontFamily: 'JetBrains Mono',
       fontFamilyFallback: DeckTokens.fontMono,
       fontSize: 10,
       letterSpacing: 0.1,
-      color: DeckTokens.fg,
+      color: AppColors.textPrimary,
     ),
     hintStyle: TextStyle(
       fontFamily: 'JetBrains Mono',
       fontFamilyFallback: DeckTokens.fontMono,
       fontSize: 12,
-      color: DeckTokens.muted.withValues(alpha: 0.85),
+      color: AppColors.textMuted.withValues(alpha: 0.85),
     ),
-    prefixIconColor: DeckTokens.muted,
-    suffixIconColor: DeckTokens.muted,
+    prefixIconColor: AppColors.textMuted,
+    suffixIconColor: AppColors.textMuted,
   );
 }

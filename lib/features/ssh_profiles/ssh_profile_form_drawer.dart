@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/models/ssh_profile_item.dart';
-import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/widgets/deck_drawer.dart';
 import '../../core/widgets/deck_fields.dart';
 import '../../core/widgets/deck_widgets.dart';
@@ -308,7 +308,7 @@ class _SshProfileFormDrawerState extends State<SshProfileFormDrawer> {
                 selectedAuthMode == SshAuthMode.password
                     ? '凭据保存在本机配置文件中，不会随配置同步到其他设备。'
                     : '私钥路径只保存在本机，不会随配置同步到其他设备。',
-                style: const TextStyle(fontSize: 11, color: DeckTokens.muted),
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
               ),
             ],
           ),

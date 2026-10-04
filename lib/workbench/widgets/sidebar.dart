@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/widgets/deck_widgets.dart';
 import 'add_connection_button.dart';
 
@@ -32,9 +32,9 @@ class Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: width,
-      decoration: const BoxDecoration(
-        color: DeckTokens.bg,
-        border: Border(right: BorderSide(color: DeckTokens.fg)),
+      decoration: BoxDecoration(
+        color: AppColors.sidebar,
+        border: Border(right: BorderSide(color: AppColors.textPrimary)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -42,17 +42,15 @@ class Sidebar extends StatelessWidget {
           Container(
             height: 40,
             padding: EdgeInsets.fromLTRB(12, 0, 8, 0),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: DeckTokens.border)),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
             child: Row(
               children: [
                 // Clipped rather than removed so the label stays reachable to
                 // screen readers when the rail collapses.
                 if (!compact)
-                  const Expanded(
-                    child: DeckLabel('Explorer', size: 10.5),
-                  )
+                  const Expanded(child: DeckLabel('Explorer', size: 10.5))
                 else
                   const Spacer(),
                 AddConnectionButton(

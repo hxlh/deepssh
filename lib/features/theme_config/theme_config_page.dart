@@ -410,16 +410,16 @@ class _SectionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: DeckTokens.accentInk),
+              Icon(icon, size: 16, color: AppColors.accentInk),
               const SizedBox(width: 8),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Georgia',
                   fontFamilyFallback: DeckTokens.fontDisplay,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: DeckTokens.fg,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -444,8 +444,8 @@ class _SectionLabel extends StatelessWidget {
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.only(bottom: 6),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: DeckTokens.border)),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
         child: DeckLabel(text, size: 10),
       ),

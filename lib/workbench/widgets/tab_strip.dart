@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_colors.dart';
 import '../../features/terminal/terminal_state.dart';
 
 class TabStrip extends StatefulWidget {
@@ -68,9 +68,9 @@ class _TabStripState extends State<TabStrip> {
       onPointerSignal: _handlePointerSignal,
       child: Container(
         height: AppSpacing.tabHeight,
-        decoration: const BoxDecoration(
-          color: DeckTokens.bg,
-          border: Border(bottom: BorderSide(color: DeckTokens.fg)),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          border: Border(bottom: BorderSide(color: AppColors.textPrimary)),
         ),
         child: ReorderableListView.builder(
           scrollController: _scrollController,
@@ -123,8 +123,8 @@ class _TabItemState extends State<_TabItem> {
   Widget build(BuildContext context) {
     final active = widget.active;
     final background = active
-        ? DeckTokens.surface
-        : (tabHovered ? DeckTokens.fgSoft : Colors.transparent);
+        ? AppColors.panel
+        : (tabHovered ? AppColors.fgSoft : Colors.transparent);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => tabHovered = true),
@@ -139,15 +139,15 @@ class _TabItemState extends State<_TabItem> {
             border: Border(
               // The prototype marks the active tab with a top rule.
               top: BorderSide(
-                color: active ? DeckTokens.accent : Colors.transparent,
+                color: active ? AppColors.accent : Colors.transparent,
                 width: 2,
               ),
-              right: const BorderSide(color: DeckTokens.border),
+              right: BorderSide(color: AppColors.border),
             ),
           ),
           child: Row(
             children: [
-              Icon(Icons.terminal, size: 13, color: DeckTokens.muted),
+              Icon(Icons.terminal, size: 13, color: AppColors.textMuted),
               const SizedBox(width: 8),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 190),
@@ -157,7 +157,7 @@ class _TabItemState extends State<_TabItem> {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                    color: active ? DeckTokens.fg : DeckTokens.muted,
+                    color: active ? AppColors.textPrimary : AppColors.textMuted,
                   ),
                 ),
               ),
@@ -175,12 +175,14 @@ class _TabItemState extends State<_TabItem> {
                       height: 17,
                       alignment: Alignment.center,
                       color: closeHovered
-                          ? DeckTokens.border
+                          ? AppColors.border
                           : Colors.transparent,
                       child: Icon(
                         Icons.close,
                         size: 12,
-                        color: closeHovered ? DeckTokens.fg : DeckTokens.muted,
+                        color: closeHovered
+                            ? AppColors.textPrimary
+                            : AppColors.textMuted,
                       ),
                     ),
                   ),

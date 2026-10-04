@@ -7,63 +7,71 @@ import 'app_tokens.dart';
 abstract final class AppTheme {
   static const BorderRadius _square = BorderRadius.zero;
 
+  /// Built against the *live* [AppColors], not the palette constants, so a
+  /// dark preset repaints menus, tooltips, scrollbars and Material buttons too.
+  ///
+  /// Callers must rebuild when the theme changes — `main.dart` does that via
+  /// `onThemeChanged`.
   static ThemeData deck() {
-    final base = ThemeData.light(useMaterial3: true);
+    final dark = AppColors.background.computeLuminance() < 0.5;
+    final base = dark
+        ? ThemeData.dark(useMaterial3: true)
+        : ThemeData.light(useMaterial3: true);
 
-    const scheme = ColorScheme(
-      brightness: Brightness.light,
-      primary: DeckTokens.accent,
-      onPrimary: DeckTokens.surface,
-      secondary: DeckTokens.accent,
-      onSecondary: DeckTokens.surface,
+    final scheme = ColorScheme(
+      brightness: dark ? Brightness.dark : Brightness.light,
+      primary: AppColors.accent,
+      onPrimary: AppColors.panel,
+      secondary: AppColors.accent,
+      onSecondary: AppColors.panel,
       error: DeckTokens.danger,
-      onError: DeckTokens.surface,
-      surface: DeckTokens.surface,
-      onSurface: DeckTokens.fg,
-      surfaceContainerHighest: DeckTokens.bg,
-      onSurfaceVariant: DeckTokens.muted,
-      outline: DeckTokens.border,
-      outlineVariant: DeckTokens.border,
+      onError: AppColors.panel,
+      surface: AppColors.panel,
+      onSurface: AppColors.textPrimary,
+      surfaceContainerHighest: AppColors.background,
+      onSurfaceVariant: AppColors.textMuted,
+      outline: AppColors.border,
+      outlineVariant: AppColors.border,
     );
 
     return base.copyWith(
       colorScheme: scheme,
-      scaffoldBackgroundColor: DeckTokens.bg,
-      canvasColor: DeckTokens.bg,
-      dividerColor: DeckTokens.border,
+      scaffoldBackgroundColor: AppColors.background,
+      canvasColor: AppColors.background,
+      dividerColor: AppColors.border,
       splashFactory: NoSplash.splashFactory,
-      hoverColor: DeckTokens.fgSoft,
-      highlightColor: DeckTokens.accentSoft,
-      focusColor: DeckTokens.accentSoft,
+      hoverColor: AppColors.fgSoft,
+      highlightColor: AppColors.accentSoft,
+      focusColor: AppColors.accentSoft,
       textTheme: _applyUiFont(base.textTheme),
       inputDecorationTheme: deckInputTheme(),
 
       // Zero radius is a global rule, not a per-widget decision.
       cardTheme: CardThemeData(
-        color: DeckTokens.surface,
+        color: AppColors.panel,
         elevation: 0,
         margin: EdgeInsets.zero,
-        shape: const RoundedRectangleBorder(
+        shape: RoundedRectangleBorder(
           borderRadius: _square,
-          side: BorderSide(color: DeckTokens.fg),
+          side: BorderSide(color: AppColors.textPrimary),
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: DeckTokens.surface,
+        backgroundColor: AppColors.panel,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        shape: const RoundedRectangleBorder(
+        shape: RoundedRectangleBorder(
           borderRadius: _square,
-          side: BorderSide(color: DeckTokens.fg),
+          side: BorderSide(color: AppColors.textPrimary),
         ),
       ),
       popupMenuTheme: PopupMenuThemeData(
-        color: DeckTokens.surface,
+        color: AppColors.panel,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        shape: const RoundedRectangleBorder(
+        shape: RoundedRectangleBorder(
           borderRadius: _square,
-          side: BorderSide(color: DeckTokens.fg),
+          side: BorderSide(color: AppColors.textPrimary),
         ),
       ),
       dividerTheme: const DividerThemeData(
@@ -71,17 +79,17 @@ abstract final class AppTheme {
         space: 1,
         thickness: 1,
       ),
-      iconTheme: const IconThemeData(color: DeckTokens.muted, size: 16),
+      iconTheme: IconThemeData(color: AppColors.textMuted, size: 16),
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(
-          color: DeckTokens.fg,
+          color: AppColors.textPrimary,
           borderRadius: _square,
         ),
-        textStyle: const TextStyle(
+        textStyle: TextStyle(
           fontFamily: 'JetBrains Mono',
           fontFamilyFallback: DeckTokens.fontMono,
           fontSize: 11,
-          color: DeckTokens.bg,
+          color: AppColors.background,
         ),
       ),
 
@@ -89,34 +97,34 @@ abstract final class AppTheme {
       // DeckButton directly.
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: DeckTokens.fg,
-          foregroundColor: DeckTokens.bg,
+          backgroundColor: AppColors.textPrimary,
+          foregroundColor: AppColors.background,
           elevation: 0,
-          shape: const RoundedRectangleBorder(
+          shape: RoundedRectangleBorder(
             borderRadius: _square,
-            side: BorderSide(color: DeckTokens.fg),
+            side: BorderSide(color: AppColors.textPrimary),
           ),
           textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: DeckTokens.fg,
-          side: const BorderSide(color: DeckTokens.border),
+          foregroundColor: AppColors.textPrimary,
+          side: BorderSide(color: AppColors.border),
           shape: const RoundedRectangleBorder(borderRadius: _square),
           textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: DeckTokens.fg,
+          foregroundColor: AppColors.textPrimary,
           shape: const RoundedRectangleBorder(borderRadius: _square),
           textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),
       scrollbarTheme: ScrollbarThemeData(
         thumbColor: WidgetStatePropertyAll<Color>(
-          DeckTokens.mix(DeckTokens.muted, DeckTokens.bg, 0.5),
+          DeckTokens.mix(AppColors.textMuted, AppColors.background, 0.5),
         ),
         trackVisibility: const WidgetStatePropertyAll<bool>(false),
         thickness: const WidgetStatePropertyAll<double>(8),
@@ -145,25 +153,20 @@ abstract final class AppTheme {
     );
   }
 
-  static FontWeight _fontWeightFor(
-    TextStyle style, {
-    bool bold = false,
-  }) {
+  static FontWeight _fontWeightFor(TextStyle style, {bool bold = false}) {
     final value = style.fontWeight?.value ?? FontWeight.normal.value;
     final target = bold || value >= FontWeight.w600.value
         ? AppColors.boldFontWeight
         : AppColors.normalFontWeight;
     return FontWeight.values.firstWhere(
       (weight) => weight.value == target,
-      orElse: () =>
-          bold || value >= FontWeight.w600.value ? FontWeight.bold : FontWeight.normal,
+      orElse: () => bold || value >= FontWeight.w600.value
+          ? FontWeight.bold
+          : FontWeight.normal,
     );
   }
 
-  static TextStyle? _applyTextStyle(
-    TextStyle? style, {
-    bool bold = false,
-  }) {
+  static TextStyle? _applyTextStyle(TextStyle? style, {bool bold = false}) {
     if (style == null) return null;
     final baseFontSize = style.fontSize;
     return style.copyWith(

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_tokens.dart';
+import '../theme/app_colors.dart';
 import 'deck_widgets.dart';
 
 /// Right-hand drawer used for the SSH / port-forwarding forms.
@@ -65,7 +66,9 @@ class DeckDrawer extends StatelessWidget {
           child: GestureDetector(
             onTap: onClose,
             behavior: HitTestBehavior.opaque,
-            child: ColoredBox(color: DeckTokens.wash(DeckTokens.fg, 0.34)),
+            child: ColoredBox(
+              color: DeckTokens.wash(AppColors.textPrimary, 0.34),
+            ),
           ),
         ),
         Align(
@@ -76,13 +79,13 @@ class DeckDrawer extends StatelessWidget {
             width: math.min(maxWidth, MediaQuery.sizeOf(context).width),
             child: Container(
               decoration: BoxDecoration(
-                color: DeckTokens.surface,
-                border: Border(left: BorderSide(color: DeckTokens.fg)),
+                color: AppColors.panel,
+                border: Border(left: BorderSide(color: AppColors.textPrimary)),
                 // Hard shadow thrown to the left, matching the prototype's
                 // `-2px 0 0` — no blur, no spread.
                 boxShadow: [
                   BoxShadow(
-                    color: DeckTokens.wash(DeckTokens.fg, 0.20),
+                    color: DeckTokens.wash(AppColors.textPrimary, 0.20),
                     offset: const Offset(-2, 0),
                   ),
                 ],
@@ -118,8 +121,8 @@ class _Head extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: DeckTokens.border)),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -133,12 +136,12 @@ class _Head extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Georgia',
                     fontFamilyFallback: DeckTokens.fontDisplay,
                     fontSize: 17,
                     height: 1.15,
-                    color: DeckTokens.fg,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
@@ -166,8 +169,8 @@ class _Foot extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 13, 18, 13),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: DeckTokens.border)),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: AppColors.border)),
       ),
       child: child,
     );

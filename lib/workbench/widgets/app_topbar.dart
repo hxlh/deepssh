@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/widgets/deck_widgets.dart';
 import 'add_connection_button.dart';
 
@@ -57,9 +58,9 @@ class AppTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 56,
-      decoration: const BoxDecoration(
-        color: DeckTokens.surface,
-        border: Border(bottom: BorderSide(color: DeckTokens.fg)),
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        border: Border(bottom: BorderSide(color: AppColors.textPrimary)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: LayoutBuilder(
@@ -115,11 +116,11 @@ class _Pulse extends StatelessWidget {
   final double? rssMb;
   final DateTime? clock;
 
-  static const _mono = TextStyle(
+  static final _mono = TextStyle(
     fontFamily: 'JetBrains Mono',
     fontFamilyFallback: DeckTokens.fontMono,
     fontSize: 11,
-    color: DeckTokens.muted,
+    color: AppColors.textMuted,
   );
 
   @override
@@ -128,7 +129,7 @@ class _Pulse extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         _PulseItem(dot: DeckTokens.ok, label: '会话', value: '$sessionCount'),
-        _PulseItem(dot: DeckTokens.accent, label: '转发', value: '$tunnelCount'),
+        _PulseItem(dot: AppColors.accent, label: '转发', value: '$tunnelCount'),
         if (rssMb != null)
           _PulseItem(label: '内存', value: '${rssMb!.toStringAsFixed(1)} MB'),
         if (clock != null) _PulseItem(label: '', value: _hms(clock!)),
@@ -161,11 +162,11 @@ class _PulseItem extends StatelessWidget {
         const SizedBox(width: 5),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'JetBrains Mono',
             fontFamilyFallback: DeckTokens.fontMono,
             fontSize: 12,
-            color: DeckTokens.fg,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(width: 14),
@@ -186,22 +187,22 @@ class _Brand extends StatelessWidget {
           height: 30,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: DeckTokens.accent,
-            border: Border.all(color: DeckTokens.fg),
-            boxShadow: DeckTokens.shadowSolid,
+            color: AppColors.accent,
+            border: Border.all(color: AppColors.textPrimary),
+            boxShadow: AppColors.shadowSolid,
           ),
-          child: const Text(
+          child: Text(
             'DS',
             style: TextStyle(
               fontFamily: 'JetBrains Mono',
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: DeckTokens.surface,
+              color: AppColors.panel,
             ),
           ),
         ),
         const SizedBox(width: 9),
-        const Column(
+        Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -214,7 +215,7 @@ class _Brand extends StatelessWidget {
                 fontSize: 15,
                 height: 1.05,
                 fontWeight: FontWeight.w700,
-                color: DeckTokens.fg,
+                color: AppColors.textPrimary,
               ),
             ),
             DeckLabel('SSH 工作台', size: 9.5, spacing: 0.14),
@@ -248,7 +249,9 @@ class _NavButtonState extends State<_NavButton> {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = widget.selected ? DeckTokens.fg : DeckTokens.muted;
+    final foreground = widget.selected
+        ? AppColors.textPrimary
+        : AppColors.textMuted;
     return Semantics(
       button: true,
       selected: widget.selected,
@@ -263,10 +266,10 @@ class _NavButtonState extends State<_NavButton> {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: widget.selected
-                  ? DeckTokens.bg
-                  : (_hovered ? DeckTokens.fgSoft : Colors.transparent),
+                  ? AppColors.background
+                  : (_hovered ? AppColors.fgSoft : Colors.transparent),
               border: Border.all(
-                color: widget.selected ? DeckTokens.border : Colors.transparent,
+                color: widget.selected ? AppColors.border : Colors.transparent,
               ),
             ),
             child: Row(
@@ -308,14 +311,14 @@ class _Count extends StatelessWidget {
       height: 18,
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(horizontal: 5),
-      color: DeckTokens.fg,
+      color: AppColors.textPrimary,
       child: Text(
         '$badge',
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'JetBrains Mono',
           fontSize: 10,
           fontWeight: FontWeight.w700,
-          color: DeckTokens.bg,
+          color: AppColors.background,
         ),
       ),
     );

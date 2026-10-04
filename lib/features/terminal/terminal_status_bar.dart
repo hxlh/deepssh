@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:xterm/xterm.dart' as xterm;
 
 import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_colors.dart';
 import 'terminal_state.dart';
 
 /// Terminal status strip.
@@ -28,7 +29,7 @@ class TerminalStatusBar extends StatelessWidget {
     return Container(
       height: 26,
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      color: DeckTokens.fg,
+      color: AppColors.textPrimary,
       child: Row(
         children: [
           _Item(
@@ -84,8 +85,12 @@ class _Item extends StatelessWidget {
             fontFamilyFallback: DeckTokens.fontMono,
             fontSize: 10.5,
             color: dim
-                ? DeckTokens.mix(DeckTokens.bg, DeckTokens.fg, 0.28)
-                : DeckTokens.bg,
+                ? DeckTokens.mix(
+                    AppColors.background,
+                    AppColors.textPrimary,
+                    0.28,
+                  )
+                : AppColors.background,
           ),
         ),
       ],

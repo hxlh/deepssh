@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_tokens.dart';
+import '../theme/app_colors.dart';
 
 /// Form controls for the drawer forms.
 ///
@@ -16,7 +17,7 @@ abstract final class DeckFieldStyle {
   static InputDecoration decoration({String? hint}) => InputDecoration(
     isDense: true,
     filled: true,
-    fillColor: DeckTokens.surface,
+    fillColor: AppColors.panel,
     // The prototype's `placeholder` is decorative: the stacked label already
     // names the field. Left as `hintText` it would concatenate onto the
     // field's semantics label and take the field's name with it.
@@ -25,24 +26,24 @@ abstract final class DeckFieldStyle {
         : ExcludeSemantics(
             child: Text(
               hint,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'JetBrains Mono',
                 fontFamilyFallback: DeckTokens.fontMono,
                 fontSize: 12,
-                color: DeckTokens.muted,
+                color: AppColors.textMuted,
               ),
             ),
           ),
-    hintStyle: const TextStyle(
+    hintStyle: TextStyle(
       fontFamily: 'JetBrains Mono',
       fontFamilyFallback: DeckTokens.fontMono,
       fontSize: 12,
-      color: DeckTokens.muted,
+      color: AppColors.textMuted,
     ),
     contentPadding: content,
-    border: _border(DeckTokens.border),
-    enabledBorder: _border(DeckTokens.border),
-    focusedBorder: _border(DeckTokens.fg),
+    border: _border(AppColors.border),
+    enabledBorder: _border(AppColors.border),
+    focusedBorder: _border(AppColors.textPrimary),
     errorBorder: _border(DeckTokens.danger),
     focusedErrorBorder: _border(DeckTokens.danger),
     errorStyle: const TextStyle(fontSize: 11, color: DeckTokens.danger),
@@ -53,11 +54,11 @@ abstract final class DeckFieldStyle {
     borderSide: BorderSide(color: color),
   );
 
-  static const TextStyle text = TextStyle(
+  static TextStyle text = TextStyle(
     fontFamily: 'JetBrains Mono',
     fontFamilyFallback: DeckTokens.fontMono,
     fontSize: 12,
-    color: DeckTokens.fg,
+    color: AppColors.textPrimary,
   );
 }
 
@@ -91,7 +92,7 @@ class DeckField extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             hint!,
-            style: const TextStyle(fontSize: 11, color: DeckTokens.muted),
+            style: TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
         ],
       ],
@@ -108,13 +109,13 @@ class DeckFieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: 'JetBrains Mono',
         fontFamilyFallback: DeckTokens.fontMono,
         fontSize: 10,
         letterSpacing: 1.0,
         height: 1.2,
-        color: DeckTokens.muted,
+        color: AppColors.textMuted,
       ),
     );
   }

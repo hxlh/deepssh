@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/ssh_profile_item.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/widgets/deck_page.dart';
 import '../../core/widgets/deck_widgets.dart';
 
@@ -107,7 +108,8 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
     return DeckPageScaffold(
       eyebrow: 'SSH',
       title: '连接配置',
-      subtitle: '管理远程主机凭据、认证方式与终端类型。共 ${widget.profiles.length} 个配置，'
+      subtitle:
+          '管理远程主机凭据、认证方式与终端类型。共 ${widget.profiles.length} 个配置，'
           '其中 ${widget.onlineProfileIds.length} 个在线。',
       actions: [
         DeckButton(
@@ -171,7 +173,7 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
                       flexWeights: const [1],
                       statusColor: widget.onlineProfileIds.contains(profile.id)
                           ? DeckTokens.ok
-                          : DeckTokens.border,
+                          : AppColors.border,
                       cells: [
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,10 +185,10 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
                                   child: Text(
                                     profile.name,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.w600,
-                                      color: DeckTokens.fg,
+                                      color: AppColors.textPrimary,
                                     ),
                                   ),
                                 ),
@@ -210,11 +212,11 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
                             Text(
                               '${profile.username}@${profile.host}:${profile.port}',
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: 'JetBrains Mono',
                                 fontFamilyFallback: DeckTokens.fontMono,
                                 fontSize: 11,
-                                color: DeckTokens.muted,
+                                color: AppColors.textMuted,
                               ),
                             ),
                           ],
@@ -306,8 +308,8 @@ class _OnlineBadge extends StatelessWidget {
     return DeckStatusBadge(
       label: '在线',
       color: DeckTokens.ok,
-      background: DeckTokens.okSoft,
-      borderColor: DeckTokens.mix(DeckTokens.ok, DeckTokens.border, 0.4),
+      background: AppColors.okSoft,
+      borderColor: DeckTokens.mix(DeckTokens.ok, AppColors.border, 0.4),
     );
   }
 }
@@ -322,7 +324,7 @@ class _ErrorStrip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: DeckTokens.dangerSoft,
+        color: AppColors.dangerSoft,
         border: Border.all(color: DeckTokens.danger),
       ),
       child: Row(

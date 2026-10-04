@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models/ssh_profile_item.dart';
 import '../../core/models/tunnel_config_item.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/widgets/deck_page.dart';
 import '../../core/widgets/deck_widgets.dart';
 
@@ -75,20 +76,20 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
     TunnelRuntimeStatus.forwarding => (
       color: DeckTokens.ok,
       label: '运行中',
-      background: DeckTokens.okSoft,
-      border: DeckTokens.mix(DeckTokens.ok, DeckTokens.border, 0.4),
+      background: AppColors.okSoft,
+      border: DeckTokens.mix(DeckTokens.ok, AppColors.border, 0.4),
     ),
     TunnelRuntimeStatus.waiting => (
       color: DeckTokens.warn,
       label: '等待中',
-      background: DeckTokens.warnSoft,
-      border: DeckTokens.mix(DeckTokens.warnBar, DeckTokens.border, 0.45),
+      background: AppColors.warnSoft,
+      border: DeckTokens.mix(DeckTokens.warnBar, AppColors.border, 0.45),
     ),
     TunnelRuntimeStatus.stopped => (
-      color: DeckTokens.muted,
+      color: AppColors.textMuted,
       label: '已停止',
-      background: DeckTokens.bg,
-      border: DeckTokens.border,
+      background: AppColors.background,
+      border: AppColors.border,
     ),
   };
 
@@ -136,9 +137,9 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
                     DeckTableRow(
                       flexWeights: const [1],
                       statusColor: switch (tunnel.status) {
-                        TunnelRuntimeStatus.forwarding => DeckTokens.accent,
+                        TunnelRuntimeStatus.forwarding => AppColors.accent,
                         TunnelRuntimeStatus.waiting => DeckTokens.warnBar,
-                        TunnelRuntimeStatus.stopped => DeckTokens.border,
+                        TunnelRuntimeStatus.stopped => AppColors.border,
                       },
                       cells: [
                         Column(
@@ -151,10 +152,10 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
                                   child: Text(
                                     tunnel.name,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.w600,
-                                      color: DeckTokens.fg,
+                                      color: AppColors.textPrimary,
                                     ),
                                   ),
                                 ),
@@ -189,17 +190,19 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
                                   ),
                                   TextSpan(
                                     text: '  →  ',
-                                    style: const TextStyle(
-                                      color: DeckTokens.muted,
+                                    style: TextStyle(
+                                      color: AppColors.textMuted,
                                     ),
                                   ),
                                   TextSpan(
                                     text:
                                         '${tunnel.targetHost}:${tunnel.targetPort}',
                                   ),
-                                  const TextSpan(
+                                  TextSpan(
                                     text: '  经  ',
-                                    style: TextStyle(color: DeckTokens.muted),
+                                    style: TextStyle(
+                                      color: AppColors.textMuted,
+                                    ),
                                   ),
                                   TextSpan(
                                     text: profileName(tunnel.sshProfileId),
@@ -207,11 +210,11 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
                                 ],
                               ),
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: 'JetBrains Mono',
                                 fontFamilyFallback: DeckTokens.fontMono,
                                 fontSize: 11,
-                                color: DeckTokens.muted,
+                                color: AppColors.textMuted,
                               ),
                             ),
                           ],
@@ -276,7 +279,7 @@ class _ErrorStrip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: DeckTokens.dangerSoft,
+        color: AppColors.dangerSoft,
         border: Border.all(color: DeckTokens.danger),
       ),
       child: Row(

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/widgets/deck_widgets.dart';
 import '../../src/rust/mem_metrics.dart';
 import '../events/workbench_events.dart';
@@ -170,8 +171,8 @@ class _HorizontalGrip extends StatelessWidget {
       onVerticalDragUpdate: (details) => onDrag(details.delta.dy),
       child: Container(
         height: 7,
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: DeckTokens.border)),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
       ),
     );
@@ -214,9 +215,9 @@ class _DockPanelShell extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.fromLTRB(0, 0, 0, 6),
       decoration: BoxDecoration(
-        color: DeckTokens.surface,
-        border: Border.all(color: DeckTokens.fg),
-        boxShadow: DeckTokens.shadowHard,
+        color: AppColors.panel,
+        border: Border.all(color: AppColors.textPrimary),
+        boxShadow: AppColors.shadowHard,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -226,7 +227,7 @@ class _DockPanelShell extends StatelessWidget {
             decoration: BoxDecoration(
               border: collapsed
                   ? null
-                  : const Border(bottom: BorderSide(color: DeckTokens.border)),
+                  : Border(bottom: BorderSide(color: AppColors.border)),
             ),
             child: Row(
               children: [
@@ -235,12 +236,12 @@ class _DockPanelShell extends StatelessWidget {
                     cursor: SystemMouseCursors.click,
                     child: GestureDetector(
                       onTap: onToggle,
-                      child: const Padding(
+                      child: Padding(
                         padding: EdgeInsets.only(right: 8),
                         child: Icon(
                           Icons.keyboard_arrow_down,
                           size: 12,
-                          color: DeckTokens.muted,
+                          color: AppColors.textMuted,
                         ),
                       ),
                     ),
@@ -283,10 +284,10 @@ class _EventsPanel extends StatelessWidget {
           ? _MiniSummary(entries: entries, memory: memory)
           : DeckLabel('${entries.length}', size: 10),
       child: entries.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
                 '暂无事件',
-                style: TextStyle(fontSize: 11.5, color: DeckTokens.muted),
+                style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
               ),
             )
           : ListView.builder(
@@ -321,7 +322,7 @@ class _MiniSummary extends StatelessWidget {
                 fontSize: 10.5,
                 color: latest.level == WorkbenchEventLevel.error
                     ? DeckTokens.danger
-                    : DeckTokens.fg,
+                    : AppColors.textPrimary,
               ),
             ),
           ),
@@ -329,11 +330,11 @@ class _MiniSummary extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             'RSS ${_mb(memory!.currentRss)} MB',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'JetBrains Mono',
               fontFamilyFallback: DeckTokens.fontMono,
               fontSize: 10.5,
-              color: DeckTokens.muted,
+              color: AppColors.textMuted,
             ),
           ),
         ],
@@ -363,7 +364,7 @@ class _FeedRow extends StatelessWidget {
         border: isError
             ? const Border(left: BorderSide(color: DeckTokens.danger, width: 3))
             : null,
-        color: isError ? DeckTokens.dangerSoft : null,
+        color: isError ? AppColors.dangerSoft : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -372,11 +373,11 @@ class _FeedRow extends StatelessWidget {
             width: 58,
             child: Text(
               '$hh:$mm:$ss',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'JetBrains Mono',
                 fontFamilyFallback: DeckTokens.fontMono,
                 fontSize: 10.5,
-                color: DeckTokens.muted,
+                color: AppColors.textMuted,
               ),
             ),
           ),
@@ -387,13 +388,13 @@ class _FeedRow extends StatelessWidget {
             size: 14,
             color: isError
                 ? DeckTokens.danger
-                : (isWarn ? DeckTokens.warn : DeckTokens.muted),
+                : (isWarn ? DeckTokens.warn : AppColors.textMuted),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: RichText(
               text: TextSpan(
-                style: const TextStyle(fontSize: 12, color: DeckTokens.fg),
+                style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
                 children: [
                   if (isError || isWarn) ...[
                     TextSpan(
@@ -411,7 +412,7 @@ class _FeedRow extends StatelessWidget {
                   if (event.subject != null)
                     TextSpan(
                       text: '  ${event.subject}',
-                      style: TextStyle(color: DeckTokens.accentInk),
+                      style: TextStyle(color: AppColors.accentInk),
                     ),
                 ],
               ),
@@ -437,10 +438,10 @@ class _MemoryPanel extends StatelessWidget {
           ? DeckLabel('—', size: 10)
           : DeckLabel('RSS ${_mb(snapshot!.currentRss)} MB', size: 10),
       child: snapshot == null
-          ? const Center(
+          ? Center(
               child: Text(
                 '等待采样',
-                style: TextStyle(fontSize: 11.5, color: DeckTokens.muted),
+                style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
               ),
             )
           : ListView(
@@ -450,7 +451,7 @@ class _MemoryPanel extends StatelessWidget {
                   label: '常驻内存 (RSS)',
                   value: _mb(snapshot!.currentRss),
                   fraction: _fraction(snapshot!.currentRss, snapshot!.peakRss),
-                  color: DeckTokens.accent,
+                  color: AppColors.accent,
                 ),
                 _Gauge(
                   label: '峰值内存',
@@ -465,7 +466,7 @@ class _MemoryPanel extends StatelessWidget {
                     snapshot!.currentCommit,
                     snapshot!.peakCommit,
                   ),
-                  color: DeckTokens.fg,
+                  color: AppColors.textPrimary,
                 ),
                 _KeyValue(label: '页错误', value: '${snapshot!.pageFaults}'),
                 _KeyValue(
@@ -502,8 +503,8 @@ class _Gauge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: DeckTokens.border)),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,16 +514,16 @@ class _Gauge extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(fontSize: 12, color: DeckTokens.muted),
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'JetBrains Mono',
                   fontFamilyFallback: DeckTokens.fontMono,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: DeckTokens.fg,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -531,8 +532,8 @@ class _Gauge extends StatelessWidget {
           Container(
             height: 8,
             decoration: BoxDecoration(
-              color: DeckTokens.border,
-              border: Border.all(color: DeckTokens.border),
+              color: AppColors.border,
+              border: Border.all(color: AppColors.border),
             ),
             child: FractionallySizedBox(
               alignment: Alignment.centerLeft,
@@ -561,16 +562,16 @@ class _KeyValue extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 11.5, color: DeckTokens.muted),
+            style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'JetBrains Mono',
               fontFamilyFallback: DeckTokens.fontMono,
               fontSize: 11.5,
               fontWeight: FontWeight.w700,
-              color: DeckTokens.fg,
+              color: AppColors.textPrimary,
             ),
           ),
         ],

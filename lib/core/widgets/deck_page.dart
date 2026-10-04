@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_tokens.dart';
+import '../theme/app_colors.dart';
 import 'deck_widgets.dart';
 
 /// Page scaffolding shared by the settings pages: eyebrow + serif title +
@@ -45,9 +46,9 @@ class DeckPageScaffold extends StatelessWidget {
                       const SizedBox(height: 5),
                       Text(
                         subtitle!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12.5,
-                          color: DeckTokens.muted,
+                          color: AppColors.textMuted,
                         ),
                       ),
                     ],
@@ -60,10 +61,7 @@ class DeckPageScaffold extends StatelessWidget {
               ],
             ],
           ),
-          if (toolbar != null) ...[
-            const SizedBox(height: 12),
-            toolbar!,
-          ],
+          if (toolbar != null) ...[const SizedBox(height: 12), toolbar!],
           const SizedBox(height: 12),
           Expanded(child: child),
         ],
@@ -95,9 +93,9 @@ class DeckTable extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: DeckTokens.surface,
-        border: Border.all(color: DeckTokens.fg),
-        boxShadow: DeckTokens.shadowSolid,
+        color: AppColors.panel,
+        border: Border.all(color: AppColors.textPrimary),
+        boxShadow: AppColors.shadowSolid,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -105,8 +103,8 @@ class DeckTable extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: DeckTokens.fg)),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.textPrimary)),
             ),
             child: Row(
               children: [
@@ -116,14 +114,11 @@ class DeckTable extends StatelessWidget {
                     child: DeckLabel(
                       headerLabels[index],
                       size: 9.5,
-                      color: DeckTokens.muted,
+                      color: AppColors.textMuted,
                     ),
                   ),
                 if (trailingWidth > 0)
-                  SizedBox(
-                    width: trailingWidth,
-                    child: const DeckLabel('操作'),
-                  ),
+                  SizedBox(width: trailingWidth, child: const DeckLabel('操作')),
               ],
             ),
           ),
@@ -136,7 +131,7 @@ class DeckTable extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: children.length,
               separatorBuilder: (_, _) =>
-                  const Divider(height: 1, color: DeckTokens.border),
+                  Divider(height: 1, color: AppColors.border),
               itemBuilder: (context, index) => children[index],
             ),
           ),
@@ -193,10 +188,7 @@ class DeckTableRow extends StatelessWidget {
             if (trailing != null)
               SizedBox(
                 width: trailingWidth,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: trailing,
-                ),
+                child: Align(alignment: Alignment.centerRight, child: trailing),
               ),
           ],
         ),
@@ -222,7 +214,7 @@ class DeckMonoCell extends StatelessWidget {
         fontFamilyFallback: DeckTokens.fontMono,
         fontSize: 11.5,
         fontWeight: FontWeight.w600,
-        color: color ?? DeckTokens.fg,
+        color: color ?? AppColors.textPrimary,
       ),
     );
   }
@@ -243,18 +235,18 @@ class DeckMetaCell extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 11.5, color: DeckTokens.muted),
+          style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
         ),
         const SizedBox(height: 3),
         Text(
           value,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'JetBrains Mono',
             fontFamilyFallback: DeckTokens.fontMono,
             fontSize: 11.5,
             fontWeight: FontWeight.w700,
-            color: DeckTokens.fg,
+            color: AppColors.textPrimary,
           ),
         ),
       ],
