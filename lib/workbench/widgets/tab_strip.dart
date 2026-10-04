@@ -132,7 +132,10 @@ class _TabItemState extends State<_TabItem> {
       child: GestureDetector(
         onTap: widget.onSelect,
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 240),
+          // The prototype tab hugs its label (`.tab{flex:none}`) and only the
+          // label itself is capped; a fixed row width pushed the close button
+          // far away from short titles.
+          constraints: const BoxConstraints(maxWidth: 260),
           padding: const EdgeInsets.only(left: 12, right: 8),
           decoration: BoxDecoration(
             color: background,
@@ -146,6 +149,7 @@ class _TabItemState extends State<_TabItem> {
             ),
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.terminal, size: 13, color: AppColors.textMuted),
               const SizedBox(width: 8),

@@ -79,11 +79,16 @@ class DeckTable extends StatelessWidget {
     required this.headerLabels,
     required this.children,
     this.trailingWidth = 0,
+    this.showHeader = true,
   });
 
   final List<int> flexWeights;
   final List<String> headerLabels;
   final List<Widget> children;
+
+  /// The prototype's connection/tunnel lists start straight at the first row;
+  /// the table header is only used where a column legend actually helps.
+  final bool showHeader;
 
   /// Fixed width reserved for the row action column. It must not flex — the
   /// buttons would stretch and stop reading as buttons.
@@ -101,27 +106,33 @@ class DeckTable extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.textPrimary)),
-            ),
-            child: Row(
-              children: [
-                for (var index = 0; index < headerLabels.length; index++)
-                  Expanded(
-                    flex: flexWeights[index],
-                    child: DeckLabel(
-                      headerLabels[index],
-                      size: 9.5,
-                      color: AppColors.textMuted,
+          if (showHeader)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: AppColors.textPrimary),
+                ),
+              ),
+              child: Row(
+                children: [
+                  for (var index = 0; index < headerLabels.length; index++)
+                    Expanded(
+                      flex: flexWeights[index],
+                      child: DeckLabel(
+                        headerLabels[index],
+                        size: 9.5,
+                        color: AppColors.textMuted,
+                      ),
                     ),
-                  ),
-                if (trailingWidth > 0)
-                  SizedBox(width: trailingWidth, child: const DeckLabel('操作')),
-              ],
+                  if (trailingWidth > 0)
+                    SizedBox(
+                      width: trailingWidth,
+                      child: const DeckLabel('操作'),
+                    ),
+                ],
+              ),
             ),
-          ),
           // The prototype's list hugs its rows; the page around it scrolls.
           // Shrink-wrapping here keeps a two-row table from drawing a
           // 700px-tall empty box.

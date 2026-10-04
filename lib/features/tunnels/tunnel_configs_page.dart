@@ -60,7 +60,7 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
           ),
           DeckButton(
             label: '删除',
-            style: DeckButtonStyle.solid,
+            style: DeckButtonStyle.danger,
             destructive: true,
             onPressed: () => Navigator.of(context).pop(true),
           ),
@@ -108,7 +108,7 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
       actions: [
         DeckButton(
           label: '新增转发',
-          style: DeckButtonStyle.solid,
+          style: DeckButtonStyle.accent,
           icon: Icons.add,
           onPressed: widget.onAdd,
         ),
@@ -130,7 +130,8 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
             SingleChildScrollView(
               child: DeckTable(
                 flexWeights: const [1],
-                headerLabels: const ['转发'],
+                headerLabels: const [],
+                showHeader: false,
                 trailingWidth: _actionsWidth,
                 children: [
                   for (final tunnel in widget.tunnels)

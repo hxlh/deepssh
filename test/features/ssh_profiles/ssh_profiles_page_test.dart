@@ -70,10 +70,7 @@ void main() {
     await tester.pumpAndSettle();
     // The confirm dialog repeats the label, so target it inside the dialog.
     await tester.tap(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('删除'),
-      ),
+      find.descendant(of: find.byType(AlertDialog), matching: find.text('删除')),
     );
     await tester.pumpAndSettle();
     expect(deleted, profile);
@@ -90,9 +87,7 @@ void main() {
       authMode: SshAuthMode.privateKey,
     );
 
-    await tester.pumpWidget(
-      page(profiles: const [profile, keyProfile]),
-    );
+    await tester.pumpWidget(page(profiles: const [profile, keyProfile]));
 
     expect(find.text('Production'), findsOneWidget);
     expect(find.text('Bastion'), findsOneWidget);
@@ -104,7 +99,9 @@ void main() {
 
     await tester.enterText(find.byType(TextField).first, '');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('auth-filter-私钥')));
+    await tester.tap(find.byKey(const ValueKey('auth-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('私钥').last);
     await tester.pumpAndSettle();
     expect(find.text('Production'), findsNothing);
     expect(find.text('Bastion'), findsOneWidget);

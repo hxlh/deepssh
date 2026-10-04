@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models/ssh_profile_item.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/deck_fields.dart';
 import '../../core/widgets/deck_page.dart';
 import '../../core/widgets/deck_widgets.dart';
 
@@ -106,7 +107,7 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
     const actionsWidth = 196.0;
 
     return DeckPageScaffold(
-      eyebrow: 'SSH',
+      eyebrow: 'SSH Profiles',
       title: '连接配置',
       subtitle:
           '管理远程主机凭据、认证方式与终端类型。共 ${widget.profiles.length} 个配置，'
@@ -114,7 +115,7 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
       actions: [
         DeckButton(
           label: '新增 SSH 配置',
-          style: DeckButtonStyle.solid,
+          style: DeckButtonStyle.accent,
           icon: Icons.add,
           onPressed: widget.onAdd,
         ),
@@ -122,7 +123,7 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
       toolbar: Row(
         children: [
           SizedBox(
-            width: 280,
+            width: 340,
             child: TextField(
               controller: _searchController,
               style: const TextStyle(
@@ -132,13 +133,13 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
               ),
               onChanged: (value) => setState(() => _query = value),
               decoration: const InputDecoration(
-                hintText: '搜索名称 / 主机 / 用户名',
+                hintText: '搜索名称、主机或用户名…',
                 prefixIcon: Icon(Icons.search, size: 14),
               ),
             ),
           ),
           const SizedBox(width: 8),
-          _AuthFilter(
+          _AuthFilterSelect(
             selected: _authFilter,
             onChanged: (mode) => setState(() => _authFilter = mode),
           ),
@@ -166,7 +167,8 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
               child: DeckTable(
                 flexWeights: const [1],
                 trailingWidth: actionsWidth,
-                headerLabels: const ['SSH 配置'],
+                headerLabels: const [],
+                showHeader: false,
                 children: [
                   for (final profile in visible)
                     DeckTableRow(
@@ -223,7 +225,7 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
                         ),
                       ],
                       meta: (
-                        label: '最后连接',
+                        label: '最近使用',
                         value: _lastConnectedLabel(profile.id),
                       ),
                       trailingWidth: actionsWidth,
@@ -262,8 +264,8 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
   }
 }
 
-class _AuthFilter extends StatelessWidget {
-  const _AuthFilter({required this.selected, required this.onChanged});
+class _AuthFilterSelect extends StatelessWidget {
+  const _AuthFilterSelect({required this.selected, required this.onChanged});
 
   final SshAuthMode? selected;
   final ValueChanged<SshAuthMode?> onChanged;
@@ -276,23 +278,35 @@ class _AuthFilter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (final option in _options) ...[
-          DeckButton(
-            key: ValueKey(
-              'auth-filter-${option.$1 == '全部认证方式' ? 'all' : option.$1}',
-            ),
-            label: option.$1,
-            dense: true,
-            style: selected == option.$2
-                ? DeckButtonStyle.solid
-                : DeckButtonStyle.ghost,
-            onPressed: () => onChanged(option.$2),
+    return SizedBox(
+      width: 150,
+      child: InputDecorator(
+        isEmpty: false,
+        isFocused: false,
+        decoration: DeckFieldStyle.decoration().copyWith(
+          contentPadding: const EdgeInsets.fromLTRB(10, 8, 28, 8),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<SshAuthMode?>(
+            key: const ValueKey('auth-filter'),
+            value: selected,
+            isExpanded: true,
+            isDense: true,
+            icon: const Icon(Icons.arrow_drop_down, size: 16),
+            style: DeckFieldStyle.text,
+            borderRadius: BorderRadius.zero,
+            hint: Text('全部认证方式', style: DeckFieldStyle.text),
+            items: [
+              for (final option in _options)
+                DropdownMenuItem<SshAuthMode?>(
+                  value: option.$2,
+                  child: Text(option.$1, style: DeckFieldStyle.text),
+                ),
+            ],
+            onChanged: onChanged,
           ),
-          const SizedBox(width: 4),
-        ],
-      ],
+        ),
+      ),
     );
   }
 }
