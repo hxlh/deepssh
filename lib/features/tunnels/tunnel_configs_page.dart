@@ -106,7 +106,7 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
               icon: Icons.swap_horiz,
             )
           else
-            Expanded(
+            SingleChildScrollView(
               child: DeckTable(
                 flexWeights: const [1],
                 headerLabels: const ['隧道'],

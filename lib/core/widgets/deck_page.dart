@@ -100,6 +100,7 @@ class DeckTable extends StatelessWidget {
         boxShadow: DeckTokens.shadowSolid,
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
@@ -126,8 +127,13 @@ class DeckTable extends StatelessWidget {
               ],
             ),
           ),
-          Expanded(
+          // The prototype's list hugs its rows; the page around it scrolls.
+          // Shrink-wrapping here keeps a two-row table from drawing a
+          // 700px-tall empty box.
+          Flexible(
             child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
               itemCount: children.length,
               separatorBuilder: (_, _) =>
                   const Divider(height: 1, color: DeckTokens.border),

@@ -136,7 +136,7 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
               icon: Icons.dns_outlined,
             )
           else
-            Expanded(
+            SingleChildScrollView(
               child: DeckTable(
                 flexWeights: const [1],
                 trailingWidth: actionsWidth,
