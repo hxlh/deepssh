@@ -37,6 +37,7 @@ class HostTree extends StatelessWidget {
     this.onReorderLocalTerminals,
     this.sectionOrder = const [],
     this.onSectionOrderChanged,
+    this.compact = false,
   });
 
   final HostTreeState state;
@@ -66,6 +67,11 @@ class HostTree extends StatelessWidget {
   final void Function(int oldIndex, int newIndex)? onReorderLocalTerminals;
   final List<String> sectionOrder;
   final ValueChanged<List<String>>? onSectionOrderChanged;
+
+  /// Icon-rail mode (prototype `RAIL_MAX`, width <= 96px): names leave the
+  /// painted box but stay available through tooltips, and the group identity
+  /// rides the icon colour and the active row's left rule.
+  final bool compact;
 
   /// Read through a getter so it follows the live theme.
   static Color get _menuAccent => AppColors.accent;
@@ -210,7 +216,10 @@ class HostTree extends StatelessWidget {
   Widget _sessionItem(BuildContext context, SshSessionItem session) {
     final isSelected = selectedTerminalId == session.id;
     final groupColor = _groupColor(session.connectionGroupId);
-    return InkWell(
+    final iconColor = groupColor == Colors.transparent
+        ? AppColors.textMuted
+        : groupColor;
+    final row = InkWell(
       onTap: () => onSshSessionTap(session),
       onSecondaryTapDown: (details) {
         _showSshSessionMenu(
@@ -223,8 +232,12 @@ class HostTree extends StatelessWidget {
       },
       child: Container(
         height: AppSpacing.itemHeight,
-        margin: const EdgeInsets.fromLTRB(24, 2, 8, 2),
-        padding: const EdgeInsets.only(left: 7, right: 10),
+        margin: compact
+            ? const EdgeInsets.fromLTRB(4, 2, 4, 2)
+            : const EdgeInsets.fromLTRB(24, 2, 8, 2),
+        padding: compact
+            ? EdgeInsets.zero
+            : const EdgeInsets.only(left: 7, right: 10),
         decoration: BoxDecoration(
           // The 3px left rule carries connection state; a rounded fill would
           // fight the deck's zero-radius language.
@@ -238,35 +251,47 @@ class HostTree extends StatelessWidget {
               ? DeckTokens.wash(groupColor, 0.30)
               : DeckTokens.wash(groupColor, 0.12),
         ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.terminal,
-              size: 15,
-              color: isSelected ? AppColors.textPrimary : AppColors.textMuted,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                session.displayTitle,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: isSelected
-                      ? AppColors.textPrimary
-                      : AppColors.textPrimary,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+        child: compact
+            ? Center(
+                child: Icon(
+                  Icons.terminal,
+                  size: 16,
+                  color: isSelected ? AppColors.accentInk : iconColor,
                 ),
+              )
+            : Row(
+                children: [
+                  Icon(
+                    Icons.terminal,
+                    size: 15,
+                    color: isSelected
+                        ? AppColors.textPrimary
+                        : AppColors.textMuted,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      session.displayTitle,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.textPrimary,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
+    return compact ? Tooltip(message: session.displayTitle, child: row) : row;
   }
 
   Widget _localTerminalItem(BuildContext context, LocalTerminalItem terminal) {
-    return InkWell(
+    final selected = selectedTerminalId == terminal.id;
+    final row = InkWell(
       onTap: () => onLocalTerminalTap(terminal),
       onSecondaryTapDown: (details) {
         _showCloseMenu(
@@ -278,74 +303,92 @@ class HostTree extends StatelessWidget {
       },
       child: Container(
         height: AppSpacing.itemHeight,
-        margin: const EdgeInsets.fromLTRB(24, 2, 8, 2),
-        padding: const EdgeInsets.only(left: 7, right: 10),
+        margin: compact
+            ? const EdgeInsets.fromLTRB(4, 2, 4, 2)
+            : const EdgeInsets.fromLTRB(24, 2, 8, 2),
+        padding: compact
+            ? EdgeInsets.zero
+            : const EdgeInsets.only(left: 7, right: 10),
         decoration: BoxDecoration(
           border: Border(
             left: BorderSide(
-              color: selectedTerminalId == terminal.id
-                  ? AppColors.accent
-                  : Colors.transparent,
+              color: selected ? AppColors.accent : Colors.transparent,
               width: 3,
             ),
           ),
-          color: selectedTerminalId == terminal.id
-              ? AppColors.selection
-              : Colors.transparent,
+          color: selected ? AppColors.selection : Colors.transparent,
         ),
-        child: Row(
-          children: [
-            Icon(Icons.terminal, size: 15, color: AppColors.textMuted),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                terminal.displayTitle,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: selectedTerminalId == terminal.id
-                      ? AppColors.accentInk
-                      : AppColors.textPrimary,
+        child: compact
+            ? Center(
+                child: Icon(
+                  Icons.terminal,
+                  size: 16,
+                  color: selected ? AppColors.accentInk : AppColors.textMuted,
                 ),
+              )
+            : Row(
+                children: [
+                  Icon(Icons.terminal, size: 15, color: AppColors.textMuted),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      terminal.displayTitle,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: selected
+                            ? AppColors.accentInk
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
+    return compact ? Tooltip(message: terminal.displayTitle, child: row) : row;
   }
 
   Widget _profileHeader(SshProfileItem profile) {
-    return InkWell(
+    final header = InkWell(
       onTap: () => onSshProfileTap(profile),
       child: Container(
-        height: 32,
+        height: compact ? 34 : 32,
         margin: const EdgeInsets.fromLTRB(4, 2, 4, 2),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 8),
         decoration: BoxDecoration(
           border: Border(
             left: BorderSide(color: _groupColor(profile.id), width: 3),
           ),
         ),
-        child: Row(
-          children: [
-            Icon(Icons.computer, size: 15, color: AppColors.textMuted),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                profile.name,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+        child: compact
+            ? Center(
+                child: Icon(
+                  Icons.computer,
+                  size: 16,
+                  color: _groupColor(profile.id),
                 ),
+              )
+            : Row(
+                children: [
+                  Icon(Icons.computer, size: 15, color: AppColors.textMuted),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      profile.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
+    return compact ? Tooltip(message: profile.name, child: header) : header;
   }
 
   Widget _profileSection(SshProfileItem profile, int sectionIndex) {
@@ -381,24 +424,24 @@ class HostTree extends StatelessWidget {
   }
 
   Widget _localSection(int sectionIndex) {
-    return Column(
-      key: const ValueKey('section-local'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ReorderableDragStartListener(
-          index: sectionIndex,
-          child: InkWell(
-            onTap: onToggleLocal,
-            child: Container(
-              height: 32,
-              margin: const EdgeInsets.fromLTRB(4, 2, 4, 2),
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              decoration: BoxDecoration(
-                border: Border(
-                  left: BorderSide(color: AppColors.accent, width: 3),
+    final header = InkWell(
+      onTap: onToggleLocal,
+      child: Container(
+        height: compact ? 34 : 32,
+        margin: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 8),
+        decoration: BoxDecoration(
+          border: Border(left: BorderSide(color: AppColors.accent, width: 3)),
+        ),
+        child: compact
+            ? Center(
+                child: Icon(
+                  Icons.laptop,
+                  size: 16,
+                  color: AppColors.textPrimary,
                 ),
-              ),
-              child: Row(
+              )
+            : Row(
                 children: [
                   Icon(Icons.laptop, size: 15, color: AppColors.textMuted),
                   const SizedBox(width: 8),
@@ -419,8 +462,15 @@ class HostTree extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-          ),
+      ),
+    );
+    return Column(
+      key: const ValueKey('section-local'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ReorderableDragStartListener(
+          index: sectionIndex,
+          child: compact ? Tooltip(message: 'Local', child: header) : header,
         ),
         if (localExpanded)
           ReorderableListView.builder(
@@ -484,6 +534,8 @@ class HostTree extends StatelessWidget {
                       );
                     },
                   ),
+                if (sections.isEmpty && state.hosts.isEmpty)
+                  _TreeEmptyState(compact: compact),
               ],
             ),
           ),
@@ -499,6 +551,8 @@ class HostTree extends StatelessWidget {
                 label: '主题配置',
                 icon: Icons.palette_outlined,
                 active: themeConfigActive,
+                tooltip: '主题配置',
+                compact: compact,
                 onTap: onOpenThemeConfig,
               ),
               _FooterTool(
@@ -506,6 +560,7 @@ class HostTree extends StatelessWidget {
                 icon: Icons.memory,
                 active: memoryDockVisible,
                 tooltip: memoryDockVisible ? '隐藏内存监控面板' : '显示内存监控面板',
+                compact: compact,
                 onTap: onToggleMemoryDock,
               ),
             ],
@@ -564,6 +619,45 @@ class _HostContextMenuItemState extends State<_HostContextMenuItem> {
   }
 }
 
+/// Tree empty state: `#exTreeEmpty`. The rail keeps the icon and drops the
+/// copy so a 56px column never shows clipped text.
+class _TreeEmptyState extends StatelessWidget {
+  const _TreeEmptyState({required this.compact});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 28),
+      child: Column(
+        children: [
+          Icon(Icons.terminal, size: 26, color: AppColors.textMuted),
+          if (!compact) ...[
+            const SizedBox(height: 10),
+            Text(
+              '暂无已打开的会话',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'JetBrains Mono',
+                fontFamilyFallback: DeckTokens.fontMono,
+                fontSize: 11.5,
+                color: AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '从右上角「新增连接」打开一个终端',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// Explorer footer tool row, matching the prototype's `.ex-foot` / `.ex-tool`.
 class _FooterTool extends StatefulWidget {
   const _FooterTool({
@@ -572,6 +666,7 @@ class _FooterTool extends StatefulWidget {
     required this.active,
     required this.onTap,
     this.tooltip,
+    this.compact = false,
   });
 
   final String label;
@@ -579,6 +674,7 @@ class _FooterTool extends StatefulWidget {
   final bool active;
   final VoidCallback onTap;
   final String? tooltip;
+  final bool compact;
 
   @override
   State<_FooterTool> createState() => _FooterToolState();
@@ -603,27 +699,33 @@ class _FooterToolState extends State<_FooterTool> {
         onTap: widget.onTap,
         behavior: HitTestBehavior.opaque,
         child: Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          height: widget.compact ? 34 : 32,
+          padding: EdgeInsets.symmetric(horizontal: widget.compact ? 0 : 8),
           color: background,
-          child: Row(
-            children: [
-              Icon(widget.icon, size: 14, color: foreground),
-              const SizedBox(width: 8),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: foreground,
-                  fontWeight: widget.active ? FontWeight.w600 : FontWeight.w400,
+          child: widget.compact
+              ? Center(child: Icon(widget.icon, size: 15, color: foreground))
+              : Row(
+                  children: [
+                    Icon(widget.icon, size: 14, color: foreground),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: foreground,
+                        fontWeight: widget.active
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );
-    final tip = widget.tooltip;
+    final tip = widget.compact
+        ? (widget.tooltip ?? widget.label)
+        : widget.tooltip;
     return tip == null ? body : Tooltip(message: tip, child: body);
   }
 }

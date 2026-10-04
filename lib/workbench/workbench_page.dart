@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
 import 'package:xterm/xterm.dart' as xterm;
@@ -1748,17 +1747,16 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                                 sectionOrder: explorerSectionOrder,
                                 onSectionOrderChanged:
                                     _handleExplorerSectionOrderChanged,
+                                compact:
+                                    _sidebarWidth <= Sidebar.compactBreakpoint,
                               ),
                             ),
                             ResizeHandle(
-                              onDrag: (delta) {
-                                setState(() {
-                                  _sidebarWidth = max(
-                                    _minSidebarWidth,
-                                    _sidebarWidth + delta,
-                                  );
-                                });
-                              },
+                              value: _sidebarWidth,
+                              min: _minSidebarWidth,
+                              max: 560,
+                              onChanged: (width) =>
+                                  setState(() => _sidebarWidth = width),
                             ),
                           ],
                           Expanded(
@@ -1818,15 +1816,11 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                         height: _dockHeight,
                         collapsed: _dockCollapsed,
                         showMemory: _memoryDockVisible,
-                        onToggleCollapsed: () =>
-                            setState(() => _dockCollapsed = !_dockCollapsed),
-                        // Dragging the grip up gives the dock more room, so the
-                        // height moves opposite to the pointer delta.
-                        onHeightChanged: (delta) => setState(() {
-                          _dockHeight = (_dockHeight - delta).clamp(
-                            96.0,
-                            420.0,
-                          );
+                        onCollapsedChanged: (collapsed) =>
+                            setState(() => _dockCollapsed = collapsed),
+                        onHeightChanged: (height) => setState(() {
+                          _dockCollapsed = false;
+                          _dockHeight = height.clamp(96.0, 420.0);
                         }),
                       ),
                   ],

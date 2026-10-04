@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_colors.dart';
@@ -17,7 +19,7 @@ class WorkbenchDock extends StatefulWidget {
     required this.height,
     required this.collapsed,
     required this.showMemory,
-    required this.onToggleCollapsed,
+    required this.onCollapsedChanged,
     required this.onHeightChanged,
   });
 
@@ -30,7 +32,13 @@ class WorkbenchDock extends StatefulWidget {
   /// the row entirely, so 实时事件 fills the dock (prototype `data-mem`).
   final bool showMemory;
 
-  final VoidCallback onToggleCollapsed;
+  /// Collapse/expand requests from the splitter, the fold arrow or the
+  /// keyboard (`Home` / `End` / arrow keys).
+  final ValueChanged<bool> onCollapsedChanged;
+
+  /// Absolute panel height in logical pixels; the parent clamps it and expands
+  /// the dock. The splitter maps the pointer position to this value directly,
+  /// so the grip stays glued to the cursor across fold/unfold.
   final ValueChanged<double> onHeightChanged;
 
   @override
@@ -39,6 +47,9 @@ class WorkbenchDock extends StatefulWidget {
 
 class _WorkbenchDockState extends State<WorkbenchDock> {
   static const double _collapsedHeight = 37;
+  static const double _minHeight = 96;
+  static const double _maxHeight = 420;
+  static const double _collapseAt = 96;
   static const double _eventsFraction = 0.6;
   static const double _minEventsWidth = 260;
   static const double _minMemoryWidth = 220;
@@ -96,19 +107,22 @@ class _WorkbenchDockState extends State<WorkbenchDock> {
     setState(() => _snapshot = next);
   }
 
-  void _dragEventsWidth(DragUpdateDetails details, double maxWidth) {
-    final current = _eventsWidth ?? maxWidth * _eventsFraction;
-    // With 内存监控 hidden there is no second panel to make room for, so the
-    // divider can push the feed all the way across.
-    final upper = widget.showMemory
-        ? (maxWidth - _minMemoryWidth).clamp(_minEventsWidth, 900.0)
-        : maxWidth;
-    setState(
-      () => _eventsWidth = (current + details.delta.dx).clamp(
-        _minEventsWidth,
-        upper,
-      ),
-    );
+  /// Bottom edge of the whole dock in global coordinates. The splitter uses it
+  /// to turn the pointer's absolute Y into the panel height, matching the
+  /// prototype's `dockHeightAt(clientY)`.
+  double _dockBottomY() {
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.attached) return 0;
+    return box.localToGlobal(Offset(0, box.size.height)).dy;
+  }
+
+  void _requestHeight(double height) {
+    if (height < _collapseAt) {
+      if (!widget.collapsed) widget.onCollapsedChanged(true);
+      return;
+    }
+    if (widget.collapsed) widget.onCollapsedChanged(false);
+    widget.onHeightChanged(height.clamp(_minHeight, _maxHeight));
   }
 
   @override
@@ -117,7 +131,19 @@ class _WorkbenchDockState extends State<WorkbenchDock> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (!collapsed) _HorizontalGrip(onDrag: widget.onHeightChanged),
+        // The splitter stays in the layout while folded: the prototype hides
+        // only its grip, and dragging the strip back down re-opens the dock.
+        _DockSplitter(
+          collapsed: collapsed,
+          currentHeight: collapsed ? _collapsedHeight : widget.height,
+          dockBottomY: _dockBottomY,
+          onHeightRequested: _requestHeight,
+          onCollapseRequested: () => widget.onCollapsedChanged(true),
+          onExpandRequested: (height) {
+            widget.onCollapsedChanged(false);
+            widget.onHeightChanged(height.clamp(_minHeight, _maxHeight));
+          },
+        ),
         SizedBox(
           height: collapsed ? _collapsedHeight : widget.height,
           child: LayoutBuilder(
@@ -139,12 +165,24 @@ class _WorkbenchDockState extends State<WorkbenchDock> {
                       events: widget.events,
                       collapsed: collapsed,
                       memory: _snapshot,
-                      onToggle: widget.onToggleCollapsed,
+                      onToggle: () => widget.onCollapsedChanged(!collapsed),
                     ),
                   ),
                   if (showMemory) ...[
                     _VerticalGrip(
-                      onDrag: (details) => _dragEventsWidth(details, maxWidth),
+                      minWidth: _minEventsWidth,
+                      maxWidth: widget.showMemory
+                          ? math.max(
+                              _minEventsWidth,
+                              maxWidth - _minMemoryWidth,
+                            )
+                          : maxWidth,
+                      currentWidth: eventsWidth,
+                      onWidthRequested: (width) => setState(
+                        () => _eventsWidth = width
+                            .clamp(_minEventsWidth, maxWidth)
+                            .toDouble(),
+                      ),
                     ),
                     Expanded(child: _MemoryPanel(snapshot: _snapshot)),
                   ],
@@ -158,21 +196,142 @@ class _WorkbenchDockState extends State<WorkbenchDock> {
   }
 }
 
-/// Horizontal splitter above the dock.
-class _HorizontalGrip extends StatelessWidget {
-  const _HorizontalGrip({required this.onDrag});
+/// Horizontal splitter above the dock: a real hit target in both states, with
+/// the prototype's centred grip, hover accent and keyboard equivalents.
+class _DockSplitter extends StatefulWidget {
+  const _DockSplitter({
+    required this.collapsed,
+    required this.currentHeight,
+    required this.dockBottomY,
+    required this.onHeightRequested,
+    required this.onCollapseRequested,
+    required this.onExpandRequested,
+  });
 
-  final ValueChanged<double> onDrag;
+  final bool collapsed;
+  final double currentHeight;
+  final double Function() dockBottomY;
+  final ValueChanged<double> onHeightRequested;
+  final VoidCallback onCollapseRequested;
+  final ValueChanged<double> onExpandRequested;
+
+  static const double height = 10;
+
+  @override
+  State<_DockSplitter> createState() => _DockSplitterState();
+}
+
+class _DockSplitterState extends State<_DockSplitter> {
+  static const double _minHeight = 96;
+  static const double _maxHeight = 420;
+  static const double _collapseAt = 96;
+  static const double _collapsedHeight = 37;
+
+  final FocusNode _focusNode = FocusNode();
+  bool _hovered = false;
+  bool _focused = false;
+  bool _dragging = false;
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final current = widget.collapsed ? _collapsedHeight : widget.currentHeight;
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      final target = widget.collapsed
+          ? _minHeight
+          : (current + 16).clamp(_minHeight, _maxHeight);
+      widget.onExpandRequested(target);
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      final target = current - 16;
+      if (target < _collapseAt) {
+        widget.onCollapseRequested();
+      } else {
+        widget.onHeightRequested(target);
+      }
+    } else if (event.logicalKey == LogicalKeyboardKey.home) {
+      widget.onCollapseRequested();
+    } else if (event.logicalKey == LogicalKeyboardKey.end) {
+      widget.onExpandRequested(_maxHeight);
+    } else {
+      return KeyEventResult.ignored;
+    }
+    return KeyEventResult.handled;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onVerticalDragUpdate: (details) => onDrag(details.delta.dy),
-      child: Container(
-        height: 7,
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: AppColors.border)),
+    final active = _hovered || _focused || _dragging;
+    return Focus(
+      focusNode: _focusNode,
+      onFocusChange: (value) => setState(() => _focused = value),
+      onKeyEvent: _onKey,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.resizeUpDown,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (_) => _focusNode.requestFocus(),
+          onVerticalDragStart: (_) {
+            _focusNode.requestFocus();
+            setState(() => _dragging = true);
+          },
+          onVerticalDragEnd: (_) => setState(() => _dragging = false),
+          onVerticalDragCancel: () => setState(() => _dragging = false),
+          onVerticalDragUpdate: (details) {
+            final height =
+                widget.dockBottomY() -
+                details.globalPosition.dy -
+                _DockSplitter.height / 2;
+            widget.onHeightRequested(height);
+          },
+          child: SizedBox(
+            height: _DockSplitter.height,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    height: 1,
+                    color: active ? AppColors.accent : AppColors.border,
+                  ),
+                ),
+                if (!widget.collapsed)
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    width: 26,
+                    height: 3,
+                    color: active ? AppColors.textPrimary : AppColors.border,
+                  ),
+                if (active)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.accent.withValues(alpha: 0.14),
+                              blurRadius: 0,
+                              spreadRadius: 3,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -180,17 +339,102 @@ class _HorizontalGrip extends StatelessWidget {
 }
 
 /// Vertical splitter between the two dock panels.
-class _VerticalGrip extends StatelessWidget {
-  const _VerticalGrip({required this.onDrag});
+class _VerticalGrip extends StatefulWidget {
+  const _VerticalGrip({
+    required this.minWidth,
+    required this.maxWidth,
+    required this.currentWidth,
+    required this.onWidthRequested,
+  });
 
-  final ValueChanged<DragUpdateDetails> onDrag;
+  final double minWidth;
+  final double maxWidth;
+  final double currentWidth;
+  final ValueChanged<double> onWidthRequested;
+
+  static const double width = 7;
+
+  @override
+  State<_VerticalGrip> createState() => _VerticalGripState();
+}
+
+class _VerticalGripState extends State<_VerticalGrip> {
+  final FocusNode _focusNode = FocusNode();
+  bool _hovered = false;
+  bool _focused = false;
+  bool _dragging = false;
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      widget.onWidthRequested(widget.currentWidth - 16);
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      widget.onWidthRequested(widget.currentWidth + 16);
+    } else if (event.logicalKey == LogicalKeyboardKey.home) {
+      widget.onWidthRequested(widget.minWidth);
+    } else if (event.logicalKey == LogicalKeyboardKey.end) {
+      widget.onWidthRequested(widget.maxWidth);
+    } else {
+      return KeyEventResult.ignored;
+    }
+    return KeyEventResult.handled;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onHorizontalDragUpdate: onDrag,
-      child: Container(width: 7),
+    final active = _hovered || _focused || _dragging;
+    return Focus(
+      focusNode: _focusNode,
+      onFocusChange: (value) => setState(() => _focused = value),
+      onKeyEvent: _onKey,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.resizeLeftRight,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (_) => _focusNode.requestFocus(),
+          onHorizontalDragStart: (_) {
+            _focusNode.requestFocus();
+            setState(() => _dragging = true);
+          },
+          onHorizontalDragEnd: (_) => setState(() => _dragging = false),
+          onHorizontalDragCancel: () => setState(() => _dragging = false),
+          onHorizontalDragUpdate: (details) =>
+              widget.onWidthRequested(widget.currentWidth + details.delta.dx),
+          child: SizedBox(
+            width: _VerticalGrip.width,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  top: 0,
+                  bottom: 0,
+                  left: 3,
+                  child: Container(
+                    width: 1,
+                    color: active ? AppColors.accent : AppColors.border,
+                  ),
+                ),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  width: 3,
+                  height: 26,
+                  color: active ? AppColors.textPrimary : AppColors.border,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -213,7 +457,11 @@ class _DockPanelShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(0, 0, 0, 6),
+      // Folded, the title bar is the whole panel: the prototype drops the
+      // outer bottom gap so 37px is enough for the header.
+      margin: collapsed
+          ? EdgeInsets.zero
+          : const EdgeInsets.fromLTRB(0, 0, 0, 6),
       decoration: BoxDecoration(
         color: AppColors.panel,
         border: Border.all(color: AppColors.textPrimary),

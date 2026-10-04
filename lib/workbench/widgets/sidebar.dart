@@ -46,13 +46,14 @@ class Sidebar extends StatelessWidget {
               border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
             child: Row(
+              mainAxisAlignment: compact
+                  ? MainAxisAlignment.center
+                  : MainAxisAlignment.start,
               children: [
                 // Clipped rather than removed so the label stays reachable to
                 // screen readers when the rail collapses.
                 if (!compact)
-                  const Expanded(child: DeckLabel('Explorer', size: 10.5))
-                else
-                  const Spacer(),
+                  const Expanded(child: DeckLabel('Explorer', size: 10.5)),
                 AddConnectionButton(
                   onSelected: onAddConnectionSelected,
                   compact: true,
