@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:deepssh/core/models/theme_settings.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/theme/theme_bridge.dart';
+import 'package:deepssh/workbench/widgets/app_topbar.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,7 +24,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('主题配置'));
+    await tester.tap(find.byKey(appNavKey(AppSection.theme)));
     await tester.pumpAndSettle();
     expect(find.text('主题配置'), findsWidgets);
     expect(find.textContaining('#FAF9F5'), findsWidgets);
@@ -54,7 +55,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('主题配置'));
+    await tester.tap(find.byKey(appNavKey(AppSection.theme)));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, 'Inter'), 'A');
     await tester.enterText(
