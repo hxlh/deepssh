@@ -1186,18 +1186,26 @@ class _RegexRuleRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Exact prototype `.rx`: 40px row, 18px grip, pattern ≤280,
+          // note ≤150, auto colour cell, 32px delete, 8px gaps.
           SizedBox(
             height: 32,
             child: Row(
               children: [
-                ReorderableDragStartListener(
-                  index: index,
-                  child: Tooltip(
-                    message: '拖动调整优先级',
-                    child: Icon(
-                      Icons.drag_indicator,
-                      size: 18,
-                      color: AppColors.textMuted,
+                SizedBox(
+                  width: 18,
+                  height: 32,
+                  child: Center(
+                    child: ReorderableDragStartListener(
+                      index: index,
+                      child: Tooltip(
+                        message: '拖动调整优先级',
+                        child: Icon(
+                          Icons.drag_indicator,
+                          size: 15,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1208,6 +1216,7 @@ class _RegexRuleRow extends StatelessWidget {
                     key: ValueKey('regex-pattern-$index'),
                     value: pattern,
                     hint: '正则表达式',
+                    mono: true,
                     isError: patternError != null,
                     onChanged: onPatternChanged,
                   ),
@@ -1224,20 +1233,10 @@ class _RegexRuleRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 _RuleColorButton(value: color, onChanged: onColorChanged),
-                const SizedBox(width: 4),
+                const SizedBox(width: 8),
                 Tooltip(
                   message: '移除正则规则',
-                  child: IconButton(
-                    onPressed: onRemove,
-                    icon: const Icon(Icons.close, size: 16),
-                    color: AppColors.textMuted,
-                    hoverColor: AppColors.tabHover,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 32,
-                      height: 32,
-                    ),
-                  ),
+                  child: _RuleDeleteButton(onPressed: onRemove),
                 ),
               ],
             ),
@@ -1281,12 +1280,14 @@ class _RuleInput extends StatefulWidget {
     required this.value,
     required this.onChanged,
     this.hint,
+    this.mono = false,
     this.isError = false,
   });
 
   final String value;
   final ValueChanged<String> onChanged;
   final String? hint;
+  final bool mono;
   final bool isError;
 
   @override
@@ -1297,6 +1298,18 @@ class _RuleInputState extends State<_RuleInput> {
   late final TextEditingController _controller = TextEditingController(
     text: widget.value,
   );
+  final FocusNode _focusNode = FocusNode();
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_handleFocusChanged);
+  }
+
+  void _handleFocusChanged() {
+    if (mounted) setState(() => _focused = _focusNode.hasFocus);
+  }
 
   @override
   void didUpdateWidget(covariant _RuleInput oldWidget) {
@@ -1308,36 +1321,54 @@ class _RuleInputState extends State<_RuleInput> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: _controller,
-      onChanged: widget.onChanged,
-      style: DeckFieldStyle.text,
-      decoration: DeckFieldStyle.decoration(hint: widget.hint).copyWith(
-        fillColor: AppColors.background,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-        border: _ruleBorder(
-          widget.isError ? DeckTokens.danger : AppColors.border,
-        ),
-        enabledBorder: _ruleBorder(
-          widget.isError ? DeckTokens.danger : AppColors.border,
-        ),
-        focusedBorder: _ruleBorder(
-          widget.isError ? DeckTokens.danger : AppColors.accent,
+    final borderColor = widget.isError
+        ? DeckTokens.danger
+        : (_focused ? AppColors.accent : AppColors.border);
+    return Container(
+      height: 32,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: _focused ? AppColors.panel : AppColors.background,
+        border: Border.all(color: borderColor),
+      ),
+      child: TextField(
+        focusNode: _focusNode,
+        controller: _controller,
+        onChanged: widget.onChanged,
+        textAlignVertical: TextAlignVertical.center,
+        style: widget.mono
+            ? TextStyle(
+                fontFamily: 'JetBrains Mono',
+                fontFamilyFallback: DeckTokens.fontMono,
+                fontSize: 11.5,
+                color: AppColors.textPrimary,
+              )
+            : TextStyle(fontSize: 12.5, color: AppColors.textPrimary),
+        decoration: InputDecoration(
+          isDense: true,
+          isCollapsed: true,
+          border: InputBorder.none,
+          hintText: widget.hint,
+          hintStyle: widget.mono
+              ? TextStyle(
+                  fontFamily: 'JetBrains Mono',
+                  fontFamilyFallback: DeckTokens.fontMono,
+                  fontSize: 11.5,
+                  color: AppColors.textMuted,
+                )
+              : TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
         ),
       ),
     );
   }
-
-  OutlineInputBorder _ruleBorder(Color color) => OutlineInputBorder(
-    borderRadius: BorderRadius.zero,
-    borderSide: BorderSide(color: color),
-  );
 }
 
 class _RuleColorButton extends StatelessWidget {
@@ -1357,27 +1388,37 @@ class _RuleColorButton extends StatelessWidget {
           onChanged: onChanged,
         ),
         child: Container(
-          width: 62,
           height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             color: AppColors.background,
             border: Border.all(color: AppColors.border),
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Container(
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: value,
-                    border: Border.all(color: AppColors.textPrimary),
-                  ),
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: value,
+                  border: Border.all(color: AppColors.textPrimary),
                 ),
               ),
+              const SizedBox(width: 8),
+              Text(
+                css.colorToHex(value),
+                style: TextStyle(
+                  fontFamily: 'JetBrains Mono',
+                  fontFamilyFallback: DeckTokens.fontMono,
+                  fontSize: 11,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
               Icon(
                 Icons.keyboard_arrow_down,
-                size: 14,
+                size: 11,
                 color: AppColors.textMuted,
               ),
             ],
@@ -1388,7 +1429,48 @@ class _RuleColorButton extends StatelessWidget {
   }
 }
 
-/// Dropdown trigger + overlay menu, mirroring the prototype `.psel` block.
+class _RuleDeleteButton extends StatefulWidget {
+  const _RuleDeleteButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  State<_RuleDeleteButton> createState() => _RuleDeleteButtonState();
+}
+
+class _RuleDeleteButtonState extends State<_RuleDeleteButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onPressed,
+          child: Container(
+            decoration: BoxDecoration(
+              color: _hovered ? AppColors.background : Colors.transparent,
+              border: Border.all(
+                color: _hovered ? AppColors.border : Colors.transparent,
+              ),
+            ),
+            child: Icon(
+              Icons.close,
+              size: 13,
+              color: _hovered ? DeckTokens.danger : AppColors.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PresetDropdown extends StatefulWidget {
   const _PresetDropdown({
     required this.kind,
