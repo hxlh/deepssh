@@ -25,6 +25,38 @@ void deckSetText(TextEditingController controller, String text) {
   );
 }
 
+/// Decoration for fields whose chrome is painted by a surrounding container.
+///
+/// The app installs an [InputDecorationTheme] that fills every field and draws
+/// an outline (`enabledBorder`/`focusedBorder`). Overriding only
+/// [InputDecoration.border] with [InputBorder.none] leaves those state borders
+/// alive, so the field paints a second box — and a second fill — inside the
+/// outer frame, with its text pressed against that inner border. Every state
+/// border and the fill have to be switched off explicitly.
+InputDecoration deckBareInputDecoration({
+  String? hint,
+  TextStyle? hintStyle,
+  EdgeInsetsGeometry? contentPadding,
+  bool isDense = true,
+  bool isCollapsed = true,
+}) {
+  return InputDecoration(
+    isDense: isDense,
+    isCollapsed: isCollapsed,
+    filled: false,
+    fillColor: Colors.transparent,
+    hintText: hint,
+    hintStyle: hintStyle,
+    contentPadding: contentPadding,
+    border: InputBorder.none,
+    enabledBorder: InputBorder.none,
+    focusedBorder: InputBorder.none,
+    disabledBorder: InputBorder.none,
+    errorBorder: InputBorder.none,
+    focusedErrorBorder: InputBorder.none,
+  );
+}
+
 /// Form controls for the drawer forms.
 ///
 /// The prototype does not use Material's floating labels: every field is a
@@ -75,7 +107,11 @@ abstract final class DeckFieldStyle {
     borderSide: BorderSide(color: color),
   );
 
-  static TextStyle text = TextStyle(
+  /// A getter, not a cached field: a static TextStyle captures AppColors at
+  /// first evaluation, so applying a new preset at runtime (or a golden that
+  /// runs after a dark-preset test) would keep rendering field text in the
+  /// previously cached colour.
+  static TextStyle get text => TextStyle(
     fontFamily: 'JetBrains Mono',
     fontFamilyFallback: DeckTokens.fontMono,
     fontSize: 12,

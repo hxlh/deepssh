@@ -142,6 +142,13 @@ Future<void> _withUiTheme(
 
 void main() {
   if (_enabled) {
+    // Pin the derived palette the way the running app sees it: main.dart
+    // applies the saved UI theme at startup, and applyUi derives border and
+    // text scale from it. Without this, a golden rendered in isolation (raw
+    // token border, 14px base) differs from one rendered after a preset test
+    // (derived border, 13px base), so the same render passes alone and fails
+    // in the suite.
+    AppColors.applyUi(UiThemeSettings.commandDeck());
     AppColors.fontFamily = 'Noto Sans SC';
   }
 

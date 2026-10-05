@@ -217,13 +217,11 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                 fontFamily: 'monospace',
                 fontSize: 13,
               ),
-              decoration: const InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
+              decoration: deckBareInputDecoration(
                 // Symmetric padding is what centres the value; a fixed outer
                 // height leaves the font's descent space hanging below and the
                 // text reads high.
-                contentPadding: EdgeInsets.symmetric(
+                contentPadding: const EdgeInsets.symmetric(
                   horizontal: 8,
                   vertical: 7,
                 ),

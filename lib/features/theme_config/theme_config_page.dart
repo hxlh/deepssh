@@ -1384,23 +1384,29 @@ class _RegexRuleRow extends StatelessWidget {
                 const SizedBox(width: 8),
                 Flexible(
                   flex: 280,
-                  child: _RuleInput(
-                    key: ValueKey('regex-pattern-$index'),
-                    value: pattern,
-                    hint: '正则表达式',
-                    mono: true,
-                    isError: patternError != null,
-                    onChanged: onPatternChanged,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    child: _RuleInput(
+                      key: ValueKey('regex-pattern-$index'),
+                      value: pattern,
+                      hint: '正则表达式',
+                      mono: true,
+                      isError: patternError != null,
+                      onChanged: onPatternChanged,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Flexible(
                   flex: 150,
-                  child: _RuleInput(
-                    key: ValueKey('regex-note-$index'),
-                    value: note,
-                    hint: '备注',
-                    onChanged: onNoteChanged,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 150),
+                    child: _RuleInput(
+                      key: ValueKey('regex-note-$index'),
+                      value: note,
+                      hint: '备注',
+                      onChanged: onNoteChanged,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1523,11 +1529,8 @@ class _RuleInputState extends State<_RuleInput> {
                 color: AppColors.textPrimary,
               )
             : TextStyle(fontSize: 12.5, color: AppColors.textPrimary),
-        decoration: InputDecoration(
-          isDense: true,
-          isCollapsed: true,
-          border: InputBorder.none,
-          hintText: widget.hint,
+        decoration: deckBareInputDecoration(
+          hint: widget.hint,
           hintStyle: widget.mono
               ? TextStyle(
                   fontFamily: 'JetBrains Mono',

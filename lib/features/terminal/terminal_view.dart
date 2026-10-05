@@ -11,6 +11,7 @@ import 'package:xterm/xterm.dart' as xterm;
 import '../../core/models/theme_settings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/deck_fields.dart';
 import '../local_terminal/local_terminal_bridge.dart';
 import '../ssh/ssh_bridge.dart';
 import 'terminal_find.dart';
@@ -879,8 +880,7 @@ class _TerminalViewState extends State<TerminalView> {
                     textInputAction: TextInputAction.none,
                     enableSuggestions: false,
                     autocorrect: false,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
+                    decoration: deckBareInputDecoration(
                       contentPadding: EdgeInsets.zero,
                     ),
                     style: const TextStyle(color: Colors.transparent),

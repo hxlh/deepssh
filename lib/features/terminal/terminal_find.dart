@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart' as xterm;
 
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/deck_fields.dart';
 
 class _FindMatch {
   const _FindMatch({
@@ -170,11 +171,7 @@ class TerminalFindSession {
             text,
             positions,
             ' ',
-            _SearchPosition(
-              row: row,
-              column: column,
-              endColumn: column + 1,
-            ),
+            _SearchPosition(row: row, column: column, endColumn: column + 1),
           );
           continue;
         }
@@ -184,11 +181,7 @@ class TerminalFindSession {
           text,
           positions,
           char,
-          _SearchPosition(
-            row: row,
-            column: column,
-            endColumn: column + width,
-          ),
+          _SearchPosition(row: row, column: column, endColumn: column + width),
         );
       }
     }
@@ -415,13 +408,11 @@ class _TerminalFindBarState extends State<TerminalFindBar> {
                               height: 1.0,
                               forceStrutHeight: true,
                             ),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.only(
+                            decoration: deckBareInputDecoration(
+                              contentPadding: const EdgeInsets.only(
                                 top: 12,
                                 bottom: 6,
                               ),
-                              isDense: true,
                             ),
                           ),
                         ),

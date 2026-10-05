@@ -104,7 +104,7 @@ abstract final class AppTheme {
             borderRadius: _square,
             side: BorderSide(color: AppColors.textPrimary),
           ),
-          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          textStyle: _buttonTextStyle(),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -112,14 +112,14 @@ abstract final class AppTheme {
           foregroundColor: AppColors.textPrimary,
           side: BorderSide(color: AppColors.border),
           shape: const RoundedRectangleBorder(borderRadius: _square),
-          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          textStyle: _buttonTextStyle(),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
           shape: const RoundedRectangleBorder(borderRadius: _square),
-          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          textStyle: _buttonTextStyle(),
         ),
       ),
       scrollbarTheme: ScrollbarThemeData(
@@ -152,6 +152,20 @@ abstract final class AppTheme {
       labelSmall: _applyTextStyle(textTheme.labelSmall),
     );
   }
+
+  /// Label style for Material's own buttons.
+  ///
+  /// `ButtonStyleButton` hands this style to its `Material` as `textStyle`,
+  /// which *replaces* the inherited default text style instead of merging with
+  /// it. Naming the deck UI font here is what keeps `TextButton` labels (for
+  /// example the theme page's "添加规则") on the same font stack as the rest of
+  /// the UI; without it they fall back to the platform default.
+  static TextStyle _buttonTextStyle() => TextStyle(
+    fontFamily: AppColors.fontFamilyPrimary,
+    fontFamilyFallback: AppColors.fontFamilyFallback,
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+  );
 
   static FontWeight _fontWeightFor(TextStyle style, {bool bold = false}) {
     final value = style.fontWeight?.value ?? FontWeight.normal.value;
