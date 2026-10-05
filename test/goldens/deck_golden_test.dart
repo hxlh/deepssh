@@ -104,9 +104,9 @@ Future<void> _loadGoldenFont() async {
     'Roboto',
   ];
   for (final family in aliases) {
-    await (FontLoader(family)
-          ..addFont(rootBundle.load('assets/fonts/NotoSansSC-Regular.ttf')))
-        .load();
+    await (FontLoader(
+      family,
+    )..addFont(rootBundle.load('assets/fonts/NotoSansSC-Regular.ttf'))).load();
   }
   _goldenFontLoaded = true;
 }
@@ -215,17 +215,27 @@ void main() {
 
   testWidgets('workbench dock', (tester) async {
     if (!_enabled) return;
+    // Fixed timestamps: `record` defaults to DateTime.now(), which would make
+    // the dock golden shift on every run (the feed renders hh:mm:ss).
+    final t = DateTime(2026, 10, 4, 14, 32);
     final events = WorkbenchEvents()
       ..record(
         WorkbenchEventLevel.error,
         '转发启动失败',
         subject: 'db-5432 · port 10048',
+        time: t,
       )
-      ..record(WorkbenchEventLevel.warn, '转发已停止', subject: 'web-8080')
+      ..record(
+        WorkbenchEventLevel.warn,
+        '转发已停止',
+        subject: 'web-8080',
+        time: t.add(const Duration(seconds: 3)),
+      )
       ..record(
         WorkbenchEventLevel.info,
         '已连接',
         subject: 'deploy@10.24.8.11:22',
+        time: t.add(const Duration(seconds: 13)),
       );
     await _shoot(
       tester,

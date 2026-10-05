@@ -36,11 +36,16 @@ class WorkbenchEvents extends ChangeNotifier {
 
   List<WorkbenchEvent> get entries => List.unmodifiable(_entries);
 
-  void record(WorkbenchEventLevel level, String message, {String? subject}) {
+  void record(
+    WorkbenchEventLevel level,
+    String message, {
+    String? subject,
+    DateTime? time,
+  }) {
     _entries.insert(
       0,
       WorkbenchEvent(
-        time: DateTime.now(),
+        time: time ?? DateTime.now(),
         level: level,
         message: message,
         subject: subject,

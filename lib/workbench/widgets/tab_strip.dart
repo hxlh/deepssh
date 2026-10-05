@@ -157,6 +157,12 @@ class _TabItemState extends State<_TabItem> {
                 constraints: const BoxConstraints(maxWidth: 190),
                 child: Text(
                   widget.tab.label,
+                  // The prototype caps each tab on one line (`.tab` is
+                  // `white-space:nowrap`). `overflow: ellipsis` only bites
+                  // when the paragraph is single-line, so maxLines/softWrap
+                  // are what actually stop long labels wrapping to two rows.
+                  maxLines: 1,
+                  softWrap: false,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12.5,

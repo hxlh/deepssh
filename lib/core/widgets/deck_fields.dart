@@ -237,7 +237,13 @@ class _DeckSelectState<T> extends State<DeckSelect<T>> {
   }
 
   Widget _labelFor(BuildContext context, T item) =>
-      widget.itemBuilder?.call(context, item) ?? Text('$item');
+      widget.itemBuilder?.call(context, item) ??
+      Text(
+        '$item',
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.ellipsis,
+      );
 
   void _removeEntry() {
     _entry?.remove();
@@ -340,11 +346,16 @@ class _DeckSelectState<T> extends State<DeckSelect<T>> {
             child: Row(
               children: [
                 Expanded(
-                  child: DefaultTextStyle.merge(
-                    style: DeckFieldStyle.text.copyWith(
-                      overflow: TextOverflow.ellipsis,
+                  // Clip so a long value can never stretch the trigger to a
+                  // second row; the inner Text ellipsises on one line.
+                  child: ClipRect(
+                    child: DefaultTextStyle.merge(
+                      style: DeckFieldStyle.text,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: _labelFor(context, widget.value),
+                      ),
                     ),
-                    child: _labelFor(context, widget.value),
                   ),
                 ),
                 const SizedBox(width: 8),

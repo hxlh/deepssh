@@ -480,7 +480,12 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
               label: '界面字体',
               value: uiSettings.fontFamily,
               items: families,
-              itemBuilder: (context, family) => Text(_uiFontLabel(family)),
+              itemBuilder: (context, family) => Text(
+                _uiFontLabel(family),
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+              ),
               onChanged: (family) {
                 if (family == null) return;
                 _updateUi(uiSettings.copyWith(fontFamily: family));
@@ -578,8 +583,12 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
               label: '字体族',
               value: termSettings.fontFamily,
               items: [for (final option in _terminalFontOptions) option.family],
-              itemBuilder: (context, family) =>
-                  Text(_terminalFontLabel(family)),
+              itemBuilder: (context, family) => Text(
+                _terminalFontLabel(family),
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+              ),
               onChanged: (family) {
                 if (family == null) return;
                 _updateTerm(termSettings.copyWith(fontFamily: family));
