@@ -108,10 +108,9 @@ void main() {
       onTerminalSaved: (settings) => savedTerminal = settings,
     );
 
-    await tester.tap(find.byKey(const ValueKey('ui-size-select')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('15 px').last);
-    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('ui-size-select')), '15');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
 
     expect(savedUi, isNull, reason: 'editing must not persist immediately');
 
@@ -127,10 +126,9 @@ void main() {
 
     await _pumpPage(tester, onUiSaved: (settings) => savedUi = settings);
 
-    await tester.tap(find.byKey(const ValueKey('ui-size-select')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('15 px').last);
-    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('ui-size-select')), '15');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
 
     await tester.tap(find.byKey(const ValueKey('theme-reset')));
     await tester.pump();

@@ -663,6 +663,12 @@ class _FeedRow extends StatelessWidget {
                   child: RichText(
                     text: TextSpan(
                       style: TextStyle(
+                        // The prototype's `.feed-row` body uses the UI sans
+                        // stack (only `time` and `.lvl` are mono). Leaving this
+                        // family-less made the feed the one surface that fell
+                        // outside the deck font stack.
+                        fontFamily: AppColors.fontFamily,
+                        fontFamilyFallback: DeckTokens.fontBody,
                         fontSize: 12,
                         color: AppColors.textPrimary,
                       ),

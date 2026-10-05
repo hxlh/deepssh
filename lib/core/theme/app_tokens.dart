@@ -61,6 +61,7 @@ abstract final class DeckTokens {
     'Iowan Old Style',
     'Charter',
     'Times New Roman',
+    'Noto Sans SC',
   ];
   static const List<String> fontBody = <String>[
     '-apple-system',
@@ -68,13 +69,14 @@ abstract final class DeckTokens {
     'Segoe UI',
     'PingFang SC',
     'Microsoft YaHei',
-    'Noto Sans CJK SC',
+    'Noto Sans SC',
   ];
   static const List<String> fontMono = <String>[
     'JetBrains Mono',
     'SF Mono',
     'Menlo',
     'Consolas',
+    'Noto Sans SC',
   ];
 
   /// Mixes [a] toward [b] by [amount] in OKLab space.

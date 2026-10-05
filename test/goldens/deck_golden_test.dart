@@ -4,10 +4,9 @@
 //
 //   DECK_GOLDENS=1 flutter test test/goldens/deck_golden_test.dart --update-goldens
 //
-// The goldens are font-dependent — this box has no Georgia, JetBrains Mono or
-// CJK sans, so text falls back and only layout, colour and spacing are
-// meaningful. That also means the images never match on another machine, which
-// is why the test skips itself by default rather than failing CI.
+// The CJK fallback is bundled in pubspec.yaml so Chinese text renders in the
+// headless Flutter engine without depending on fonts installed on the host.
+// The test remains opt-in because golden pixels are still platform-dependent.
 import 'dart:io';
 
 import 'package:deepssh/core/models/ssh_profile_item.dart';
@@ -28,6 +27,7 @@ import 'package:deepssh/workbench/widgets/app_topbar.dart';
 import 'package:deepssh/workbench/widgets/tab_strip.dart';
 import 'package:deepssh/workbench/widgets/workbench_dock.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _profiles = [
@@ -86,11 +86,39 @@ const _tunnels = [
 ];
 
 final bool _enabled = Platform.environment['DECK_GOLDENS'] == '1';
+bool _goldenFontLoaded = false;
+
+Future<void> _loadGoldenFont() async {
+  if (_goldenFontLoaded) return;
+  const aliases = [
+    'Noto Sans SC',
+    'JetBrains Mono',
+    'Georgia',
+    'Inter',
+    'Segoe UI',
+    'Consolas',
+    'SF Mono',
+    'Menlo',
+    'Ahem',
+    'sans-serif',
+    'Roboto',
+  ];
+  for (final family in aliases) {
+    await (FontLoader(family)
+          ..addFont(rootBundle.load('assets/fonts/NotoSansSC-Regular.ttf')))
+        .load();
+  }
+  _goldenFontLoaded = true;
+}
 
 Future<void> _shoot(WidgetTester tester, Widget app, String name) async {
   tester.view.physicalSize = const Size(1440, 900);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
+  final previousFontFamily = AppColors.fontFamily;
+  AppColors.fontFamily = 'Noto Sans SC';
+  addTearDown(() => AppColors.fontFamily = previousFontFamily);
+  await _loadGoldenFont();
   await tester.pumpWidget(app);
   await tester.pumpAndSettle();
   await expectLater(
@@ -113,6 +141,10 @@ Future<void> _withUiTheme(
 }
 
 void main() {
+  if (_enabled) {
+    AppColors.fontFamily = 'Noto Sans SC';
+  }
+
   testWidgets('connections page under a dark preset', (tester) async {
     if (!_enabled) return;
     await _withUiTheme(tester, UiThemeSettings.vsCodeDark(), (tester) async {

@@ -164,10 +164,11 @@ label.check input{width:14px;height:14px;accent-color:var(--accent);margin:0}
 .brand-text b{font-family:var(--font-display);font-size:15px;letter-spacing:.02em}
 .brand-text span{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 
-.page-nav{display:flex;align-items:center;gap:2px;margin-left:6px}
+.page-nav{display:flex;align-items:center;gap:2px;margin-left:6px;flex:none}
 .page-nav button{
   display:inline-flex;align-items:center;gap:7px;padding:6px 10px;background:transparent;border:1px solid transparent;
   color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;border-radius:0;
+  white-space:nowrap;flex:none;
 }
 .page-nav button:hover{color:var(--fg);background:var(--fg-soft)}
 .page-nav button[aria-current="page"]{color:var(--fg);background:var(--bg);border-color:var(--border)}
@@ -1185,11 +1186,8 @@ worker-01      Up 5 hours
               </div>
               <div class="field">
                 <label for="uiSize">基准字号</label>
-                <select class="input" id="uiSize">
-                  <option>13 px</option>
-                  <option>14 px</option>
-                  <option>15 px</option>
-                </select>
+                <input class="input" id="uiSize" type="number" min="12" max="18" step="1" value="13" inputmode="numeric" aria-describedby="uiSizeHint">
+                <span class="hint" id="uiSizeHint">12–18 整数，超界自动钳制</span>
               </div>
             </div>
           </div>
@@ -1643,40 +1641,56 @@ worker-01      Up 5 hours
     if(selState && e.target !== selMenu()){ selCloseMenu(false); }
   }, true);
 
-  /* ---------- Terminal font: family + editable size ---------- */
-  var TERM_SIZE_MIN = 8, TERM_SIZE_MAX = 32, TERM_SIZE_DEFAULT = 13;
-
-  function termSizeClamp(raw){
+  /* ---------- Font size inputs: #termSize and #uiSize are one component.
+     The band is read from each input's own min/max, so the terminal keeps its
+     wide 8-32 range and the UI base a narrower one — the control is shared,
+     the range never is. ---------- */
+  function sizeClamp(input, raw){
     var n = parseInt(raw, 10);
     if(isNaN(n)){ return null; }
-    return Math.min(TERM_SIZE_MAX, Math.max(TERM_SIZE_MIN, n));
+    var min = parseInt(input.min, 10);
+    var max = parseInt(input.max, 10);
+    if(isNaN(min)){ min = -Infinity; }
+    if(isNaN(max)){ max = Infinity; }
+    return Math.min(max, Math.max(min, n));
   }
 
-  /* Both controls write straight into the live preview — it is the only
-     surface in the prototype where these two settings are observable. */
-  function termFontApply(){
-    var pv = $('#termPreview'), fam = $('#termFont'), size = $('#termSize');
-    if(!pv || !fam || !size){ return; }
+  function bindSizeInput(input, onApply){
+    function apply(){
+      var n = sizeClamp(input, input.value);
+      if(n !== null && onApply){ onApply(n); }
+    }
+    /* Commit normalises the field itself, so what the box shows is always what
+       is applied: an out-of-range value is written back to the boundary and an
+       emptied one falls back to the authored default, never stranding a value
+       the field no longer shows. */
+    function commit(){
+      var n = sizeClamp(input, input.value);
+      input.value = (n === null ? (parseInt(input.defaultValue, 10) || 13) : n);
+      apply();
+    }
+    input.addEventListener('input', apply);
+    input.addEventListener('change', commit);
+    apply();
+  }
+
+  /* Terminal family and size land on the live preview — it is the only surface
+     in the prototype where those two settings are observable. */
+  function applyTermFont(){
+    var pv = $('#termPreview'), fam = $('#termFont');
+    if(!pv || !fam){ return; }
     pv.style.fontFamily = fam.value;
-    var n = termSizeClamp(size.value);
-    if(n !== null){ pv.style.fontSize = n + 'px'; }
   }
 
-  /* Commit normalises the field itself, so what the box shows is always what
-     is applied: a clamped value is written back, an emptied one falls back to
-     the default rather than leaving the preview on a stale size. */
-  function termSizeCommit(){
-    var size = $('#termSize');
-    if(!size){ return; }
-    var n = termSizeClamp(size.value);
-    size.value = (n === null ? TERM_SIZE_DEFAULT : n);
-    termFontApply();
-  }
-
-  $('#termFont').addEventListener('change', termFontApply);
-  $('#termSize').addEventListener('input', termFontApply);
-  $('#termSize').addEventListener('change', termSizeCommit);
-  termFontApply();
+  $('#termFont').addEventListener('change', applyTermFont);
+  bindSizeInput($('#termSize'), function(px){
+    var pv = $('#termPreview');
+    if(pv){ pv.style.fontSize = px + 'px'; }
+  });
+  /* 界面基准字号与终端字号同一形态（可键入、上下键步进、超界钳制、清空回落），
+     但原型里没有可对照的界面文本面，所以它只归一化取值、不驱动布局 ——
+     和它旁边的界面字体一样属于演示态。 */
+  bindSizeInput($('#uiSize'), null);
   window.addEventListener('resize', function(){ if(selState){ selCloseMenu(false); } });
 
   var ICON = {

@@ -65,3 +65,6 @@ figma-plugin
 .localtest/goldens/goldens/
 # Opt-in deck goldens are font-dependent; regenerate locally, never commit them.
 test/goldens/goldens/
+
+# Local render-comparison screenshots (offline HTML vs golden); regenerate locally, never commit.
+artifacts/

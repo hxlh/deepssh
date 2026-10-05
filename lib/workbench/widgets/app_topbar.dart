@@ -57,47 +57,82 @@ class AppTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 56,
       decoration: BoxDecoration(
         color: AppColors.panel,
         border: Border(bottom: BorderSide(color: AppColors.textPrimary)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: LayoutBuilder(
-        builder: (context, constraints) => Row(
-          children: [
-            const _Brand(),
-            const SizedBox(width: 18),
-            for (final section in AppSection.values) ...[
-              _NavButton(
-                key: appNavKey(section),
-                section: section,
-                selected: section == current,
-                badge: switch (section) {
-                  AppSection.workbench => sessionCount,
-                  AppSection.tunnels => tunnelCount,
-                  _ => 0,
-                },
-                onTap: () => onNavigate(section),
+        builder: (context, constraints) => constraints.maxWidth <= 640
+            ? _mobileLayout()
+            : SizedBox(
+                height: 56,
+                child: Row(
+                  children: [
+                    const _Brand(),
+                    const SizedBox(width: 18),
+                    _navItems(),
+                    const Spacer(),
+                    if (constraints.maxWidth > _pulseBreakpoint)
+                      _Pulse(
+                        sessionCount: sessionCount,
+                        tunnelCount: tunnelCount,
+                        rssMb: memoryRssMb,
+                        clock: clock,
+                      ),
+                    if (constraints.maxWidth > _pulseBreakpoint)
+                      const SizedBox(width: 14),
+                    AddConnectionButton(onSelected: onAddConnection),
+                  ],
+                ),
               ),
-              const SizedBox(width: 2),
-            ],
-            const Spacer(),
-            // The prototype drops the run summary below 980px rather than let it
-            // squeeze the nav.
-            if (constraints.maxWidth > _pulseBreakpoint)
-              _Pulse(
-                sessionCount: sessionCount,
-                tunnelCount: tunnelCount,
-                rssMb: memoryRssMb,
-                clock: clock,
-              ),
-            if (constraints.maxWidth > _pulseBreakpoint)
-              const SizedBox(width: 14),
-            AddConnectionButton(onSelected: onAddConnection),
-          ],
-        ),
       ),
+    );
+  }
+
+  Widget _mobileLayout() {
+    return Column(
+      children: [
+        SizedBox(
+          height: 56,
+          child: Row(
+            children: [
+              const _Brand(),
+              const Spacer(),
+              AddConnectionButton(onSelected: onAddConnection),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 40,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: _navItems(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _navItems() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final section in AppSection.values) ...[
+          _NavButton(
+            key: appNavKey(section),
+            section: section,
+            selected: section == current,
+            badge: switch (section) {
+              AppSection.workbench => sessionCount,
+              AppSection.tunnels => tunnelCount,
+              _ => 0,
+            },
+            onTap: () => onNavigate(section),
+          ),
+          const SizedBox(width: 2),
+        ],
+      ],
     );
   }
 }

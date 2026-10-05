@@ -452,16 +452,6 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
           !knownFamilies.contains(uiSettings.fontFamily))
         uiSettings.fontFamily,
     ];
-    final sizes = {
-      13,
-      14,
-      15,
-      if (uiSettings.fontSize != 13 &&
-          uiSettings.fontSize != 14 &&
-          uiSettings.fontSize != 15)
-        uiSettings.fontSize,
-    }.toList()..sort();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -496,16 +486,15 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
                 _updateUi(uiSettings.copyWith(fontFamily: family));
               },
             ),
-            DeckSelect<int>(
+            _ClampedSizeField(
               key: const ValueKey('ui-size-select'),
               label: '基准字号',
               value: uiSettings.fontSize,
-              items: sizes,
-              itemBuilder: (context, size) => Text('$size px'),
-              onChanged: (size) {
-                if (size == null) return;
-                _updateUi(uiSettings.copyWith(fontSize: size));
-              },
+              min: 12,
+              max: 18,
+              hint: '12–18 整数，超界自动钳制',
+              onChanged: (size) =>
+                  _updateUi(uiSettings.copyWith(fontSize: size)),
             ),
           ],
         ),
@@ -578,6 +567,35 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
           onCopy: (id) => _copyPreset(id, terminal: true),
           onRestore: () => _restoreBuiltIns(terminal: true),
           hiddenCount: _library.hiddenTerminalIds.length,
+        ),
+        const SizedBox(height: 16),
+        const _SectionLabel('字体'),
+        const SizedBox(height: 9),
+        DeckFieldRow(
+          children: [
+            DeckSelect<String>(
+              key: const ValueKey('term-font-select'),
+              label: '字体族',
+              value: termSettings.fontFamily,
+              items: [for (final option in _terminalFontOptions) option.family],
+              itemBuilder: (context, family) =>
+                  Text(_terminalFontLabel(family)),
+              onChanged: (family) {
+                if (family == null) return;
+                _updateTerm(termSettings.copyWith(fontFamily: family));
+              },
+            ),
+            _ClampedSizeField(
+              key: const ValueKey('term-size-input'),
+              label: '字号（px）',
+              value: termSettings.fontSize,
+              min: 8,
+              max: 32,
+              hint: '8–32 整数，超界自动钳制',
+              onChanged: (size) =>
+                  _updateTerm(termSettings.copyWith(fontSize: size)),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         const _SectionLabel('实时预览'),
@@ -825,8 +843,23 @@ class _ScrollbackFieldState extends State<_ScrollbackField> {
 const _uiFontOptions = <({String label, String family})>[
   (label: '系统默认（含中文）', family: ''),
   (label: '苹方 / PingFang SC', family: 'PingFang SC'),
-  (label: '思源黑体 / Noto Sans CJK', family: 'Noto Sans CJK SC'),
+  (label: '思源黑体 / Noto Sans SC', family: 'Noto Sans SC'),
 ];
+
+const _terminalFontOptions = <({String label, String family})>[
+  (label: '系统等宽（SF Mono / Menlo）', family: ''),
+  (label: 'JetBrains Mono', family: 'JetBrains Mono'),
+  (label: 'Cascadia Mono / Consolas', family: 'Consolas'),
+  (label: '思源等宽（中文）', family: 'Noto Sans SC'),
+  (label: '霞鹜文楷等宽', family: 'Noto Sans SC'),
+];
+
+String _terminalFontLabel(String family) {
+  for (final option in _terminalFontOptions) {
+    if (option.family == family) return option.label;
+  }
+  return family;
+}
 
 String _uiFontLabel(String family) {
   for (final option in _uiFontOptions) {
@@ -899,6 +932,94 @@ class _SectionLabel extends StatelessWidget {
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: DeckLabel(text, size: 10),
+    );
+  }
+}
+
+class _ClampedSizeField extends StatefulWidget {
+  const _ClampedSizeField({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.hint,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final int min;
+  final int max;
+  final String hint;
+  final ValueChanged<int> onChanged;
+
+  @override
+  State<_ClampedSizeField> createState() => _ClampedSizeFieldState();
+}
+
+class _ClampedSizeFieldState extends State<_ClampedSizeField> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.value}');
+    _focusNode = FocusNode()..addListener(_handleFocusChange);
+  }
+
+  void _handleFocusChange() {
+    if (!_focusNode.hasFocus) _commit();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ClampedSizeField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_focusNode.hasFocus &&
+        oldWidget.value != widget.value &&
+        _controller.text != '${widget.value}') {
+      _controller.text = '${widget.value}';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode
+      ..removeListener(_handleFocusChange)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _commit() {
+    final parsed = int.tryParse(_controller.text);
+    final value = (parsed ?? widget.value).clamp(widget.min, widget.max);
+    _controller.text = '$value';
+    widget.onChanged(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DeckField(
+      label: widget.label,
+      hint: widget.hint,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        style: DeckFieldStyle.text,
+        decoration: DeckFieldStyle.decoration(),
+        onChanged: (raw) {
+          final parsed = int.tryParse(raw);
+          if (parsed != null) {
+            widget.onChanged(parsed.clamp(widget.min, widget.max));
+          }
+        },
+        onEditingComplete: _commit,
+        onSubmitted: (_) => _commit(),
+      ),
     );
   }
 }

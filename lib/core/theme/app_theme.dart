@@ -176,7 +176,7 @@ abstract final class AppTheme {
         'Segoe UI',
         'PingFang SC',
         'Microsoft YaHei',
-        'Noto Sans CJK SC',
+        'Noto Sans SC',
       ],
       fontSize: baseFontSize == null
           ? AppColors.fontSize.toDouble()

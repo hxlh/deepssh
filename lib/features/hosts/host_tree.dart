@@ -6,7 +6,6 @@ import '../../core/models/ssh_session_item.dart';
 import '../../core/models/terminal_item.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
-import '../../core/theme/app_spacing.dart';
 import 'host_tree_node.dart';
 import 'host_tree_state.dart';
 
@@ -78,6 +77,38 @@ class HostTree extends StatelessWidget {
   static const double _menuItemHeight = 32;
   static const double _menuWidth = 150;
   static const String _localSectionId = 'local';
+
+  // Geometry mirrored from .ex-scroll/.ex-ghead/.ex-row in the HTML
+  // prototype. Keeping these values here makes screenshot comparisons useful.
+  static const double _rowHeight = 32;
+  static const double _rowLeft = 24;
+  static const double _rowRight = 8;
+  static const double _rowGap = 2;
+
+  static Widget _dragProxy(
+    Widget child,
+    int index,
+    Animation<double> animation,
+  ) {
+    return Material(
+      color: Colors.transparent,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.panel,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 12,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: child,
+      ),
+    );
+  }
 
   Color _groupColor(String connectionGroupId) {
     if (connectionGroupId.isEmpty) return Colors.transparent;
@@ -276,7 +307,7 @@ class HostTree extends StatelessWidget {
       onTap: () => onSshProfileTap(profile),
       child: Container(
         height: compact ? 34 : 32,
-        margin: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+        margin: const EdgeInsets.symmetric(vertical: _rowGap),
         padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 8),
         decoration: BoxDecoration(
           border: Border(
@@ -329,6 +360,7 @@ class HostTree extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             buildDefaultDragHandles: false,
+            proxyDecorator: _dragProxy,
             itemCount: sessions.length,
             onReorder: (oldIndex, newIndex) {
               onReorderSessions?.call(profile.id, oldIndex, newIndex);
@@ -352,7 +384,7 @@ class HostTree extends StatelessWidget {
       onTap: onToggleLocal,
       child: Container(
         height: compact ? 34 : 32,
-        margin: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+        margin: const EdgeInsets.symmetric(vertical: _rowGap),
         padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 8),
         decoration: BoxDecoration(
           border: Border(left: BorderSide(color: AppColors.accent, width: 3)),
@@ -401,6 +433,7 @@ class HostTree extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             buildDefaultDragHandles: false,
+            proxyDecorator: _dragProxy,
             itemCount: localTerminals.length,
             onReorder: onReorderLocalTerminals ?? (_, __) {},
             itemBuilder: (context, index) {
@@ -446,6 +479,7 @@ class HostTree extends StatelessWidget {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     buildDefaultDragHandles: false,
+                    proxyDecorator: _dragProxy,
                     itemCount: sections.length,
                     onReorder: _handleSectionReorder,
                     itemBuilder: (context, sectionIndex) {
@@ -607,7 +641,7 @@ class _ExplorerSessionRowState extends State<_ExplorerSessionRow> {
       onTap: widget.onTap,
       onSecondaryTapDown: widget.onSecondaryTapDown,
       child: Container(
-        height: AppSpacing.itemHeight,
+        height: HostTree._rowHeight,
         // `.ex-sgrip` sits in the row's own left padding via negative margins
         // (`margin:0 -8px 0 -14px`) so the glyph and name keep the alignment
         // they would have without a handle. Flutter has no negative margins,
@@ -615,10 +649,15 @@ class _ExplorerSessionRowState extends State<_ExplorerSessionRow> {
         // the same boxes the prototype computes.
         margin: widget.compact
             ? const EdgeInsets.fromLTRB(4, 2, 4, 2)
-            : const EdgeInsets.fromLTRB(20, 2, 8, 2),
+            : const EdgeInsets.fromLTRB(
+                HostTree._rowLeft,
+                HostTree._rowGap,
+                HostTree._rowRight,
+                HostTree._rowGap,
+              ),
         padding: widget.compact
             ? EdgeInsets.zero
-            : const EdgeInsets.only(right: 4),
+            : const EdgeInsets.fromLTRB(10, 0, 4, 0),
         decoration: BoxDecoration(
           border: Border(
             left: BorderSide(
@@ -639,54 +678,63 @@ class _ExplorerSessionRowState extends State<_ExplorerSessionRow> {
                   ),
                 ),
               )
-            : Row(
+            : Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  ReorderableDragStartListener(
-                    index: widget.reorderIndex,
-                    child: SizedBox(
-                      width: 14,
-                      height: 22,
-                      child: Icon(
-                        Icons.drag_indicator,
-                        size: 12,
-                        color: AppColors.textMuted,
+                  Row(
+                    children: [
+                      Icon(widget.icon, size: 15, color: iconColor),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.label,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: nameColor,
+                            fontWeight: selected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  Icon(widget.icon, size: 15, color: iconColor),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.label,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: nameColor,
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                      ),
-                    ),
-                  ),
-                  AnimatedOpacity(
-                    duration: const Duration(milliseconds: 120),
-                    opacity: _hovered || _closeFocused ? 1 : 0,
-                    child: Tooltip(
-                      message: widget.closeTooltip,
-                      child: GestureDetector(
-                        onTap: widget.onClose,
-                        child: Focus(
-                          onFocusChange: (focused) =>
-                              setState(() => _closeFocused = focused),
-                          child: SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: Icon(
-                              Icons.close,
-                              size: 13,
-                              color: AppColors.textMuted,
+                      AnimatedOpacity(
+                        duration: const Duration(milliseconds: 120),
+                        opacity: _hovered || _closeFocused ? 1 : 0,
+                        child: Tooltip(
+                          message: widget.closeTooltip,
+                          child: GestureDetector(
+                            onTap: widget.onClose,
+                            child: Focus(
+                              onFocusChange: (focused) =>
+                                  setState(() => _closeFocused = focused),
+                              child: SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: Icon(
+                                  Icons.close,
+                                  size: 13,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
                             ),
                           ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Positioned(
+                    left: -24,
+                    top: 5,
+                    child: ReorderableDragStartListener(
+                      index: widget.reorderIndex,
+                      child: SizedBox(
+                        width: 14,
+                        height: 22,
+                        child: Icon(
+                          Icons.drag_indicator,
+                          size: 12,
+                          color: AppColors.textMuted,
                         ),
                       ),
                     ),
