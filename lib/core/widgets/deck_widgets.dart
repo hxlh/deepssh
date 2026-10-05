@@ -172,14 +172,14 @@ class _DeckButtonState extends State<DeckButton> {
         foreground = AppColors.panel;
         borderColor = background;
       case DeckButtonStyle.ghost:
-        background = _hovered ? AppColors.fgSoft : Colors.transparent;
+        background = _hovered ? AppColors.surfaceHover : Colors.transparent;
         foreground = destructive
             ? DeckTokens.danger
             : (_hovered ? AppColors.textPrimary : AppColors.textMuted);
         borderColor = Colors.transparent;
       case DeckButtonStyle.outline:
       case DeckButtonStyle.danger:
-        background = _hovered ? AppColors.fgSoft : AppColors.panel;
+        background = _hovered ? AppColors.surfaceHover : AppColors.panel;
         foreground = destructive ? DeckTokens.danger : AppColors.textPrimary;
         borderColor = destructive
             ? DeckTokens.mix(DeckTokens.danger, AppColors.textPrimary, 0.45)

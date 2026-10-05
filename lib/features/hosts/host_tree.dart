@@ -670,6 +670,10 @@ class _ExplorerSessionRowState extends State<_ExplorerSessionRow> {
                 ),
               )
             : Stack(
+                // expand so the Row fills the 32px row and its own
+                // crossAxisAlignment.center centres the label; loose would
+                // top-align the shorter Row and push the text up.
+                fit: StackFit.expand,
                 clipBehavior: Clip.none,
                 children: [
                   Row(

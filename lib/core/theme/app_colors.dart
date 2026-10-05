@@ -61,6 +61,12 @@ abstract final class AppColors {
   static Color get dangerSoft => DeckTokens.wash(DeckTokens.danger, 0.12);
   static Color get fgSoft => DeckTokens.wash(textPrimary, 0.06);
 
+  /// Opaque hover wash for solid surfaces (buttons). [fgSoft] is a 6%-alpha
+  /// overlay meant to tint *behind* text; on an opaque button it would let the
+  /// row/selection background bleed through, so buttons mix toward the ink
+  /// instead of going translucent.
+  static Color get surfaceHover => DeckTokens.mix(panel, textPrimary, 0.06);
+
   /// The shadow ink: a hard offset edge in the current text colour, so it
   /// flips with a dark preset instead of staying grey-on-dark.
   static Color get shadowInk => DeckTokens.wash(textPrimary, 0.20);
