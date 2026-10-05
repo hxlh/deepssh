@@ -795,15 +795,15 @@ class _ScrollbackField extends StatefulWidget {
 }
 
 class _ScrollbackFieldState extends State<_ScrollbackField> {
-  late final TextEditingController _controller = TextEditingController(
-    text: '${widget.value}',
+  late final TextEditingController _controller = deckEditingController(
+    '${widget.value}',
   );
 
   @override
   void didUpdateWidget(covariant _ScrollbackField oldWidget) {
     super.didUpdateWidget(oldWidget);
     final next = '${widget.value}';
-    if (_controller.text != next) _controller.text = next;
+    if (_controller.text != next) deckSetText(_controller, next);
   }
 
   @override
@@ -927,7 +927,7 @@ class _FontStackFieldState extends State<_FontStackField> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.value);
+    _controller = deckEditingController(widget.value);
     _focusNode = FocusNode()..addListener(_handleFocusChange);
   }
 
@@ -941,7 +941,7 @@ class _FontStackFieldState extends State<_FontStackField> {
     if (!_focusNode.hasFocus &&
         oldWidget.value != widget.value &&
         _controller.text != widget.value) {
-      _controller.text = widget.value;
+      deckSetText(_controller, widget.value);
     }
   }
 
@@ -961,7 +961,7 @@ class _FontStackFieldState extends State<_FontStackField> {
   void _commit() {
     final list = DeckTokens.parseFontStack(_controller.text);
     final normalised = list.isEmpty ? widget.value : list.join(', ');
-    _controller.text = normalised;
+    deckSetText(_controller, normalised);
     widget.onChanged(normalised);
   }
 
@@ -1019,7 +1019,7 @@ class _ClampedSizeFieldState extends State<_ClampedSizeField> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: '${widget.value}');
+    _controller = deckEditingController('${widget.value}');
     _focusNode = FocusNode()..addListener(_handleFocusChange);
   }
 
@@ -1033,7 +1033,7 @@ class _ClampedSizeFieldState extends State<_ClampedSizeField> {
     if (!_focusNode.hasFocus &&
         oldWidget.value != widget.value &&
         _controller.text != '${widget.value}') {
-      _controller.text = '${widget.value}';
+      deckSetText(_controller, '${widget.value}');
     }
   }
 
@@ -1049,7 +1049,7 @@ class _ClampedSizeFieldState extends State<_ClampedSizeField> {
   void _commit() {
     final parsed = int.tryParse(_controller.text);
     final value = (parsed ?? widget.value).clamp(widget.min, widget.max);
-    _controller.text = '$value';
+    deckSetText(_controller, '$value');
     widget.onChanged(value);
   }
 
@@ -1467,8 +1467,8 @@ class _RuleInput extends StatefulWidget {
 }
 
 class _RuleInputState extends State<_RuleInput> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.value,
+  late final TextEditingController _controller = deckEditingController(
+    widget.value,
   );
   final FocusNode _focusNode = FocusNode();
   bool _focused = false;
@@ -1487,7 +1487,7 @@ class _RuleInputState extends State<_RuleInput> {
   void didUpdateWidget(covariant _RuleInput oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.value != _controller.text) {
-      _controller.text = widget.value;
+      deckSetText(_controller, widget.value);
     }
   }
 

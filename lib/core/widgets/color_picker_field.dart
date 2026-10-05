@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import 'css_colors.dart';
+import 'deck_fields.dart';
 
 class ColorPickerField extends StatelessWidget {
   const ColorPickerField({
@@ -99,24 +100,17 @@ class _ColorPickerDialog extends StatefulWidget {
 class _ColorPickerDialogState extends State<_ColorPickerDialog> {
   late HSVColor hsvColor;
   late TextEditingController hexController;
-  late TextEditingController htmlController;
 
   @override
   void initState() {
     super.initState();
     hsvColor = HSVColor.fromColor(widget.initialColor);
-    hexController = TextEditingController(
-      text: colorToHex(widget.initialColor),
-    );
-    htmlController = TextEditingController(
-      text: cssColorName(widget.initialColor) ?? '',
-    );
+    hexController = deckEditingController(colorToHex(widget.initialColor));
   }
 
   @override
   void dispose() {
     hexController.dispose();
-    htmlController.dispose();
     super.dispose();
   }
 
@@ -124,8 +118,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
     setState(() {
       hsvColor = hsv;
       final color = hsv.toColor();
-      hexController.text = colorToHex(color);
-      htmlController.text = cssColorName(color) ?? '';
+      deckSetText(hexController, colorToHex(color));
     });
     widget.onChanged(hsv.toColor());
   }
@@ -135,17 +128,6 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
     if (color == null) return;
     setState(() {
       hsvColor = HSVColor.fromColor(color);
-      htmlController.text = cssColorName(color) ?? '';
-    });
-    widget.onChanged(color);
-  }
-
-  void _updateFromHtml(String text) {
-    final color = parseCssColorName(text);
-    if (color == null) return;
-    setState(() {
-      hsvColor = HSVColor.fromColor(color);
-      hexController.text = colorToHex(color);
     });
     widget.onChanged(color);
   }
@@ -188,8 +170,6 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                 children: [
                   _buildInputRow('Hex', hexController, _updateFromHex),
                   const SizedBox(height: 8),
-                  _buildInputRow('HTML', htmlController, _updateFromHtml),
-                  const SizedBox(height: 8),
                   Container(
                     height: 20,
                     decoration: BoxDecoration(
@@ -222,35 +202,31 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
           ),
         ),
         Expanded(
-          child: TextField(
-            controller: controller,
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontFamily: 'monospace',
-              fontSize: 13,
+          // One border only: the container draws it, and the inner field is
+          // completely undecorated so no second box or fill can show through.
+          child: Container(
+            height: 30,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
             ),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: AppColors.background,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 6,
+            alignment: Alignment.centerLeft,
+            child: TextField(
+              controller: controller,
+              cursorColor: AppColors.accent,
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontFamily: 'monospace',
+                fontSize: 13,
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: AppColors.border),
+              decoration: const InputDecoration(
+                isDense: true,
+                isCollapsed: true,
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 8),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: AppColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(4)),
-                borderSide: BorderSide(color: AppColors.accent),
-              ),
+              onChanged: onChanged,
+              onSubmitted: onChanged,
             ),
-            onChanged: onChanged,
-            onSubmitted: onChanged,
           ),
         ),
       ],

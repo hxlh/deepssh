@@ -6,6 +6,25 @@ import 'package:flutter/services.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_colors.dart';
 
+/// Creates a controller whose caret sits at the end of [text]. A bare
+/// `TextEditingController(text: ...)` leaves the selection at offset -1, so the
+/// field selects its whole value the moment it takes focus — a highlight box
+/// over the text that reads as a stray frame.
+TextEditingController deckEditingController([String text = '']) {
+  final controller = TextEditingController();
+  deckSetText(controller, text);
+  return controller;
+}
+
+/// Assigns [text] and collapses the selection to the end, so a programmatic
+/// update never leaves the field primed to select everything on focus.
+void deckSetText(TextEditingController controller, String text) {
+  controller.value = TextEditingValue(
+    text: text,
+    selection: TextSelection.collapsed(offset: text.length),
+  );
+}
+
 /// Form controls for the drawer forms.
 ///
 /// The prototype does not use Material's floating labels: every field is a
