@@ -120,7 +120,7 @@ class _Head extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -141,17 +141,19 @@ class _Head extends StatelessWidget {
                     fontFamilyFallback: DeckTokens.fontDisplay,
                     fontSize: 17,
                     height: 1.15,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
               ],
             ),
           ),
+          // `.btn.btn-ghost.sm.icon` — a 30x30 square with the glyph only.
           DeckButton(
             label: '关闭',
             style: DeckButtonStyle.ghost,
             icon: Icons.close,
-            dense: true,
+            iconOnly: true,
             onPressed: onClose,
           ),
         ],

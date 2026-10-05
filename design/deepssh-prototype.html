@@ -90,6 +90,40 @@ select.input{cursor:pointer;appearance:none;
   background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
   background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;
   background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:28px}
+/* Numeric field: the native spinner is a rounded chrome widget that exists in
+   no other control here, so it is dropped — stepping stays on the arrow keys.
+   Tabular figures keep the digits from shifting the caret while typing. */
+.input[type=number]{appearance:textfield;-moz-appearance:textfield;font-variant-numeric:tabular-nums}
+.input[type=number]::-webkit-outer-spin-button,.input[type=number]::-webkit-inner-spin-button{appearance:none;margin:0}
+
+/* Select — the native popup cannot carry this design language: it comes back
+   with its own radius, its own system font, a filled grey selected row and
+   OS-dependent row heights, none of which exist anywhere else in the app. The
+   native <select> therefore stays in the DOM as the value holder (every
+   existing change listener reads it) and a panel built on the .psel-menu
+   vocabulary takes its place: zero radius, 1px --fg border, 2px hard shadow,
+   and a 3px accent bar for the current row. The panel is position:fixed and
+   measured off the trigger, so a scrolling .drawer-body can never clip it. */
+.sel-wrap{position:relative;display:block;width:100%}
+select.sel-native{position:absolute;width:1px;height:1px;padding:0;margin:0;border:0;
+  background:none;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sel-trigger{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;
+  border:1px solid var(--border);background:var(--surface);color:var(--fg);cursor:pointer;
+  font-family:var(--font-mono);font-size:12px;text-align:left}
+.sel-trigger:hover{border-color:color-mix(in oklch, var(--fg) 45%, var(--border))}
+.sel-trigger[aria-expanded="true"]{border-color:var(--fg);box-shadow:var(--shadow-hard)}
+.sel-trigger .sel-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sel-trigger .ico{width:11px;height:11px;flex:none;color:var(--muted);transition:transform .12s ease}
+.sel-trigger[aria-expanded="true"] .ico{transform:rotate(180deg);color:var(--fg)}
+.sel-menu{position:fixed;z-index:95;background:var(--surface);border:1px solid var(--fg);
+  box-shadow:var(--shadow-hard);padding:4px;max-height:264px;overflow:auto}
+.sel-menu[hidden]{display:none}
+.sel-opt{display:flex;align-items:center;width:100%;height:34px;padding:0 8px;border:0;
+  border-left:3px solid transparent;background:none;cursor:pointer;color:var(--fg);
+  font-family:var(--font-mono);font-size:12px;text-align:left;white-space:nowrap}
+.sel-opt:hover{background:var(--bg)}
+.sel-opt[aria-selected="true"]{border-left-color:var(--accent);background:var(--bg)}
+.sel-opt:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .field{display:flex;flex-direction:column;gap:5px}
 .field>label{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .hint{font-size:11px;color:var(--muted)}
@@ -789,7 +823,7 @@ label.check input{width:14px;height:14px;accent-color:var(--accent);margin:0}
         </aside>
         <div class="split v" id="sbSplit" role="separator" tabindex="0" aria-orientation="vertical"
              aria-label="调整资源管理器宽度" aria-valuemin="56" aria-valuemax="560" aria-valuenow="280">
-          <span class="grip" aria-hidden="true" style="position:absolute;left:2px;top:50%;margin-top:-1.5px"></span>
+          <span class="grip vgrip" aria-hidden="true"></span>
         </div>
         <div class="term-wrap" data-od-id="terminal-area">
           <div class="tabs" id="tabStrip" role="tablist" aria-label="终端标签">
@@ -1199,6 +1233,27 @@ worker-01      Up 5 hours
           </div>
 
           <div>
+            <div class="sect">字体</div>
+            <div class="grid2" style="margin-top:9px">
+              <div class="field">
+                <label for="termFont">字体族</label>
+                <select class="input" id="termFont">
+                  <option value="ui-monospace, &#39;SF Mono&#39;, Menlo, Consolas, monospace">系统等宽（SF Mono / Menlo）</option>
+                  <option value="&#39;JetBrains Mono&#39;, ui-monospace, Menlo, monospace">JetBrains Mono</option>
+                  <option value="&#39;Cascadia Mono&#39;, Consolas, ui-monospace, monospace">Cascadia Mono / Consolas</option>
+                  <option value="&#39;Source Han Mono SC&#39;, &#39;Noto Sans Mono CJK SC&#39;, monospace">思源等宽（中文）</option>
+                  <option value="&#39;LXGW WenKai Mono&#39;, &#39;Noto Sans Mono CJK SC&#39;, monospace">霞鹜文楷等宽</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="termSize">字号（px）</label>
+                <input class="input" id="termSize" type="number" min="8" max="32" step="1" value="13" inputmode="numeric" aria-describedby="termSizeHint">
+                <span class="hint" id="termSizeHint">8–32 整数，超界自动钳制</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
             <div class="sect">实时预览</div>
             <div class="mini-term" id="termPreview" style="margin-top:9px">$ <span class="t-g">deploy@prod-web-01</span>:<span class="t-b">~</span>$ tail -f app.log
 <span class="t-c">INFO</span>  server listening on :8080
@@ -1402,6 +1457,227 @@ worker-01      Up 5 hours
     get: function(k, d){ try{ return localStorage.getItem(k) || d; }catch(e){ return d; } },
     set: function(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
   };
+
+
+  /* ---------- Select: native <select> value + .psel-language panel ---------- */
+  var SEL_MENU_ID = 'selMenu';
+  var SEL_CARET = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="m6 9 6 6 6-6"/></svg>';
+  var selState = null;
+
+  function selMenu(){
+    var m = document.getElementById(SEL_MENU_ID);
+    if(m){ return m; }
+    m = document.createElement('div');
+    m.className = 'sel-menu';
+    m.id = SEL_MENU_ID;
+    m.setAttribute('role', 'listbox');
+    m.hidden = true;
+    m.addEventListener('keydown', selMenuKeys);
+    document.body.appendChild(m);
+    return m;
+  }
+
+  function selLabel(sel){
+    var o = sel.options[sel.selectedIndex];
+    return o ? o.textContent : '';
+  }
+
+  /* Every path that can change the value funnels through here: a panel click
+     dispatches a real change event, so existing listeners and this label sync
+     stay in step without either one knowing about the other. */
+  function selCommit(sel, value){
+    if(sel.value !== value){
+      sel.value = value;
+      sel.dispatchEvent(new Event('change', { bubbles:true }));
+    }
+    selCloseMenu(true);
+  }
+
+  function selFocus(idx){
+    if(!selState){ return; }
+    var opts = selState.opts;
+    if(!opts.length){ return; }
+    if(idx < 0){ idx = opts.length - 1; }
+    if(idx >= opts.length){ idx = 0; }
+    selState.idx = idx;
+    for(var i=0;i<opts.length;i++){ opts[i].tabIndex = -1; }
+    opts[idx].tabIndex = 0;
+    opts[idx].focus();
+  }
+
+  function selBuild(sel){
+    var menu = selMenu();
+    menu.textContent = '';
+    var opts = [], cur = -1;
+    for(var i=0;i<sel.options.length;i++){
+      var opt = sel.options[i];
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sel-opt';
+      b.setAttribute('role', 'option');
+      b.textContent = opt.textContent;
+      b.tabIndex = -1;
+      b.disabled = !!opt.disabled;
+      var on = (opt.value === sel.value);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      if(on){ cur = opts.length; }
+      b._selValue = opt.value;
+      b.addEventListener('click', (function(v){ return function(){ selCommit(sel, v); }; })(opt.value));
+      menu.appendChild(b);
+      opts.push(b);
+    }
+    return { opts: opts, cur: cur };
+  }
+
+  /* Measured off the trigger and flipped above when the panel would not fit
+     below — the drawer scrolls, so a percentage or a static offset would drift. */
+  function selPlace(sel){
+    var menu = selMenu();
+    var r = sel._selTrigger.getBoundingClientRect();
+    menu.style.left = Math.round(r.left) + 'px';
+    menu.style.minWidth = Math.round(r.width) + 'px';
+    menu.style.top = 'auto';
+    menu.style.bottom = 'auto';
+    menu.hidden = false;
+    var below = window.innerHeight - r.bottom - 8;
+    if(menu.offsetHeight > below && r.top - 8 > below){
+      menu.style.bottom = Math.round(window.innerHeight - r.top + 4) + 'px';
+    }else{
+      menu.style.top = Math.round(r.bottom + 4) + 'px';
+    }
+  }
+
+  function selOpenMenu(sel, from){
+    if(selState && selState.sel !== sel){ selCloseMenu(false); }
+    var built = selBuild(sel);
+    selState = { sel: sel, opts: built.opts, idx: built.cur };
+    sel._selTrigger.setAttribute('aria-expanded', 'true');
+    selPlace(sel);
+    var start = built.cur;
+    if(from === 'down'){ start = built.cur < 0 ? 0 : built.cur; }
+    if(from === 'up'){ start = built.cur < 0 ? built.opts.length - 1 : built.cur; }
+    selFocus(start);
+  }
+
+  function selCloseMenu(refocus){
+    if(!selState){ return; }
+    var sel = selState.sel;
+    selState = null;
+    sel._selTrigger.setAttribute('aria-expanded', 'false');
+    selMenu().hidden = true;
+    if(refocus){ sel._selTrigger.focus(); }
+  }
+
+  function selMenuKeys(e){
+    if(!selState){ return; }
+    var n = selState.opts.length;
+    var k = e.key;
+    if(k === 'Escape'){ e.preventDefault(); selCloseMenu(true); return; }
+    if(k === 'Tab'){ selCloseMenu(false); return; }
+    if(k === 'ArrowDown'){ e.preventDefault(); selFocus(selState.idx + 1); return; }
+    if(k === 'ArrowUp'){ e.preventDefault(); selFocus(selState.idx - 1); return; }
+    if(k === 'Home'){ e.preventDefault(); selFocus(0); return; }
+    if(k === 'End'){ e.preventDefault(); selFocus(n - 1); return; }
+    if(k === 'Enter' || k === ' '){
+      var b = selState.opts[selState.idx];
+      if(b){ e.preventDefault(); selCommit(selState.sel, b._selValue); }
+    }
+  }
+
+  function enhanceSelect(sel){
+    if(sel.dataset.selReady){ return; }
+    sel.dataset.selReady = '1';
+    var wrap = document.createElement('span');
+    wrap.className = 'sel-wrap';
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+    /* Inline sizing described the visible box, so it moves to the wrapper. */
+    if(sel.style.maxWidth){ wrap.style.maxWidth = sel.style.maxWidth; sel.style.maxWidth = ''; }
+    if(sel.style.width){ wrap.style.width = sel.style.width; sel.style.width = ''; }
+
+    var trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'sel-trigger';
+    trigger.id = sel.id + 'Trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-controls', SEL_MENU_ID);
+    trigger.innerHTML = '<span class="sel-label"></span>' + SEL_CARET;
+    wrap.insertBefore(trigger, sel);
+    /* A label[for] aimed at the hidden select would move focus nowhere. */
+    var lab = document.querySelector('label[for="' + sel.id + '"]');
+    if(lab){ lab.setAttribute('for', trigger.id); }
+    var aria = sel.getAttribute('aria-label');
+    if(aria){ trigger.setAttribute('aria-label', aria); }
+
+    sel.classList.add('sel-native');
+    sel.tabIndex = -1;
+    sel.setAttribute('aria-hidden', 'true');
+    sel._selTrigger = trigger;
+    $('.sel-label', trigger).textContent = selLabel(sel);
+    sel.addEventListener('change', function(){ $('.sel-label', trigger).textContent = selLabel(sel); });
+
+    trigger.addEventListener('click', function(){
+      if(selState && selState.sel === sel){ selCloseMenu(true); } else { selOpenMenu(sel); }
+    });
+    trigger.addEventListener('keydown', function(e){
+      if(e.key === 'ArrowDown'){ e.preventDefault(); selOpenMenu(sel, 'down'); }
+      else if(e.key === 'ArrowUp'){ e.preventDefault(); selOpenMenu(sel, 'up'); }
+    });
+  }
+
+  /* Built up front so every trigger's aria-controls already resolves. */
+  selMenu();
+  $$('select.input').forEach(enhanceSelect);
+
+  document.addEventListener('click', function(e){
+    if(!selState){ return; }
+    if(selMenu().contains(e.target) || selState.sel._selTrigger.contains(e.target)){ return; }
+    selCloseMenu(false);
+  });
+  /* The panel scrolls too, and its own scroll event reaches this capture
+     listener — closing on that would make a long list unusable. */
+  document.addEventListener('scroll', function(e){
+    if(selState && e.target !== selMenu()){ selCloseMenu(false); }
+  }, true);
+
+  /* ---------- Terminal font: family + editable size ---------- */
+  var TERM_SIZE_MIN = 8, TERM_SIZE_MAX = 32, TERM_SIZE_DEFAULT = 13;
+
+  function termSizeClamp(raw){
+    var n = parseInt(raw, 10);
+    if(isNaN(n)){ return null; }
+    return Math.min(TERM_SIZE_MAX, Math.max(TERM_SIZE_MIN, n));
+  }
+
+  /* Both controls write straight into the live preview — it is the only
+     surface in the prototype where these two settings are observable. */
+  function termFontApply(){
+    var pv = $('#termPreview'), fam = $('#termFont'), size = $('#termSize');
+    if(!pv || !fam || !size){ return; }
+    pv.style.fontFamily = fam.value;
+    var n = termSizeClamp(size.value);
+    if(n !== null){ pv.style.fontSize = n + 'px'; }
+  }
+
+  /* Commit normalises the field itself, so what the box shows is always what
+     is applied: a clamped value is written back, an emptied one falls back to
+     the default rather than leaving the preview on a stale size. */
+  function termSizeCommit(){
+    var size = $('#termSize');
+    if(!size){ return; }
+    var n = termSizeClamp(size.value);
+    size.value = (n === null ? TERM_SIZE_DEFAULT : n);
+    termFontApply();
+  }
+
+  $('#termFont').addEventListener('change', termFontApply);
+  $('#termSize').addEventListener('input', termFontApply);
+  $('#termSize').addEventListener('change', termSizeCommit);
+  termFontApply();
+  window.addEventListener('resize', function(){ if(selState){ selCloseMenu(false); } });
 
   var ICON = {
     term: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg>',
@@ -2271,7 +2547,7 @@ worker-01      Up 5 hours
   $('#drawerCancel').addEventListener('click', closeDrawer);
   $('#drawer').addEventListener('click', function(e){ if(e.target === $('#drawer')){ closeDrawer(); } });
   document.addEventListener('keydown', function(e){
-    if(e.key === 'Escape'){ closeDrawer(); $('#dialog').hidden = true; closeNoteDlg(); closeCtx(); closeMenus(); }
+    if(e.key === 'Escape'){ closeDrawer(); $('#dialog').hidden = true; closeNoteDlg(); closeCtx(); closeMenus(); selCloseMenu(true); }
   });
 
   var SSH_CRED_HINTS = {

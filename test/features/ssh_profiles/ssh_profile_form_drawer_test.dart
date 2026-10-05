@@ -1,5 +1,6 @@
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/widgets/deck_widgets.dart';
+import 'package:deepssh/core/widgets/deck_fields.dart';
 import 'package:deepssh/features/ssh_profiles/ssh_profile_form_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -68,7 +69,7 @@ void main() {
     );
 
     await fillRequiredFields(tester);
-    await tester.tap(find.byType(DropdownButton<String>));
+    await tester.tap(find.byType(DeckSelect<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('xterm-truecolor').last);
     await tester.pumpAndSettle();
@@ -122,7 +123,7 @@ void main() {
 
     final passwordTop = tester.getTopLeft(find.bySemanticsLabel('密码')).dy;
     final terminalTypeTop = tester
-        .getTopLeft(find.byType(DropdownButton<String>))
+        .getTopLeft(find.byType(DeckSelect<String>))
         .dy;
 
     expect(terminalTypeTop, greaterThan(passwordTop));
@@ -142,7 +143,7 @@ void main() {
     expect(find.bySemanticsLabel('密码'), findsOneWidget);
     expect(find.bySemanticsLabel('私钥路径'), findsNothing);
 
-    await tester.tap(find.byType(DropdownButton<SshAuthMode>));
+    await tester.tap(find.byType(DeckSelect<SshAuthMode>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('私钥').last);
     await tester.pumpAndSettle();
@@ -189,7 +190,7 @@ void main() {
     );
 
     await fillBaseFields(tester);
-    await tester.tap(find.byType(DropdownButton<SshAuthMode>));
+    await tester.tap(find.byType(DeckSelect<SshAuthMode>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('私钥').last);
     await tester.pumpAndSettle();

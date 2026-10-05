@@ -161,7 +161,9 @@ class _TabItemState extends State<_TabItem> {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                    color: active ? AppColors.textPrimary : AppColors.textMuted,
+                    color: active || tabHovered
+                        ? AppColors.textPrimary
+                        : AppColors.textMuted,
                   ),
                 ),
               ),

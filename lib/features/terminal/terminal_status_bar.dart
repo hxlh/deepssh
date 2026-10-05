@@ -27,8 +27,7 @@ class TerminalStatusBar extends StatelessWidget {
     final rows = terminal?.viewHeight ?? 0;
 
     return Container(
-      height: 26,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       color: AppColors.textPrimary,
       child: Row(
         children: [

@@ -213,14 +213,23 @@ class HostTree extends StatelessWidget {
     }
   }
 
-  Widget _sessionItem(BuildContext context, SshSessionItem session) {
-    final isSelected = selectedTerminalId == session.id;
-    final groupColor = _groupColor(session.connectionGroupId);
-    final iconColor = groupColor == Colors.transparent
-        ? AppColors.textMuted
-        : groupColor;
-    final row = InkWell(
+  Widget _sessionItem(
+    BuildContext context,
+    SshSessionItem session, {
+    Key? key,
+    required int reorderIndex,
+  }) {
+    return _ExplorerSessionRow(
+      key: key,
+      reorderIndex: reorderIndex,
+      compact: compact,
+      selected: selectedTerminalId == session.id,
+      accentColor: _groupColor(session.connectionGroupId),
+      icon: Icons.terminal,
+      label: session.displayTitle,
+      closeTooltip: '关闭 SSH 会话',
       onTap: () => onSshSessionTap(session),
+      onClose: () => onCloseSshSession(session),
       onSecondaryTapDown: (details) {
         _showSshSessionMenu(
           context: context,
@@ -230,69 +239,27 @@ class HostTree extends StatelessWidget {
           onClose: () => onCloseSshSession(session),
         );
       },
-      child: Container(
-        height: AppSpacing.itemHeight,
-        margin: compact
-            ? const EdgeInsets.fromLTRB(4, 2, 4, 2)
-            : const EdgeInsets.fromLTRB(24, 2, 8, 2),
-        padding: compact
-            ? EdgeInsets.zero
-            : const EdgeInsets.only(left: 7, right: 10),
-        decoration: BoxDecoration(
-          // The 3px left rule carries connection state; a rounded fill would
-          // fight the deck's zero-radius language.
-          border: Border(
-            left: BorderSide(
-              color: isSelected ? groupColor : Colors.transparent,
-              width: 3,
-            ),
-          ),
-          color: isSelected
-              ? DeckTokens.wash(groupColor, 0.30)
-              : DeckTokens.wash(groupColor, 0.12),
-        ),
-        child: compact
-            ? Center(
-                child: Icon(
-                  Icons.terminal,
-                  size: 16,
-                  color: isSelected ? AppColors.accentInk : iconColor,
-                ),
-              )
-            : Row(
-                children: [
-                  Icon(
-                    Icons.terminal,
-                    size: 15,
-                    color: isSelected
-                        ? AppColors.textPrimary
-                        : AppColors.textMuted,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      session.displayTitle,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: AppColors.textPrimary,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-      ),
     );
-    return compact ? Tooltip(message: session.displayTitle, child: row) : row;
   }
 
-  Widget _localTerminalItem(BuildContext context, LocalTerminalItem terminal) {
-    final selected = selectedTerminalId == terminal.id;
-    final row = InkWell(
+  Widget _localTerminalItem(
+    BuildContext context,
+    LocalTerminalItem terminal, {
+    Key? key,
+    required int reorderIndex,
+  }) {
+    return _ExplorerSessionRow(
+      key: key,
+      reorderIndex: reorderIndex,
+      compact: compact,
+      selected: selectedTerminalId == terminal.id,
+      accentColor: AppColors.accent,
+      local: true,
+      icon: Icons.terminal,
+      label: terminal.displayTitle,
+      closeTooltip: '关闭终端',
       onTap: () => onLocalTerminalTap(terminal),
+      onClose: () => onCloseLocalTerminal(terminal),
       onSecondaryTapDown: (details) {
         _showCloseMenu(
           context: context,
@@ -301,52 +268,7 @@ class HostTree extends StatelessWidget {
           onClose: () => onCloseLocalTerminal(terminal),
         );
       },
-      child: Container(
-        height: AppSpacing.itemHeight,
-        margin: compact
-            ? const EdgeInsets.fromLTRB(4, 2, 4, 2)
-            : const EdgeInsets.fromLTRB(24, 2, 8, 2),
-        padding: compact
-            ? EdgeInsets.zero
-            : const EdgeInsets.only(left: 7, right: 10),
-        decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(
-              color: selected ? AppColors.accent : Colors.transparent,
-              width: 3,
-            ),
-          ),
-          color: selected ? AppColors.selection : Colors.transparent,
-        ),
-        child: compact
-            ? Center(
-                child: Icon(
-                  Icons.terminal,
-                  size: 16,
-                  color: selected ? AppColors.accentInk : AppColors.textMuted,
-                ),
-              )
-            : Row(
-                children: [
-                  Icon(Icons.terminal, size: 15, color: AppColors.textMuted),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      terminal.displayTitle,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: selected
-                            ? AppColors.accentInk
-                            : AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-      ),
     );
-    return compact ? Tooltip(message: terminal.displayTitle, child: row) : row;
   }
 
   Widget _profileHeader(SshProfileItem profile) {
@@ -412,10 +334,12 @@ class HostTree extends StatelessWidget {
               onReorderSessions?.call(profile.id, oldIndex, newIndex);
             },
             itemBuilder: (context, sessionIndex) {
-              return ReorderableDragStartListener(
-                index: sessionIndex,
-                key: ValueKey('session-${sessions[sessionIndex].id}'),
-                child: _sessionItem(context, sessions[sessionIndex]),
+              final session = sessions[sessionIndex];
+              return _sessionItem(
+                context,
+                session,
+                key: ValueKey('session-${session.id}'),
+                reorderIndex: sessionIndex,
               );
             },
           ),
@@ -480,10 +404,12 @@ class HostTree extends StatelessWidget {
             itemCount: localTerminals.length,
             onReorder: onReorderLocalTerminals ?? (_, __) {},
             itemBuilder: (context, index) {
-              return ReorderableDragStartListener(
-                index: index,
-                key: ValueKey('local-${localTerminals[index].id}'),
-                child: _localTerminalItem(context, localTerminals[index]),
+              final terminal = localTerminals[index];
+              return _localTerminalItem(
+                context,
+                terminal,
+                key: ValueKey('local-${terminal.id}'),
+                reorderIndex: index,
               );
             },
           ),
@@ -615,6 +541,164 @@ class _HostContextMenuItemState extends State<_HostContextMenuItem> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Session/local-terminal row matching the prototype's `.ex-row`: a 14px drag
+/// grip, the 15px type icon, the name and a close button that fades in on
+/// hover (or keyboard focus).
+class _ExplorerSessionRow extends StatefulWidget {
+  const _ExplorerSessionRow({
+    super.key,
+    required this.reorderIndex,
+    required this.compact,
+    required this.selected,
+    required this.accentColor,
+    required this.icon,
+    this.local = false,
+    required this.label,
+    required this.closeTooltip,
+    required this.onTap,
+    required this.onClose,
+    this.onSecondaryTapDown,
+  });
+
+  final int reorderIndex;
+  final bool compact;
+  final bool selected;
+  final Color accentColor;
+  final IconData icon;
+
+  /// Local terminals follow `.ex-row.local`: no wash at rest, `--accent-soft`
+  /// plus `--accent-ink` copy when active, and `--fg` glyphs in the rail.
+  /// SSH rows carry their group wash instead.
+  final bool local;
+  final String label;
+  final String closeTooltip;
+  final VoidCallback onTap;
+  final VoidCallback onClose;
+  final GestureTapDownCallback? onSecondaryTapDown;
+
+  @override
+  State<_ExplorerSessionRow> createState() => _ExplorerSessionRowState();
+}
+
+class _ExplorerSessionRowState extends State<_ExplorerSessionRow> {
+  bool _hovered = false;
+  bool _closeFocused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = widget.selected;
+    final groupColor = widget.accentColor;
+    // `.ex-row .ico` is muted in the expanded layout; the group colours only
+    // move onto the glyphs in the <=96px rail (container query).
+    final iconColor = widget.compact
+        ? (widget.local ? AppColors.textPrimary : groupColor)
+        : AppColors.textMuted;
+    final background = widget.local
+        ? (selected ? AppColors.selection : Colors.transparent)
+        : DeckTokens.wash(groupColor, selected ? 0.30 : 0.12);
+    final nameColor = widget.local && selected
+        ? AppColors.accentInk
+        : AppColors.textPrimary;
+    final row = InkWell(
+      onTap: widget.onTap,
+      onSecondaryTapDown: widget.onSecondaryTapDown,
+      child: Container(
+        height: AppSpacing.itemHeight,
+        // `.ex-sgrip` sits in the row's own left padding via negative margins
+        // (`margin:0 -8px 0 -14px`) so the glyph and name keep the alignment
+        // they would have without a handle. Flutter has no negative margins,
+        // so the row starts 4px earlier instead: grip [20,34], glyph at 34 —
+        // the same boxes the prototype computes.
+        margin: widget.compact
+            ? const EdgeInsets.fromLTRB(4, 2, 4, 2)
+            : const EdgeInsets.fromLTRB(20, 2, 8, 2),
+        padding: widget.compact
+            ? EdgeInsets.zero
+            : const EdgeInsets.only(right: 4),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: selected ? groupColor : Colors.transparent,
+              width: 3,
+            ),
+          ),
+          color: background,
+        ),
+        child: widget.compact
+            ? Center(
+                child: Tooltip(
+                  message: widget.label,
+                  child: Icon(
+                    widget.icon,
+                    size: 16,
+                    color: selected ? AppColors.accentInk : iconColor,
+                  ),
+                ),
+              )
+            : Row(
+                children: [
+                  ReorderableDragStartListener(
+                    index: widget.reorderIndex,
+                    child: SizedBox(
+                      width: 14,
+                      height: 22,
+                      child: Icon(
+                        Icons.drag_indicator,
+                        size: 12,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                  Icon(widget.icon, size: 15, color: iconColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: nameColor,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 120),
+                    opacity: _hovered || _closeFocused ? 1 : 0,
+                    child: Tooltip(
+                      message: widget.closeTooltip,
+                      child: GestureDetector(
+                        onTap: widget.onClose,
+                        child: Focus(
+                          onFocusChange: (focused) =>
+                              setState(() => _closeFocused = focused),
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: Icon(
+                              Icons.close,
+                              size: 13,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: row,
     );
   }
 }

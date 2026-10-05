@@ -215,7 +215,7 @@ class _DockSplitter extends StatefulWidget {
   final VoidCallback onCollapseRequested;
   final ValueChanged<double> onExpandRequested;
 
-  static const double height = 10;
+  static const double height = 20;
 
   @override
   State<_DockSplitter> createState() => _DockSplitterState();
@@ -300,7 +300,7 @@ class _DockSplitterState extends State<_DockSplitter> {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: 0,
+                  top: _DockSplitter.height / 2,
                   child: Container(
                     height: 1,
                     color: active ? AppColors.accent : AppColors.border,
@@ -605,7 +605,10 @@ class _FeedRow extends StatelessWidget {
     final ss = event.time.second.toString().padLeft(2, '0');
 
     return Container(
-      padding: EdgeInsets.fromLTRB(isError ? 9 : 12, 6, 12, 6),
+      // `.feed-row` is padding 6/13; the 3px severity rule is an inset
+      // shadow in CSS, so it does not eat into the padding — compensate by
+      // 3px here to keep the time column on the same x as normal rows.
+      padding: EdgeInsets.fromLTRB(isError ? 10 : 13, 6, 13, 6),
       decoration: BoxDecoration(
         // Severity rides a 3px left rule, not a separate panel. An outer
         // BoxShadow would flood the whole row instead.
@@ -618,7 +621,8 @@ class _FeedRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 58,
+            // `.feed-row` first grid column is 70px wide.
+            width: 70,
             child: Text(
               '$hh:$mm:$ss',
               style: TextStyle(
@@ -629,44 +633,81 @@ class _FeedRow extends StatelessWidget {
               ),
             ),
           ),
-          Icon(
-            isError || isWarn
-                ? Icons.warning_amber_rounded
-                : Icons.chevron_right,
-            size: 14,
-            color: isError
-                ? DeckTokens.danger
-                : (isWarn ? DeckTokens.warn : AppColors.textMuted),
+          const SizedBox(width: 9),
+          SizedBox(
+            // Second grid column: 16px icon slot, 9px gap on either side.
+            width: 16,
+            child: Icon(
+              isError || isWarn
+                  ? Icons.warning_amber_rounded
+                  : Icons.chevron_right,
+              size: 14,
+              color: isError
+                  ? DeckTokens.danger
+                  : (isWarn ? DeckTokens.warn : AppColors.textMuted),
+            ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 9),
           Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
-                children: [
-                  if (isError || isWarn) ...[
-                    TextSpan(
-                      text: isError ? 'ERROR  ' : 'WARN  ',
-                      style: TextStyle(
-                        fontFamily: 'JetBrains Mono',
-                        fontFamilyFallback: DeckTokens.fontMono,
-                        fontSize: 9.5,
-                        letterSpacing: 0.1,
-                        color: isError ? DeckTokens.danger : DeckTokens.warn,
-                      ),
-                    ),
-                  ],
-                  TextSpan(text: event.message),
-                  if (event.subject != null)
-                    TextSpan(
-                      text: '  ${event.subject}',
-                      style: TextStyle(color: AppColors.accentInk),
-                    ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isError || isWarn) ...[
+                  _LevelChip(
+                    label: isError ? 'ERROR' : 'WARN',
+                    color: isError ? DeckTokens.danger : DeckTokens.warn,
+                  ),
+                  const SizedBox(width: 7),
                 ],
-              ),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textPrimary,
+                      ),
+                      children: [
+                        TextSpan(text: event.message),
+                        if (event.subject != null)
+                          TextSpan(
+                            text: '  ${event.subject}',
+                            style: TextStyle(color: AppColors.accentInk),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Inline severity chip: `.lvl` is 9.5px mono, `.1em` tracking and a 1px
+/// `currentColor` border, so severity survives a narrow dock.
+class _LevelChip extends StatelessWidget {
+  const _LevelChip({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(border: Border.all(color: color)),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'JetBrains Mono',
+          fontFamilyFallback: DeckTokens.fontMono,
+          fontSize: 9.5,
+          letterSpacing: 0.95,
+          color: color,
+        ),
       ),
     );
   }

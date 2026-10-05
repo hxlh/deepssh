@@ -13,6 +13,10 @@ import '../core/models/theme_settings.dart';
 import '../core/models/tunnel_config_item.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
+import '../core/theme/app_tokens.dart';
+import '../core/widgets/deck_fields.dart';
+import '../core/widgets/deck_toast.dart';
+import '../core/widgets/deck_widgets.dart';
 import '../features/hosts/host_tree.dart';
 import '../features/hosts/host_tree_state.dart';
 import '../features/local_terminal/local_terminal_bridge.dart';
@@ -66,6 +70,48 @@ class WorkbenchPage extends StatefulWidget {
   State<WorkbenchPage> createState() => _WorkbenchPageState();
 }
 
+class _SecretPromptDialog extends StatefulWidget {
+  const _SecretPromptDialog({required this.title, required this.label});
+
+  final String title;
+  final String label;
+
+  @override
+  State<_SecretPromptDialog> createState() => _SecretPromptDialogState();
+}
+
+class _SecretPromptDialogState extends State<_SecretPromptDialog> {
+  late final TextEditingController controller = TextEditingController();
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DeckDialog(
+      title: widget.title,
+      actions: [
+        DeckButton(label: '取消', onPressed: () => Navigator.of(context).pop()),
+        DeckButton(
+          label: '连接',
+          style: DeckButtonStyle.accent,
+          onPressed: () => Navigator.of(context).pop(controller.text),
+        ),
+      ],
+      child: DeckTextField(
+        label: widget.label,
+        controller: controller,
+        obscure: true,
+        autocorrect: false,
+        enableSuggestions: false,
+      ),
+    );
+  }
+}
+
 class _SshSessionNoteDialog extends StatefulWidget {
   const _SshSessionNoteDialog({required this.initialNote});
 
@@ -92,22 +138,22 @@ class _SshSessionNoteDialogState extends State<_SshSessionNoteDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('编辑备注'),
-      content: TextField(
-        controller: controller,
-        decoration: const InputDecoration(labelText: '会话备注'),
-      ),
+    return DeckDialog(
+      title: '编辑备注',
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
-        ),
-        FilledButton(
+        DeckButton(label: '取消', onPressed: () => Navigator.of(context).pop()),
+        DeckButton(
+          label: '保存',
+          style: DeckButtonStyle.accent,
           onPressed: () => Navigator.of(context).pop(controller.text),
-          child: const Text('保存'),
         ),
       ],
+      child: DeckTextField(
+        label: '会话备注',
+        controller: controller,
+        hintText: '例如 发布流水线',
+        autocorrect: false,
+      ),
     );
   }
 }
@@ -538,9 +584,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   }
 
   void _showLocalTerminalError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    showDeckToast(context, message);
   }
 
   void _replaceLocalTerminal(LocalTerminalItem terminal) {
@@ -1300,6 +1344,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   Future<void> _handleEditSshSessionNote(SshSessionItem session) async {
     final note = await showDialog<String>(
       context: context,
+      // Same 42% scrim as the other three deck dialogs (`.overlay`).
+      barrierColor: DeckTokens.wash(AppColors.textPrimary, 0.42),
       builder: (context) => _SshSessionNoteDialog(initialNote: session.note),
     );
     if (note == null || !mounted) return;
@@ -1396,30 +1442,11 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   Future<String?> _promptSecret({
     required String title,
     required String label,
-  }) async {
-    var secret = '';
+  }) {
     return showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          decoration: InputDecoration(labelText: label),
-          obscureText: true,
-          enableSuggestions: false,
-          autocorrect: false,
-          onChanged: (value) => secret = value,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(secret),
-            child: const Text('Connect'),
-          ),
-        ],
-      ),
+      barrierColor: DeckTokens.wash(AppColors.textPrimary, 0.42),
+      builder: (context) => _SecretPromptDialog(title: title, label: label),
     );
   }
 

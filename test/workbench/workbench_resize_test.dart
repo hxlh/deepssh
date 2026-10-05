@@ -50,7 +50,8 @@ void main() {
       const Offset(0, 420),
     );
     await tester.pumpAndSettle();
-    expect(tester.getSize(dock).height, closeTo(47, 2));
+    // 37px title bar + the 20px splitter rail that stays in the layout.
+    expect(tester.getSize(dock).height, closeTo(57, 2));
 
     // Dragging the folded splitter down re-opens it in place.
     rect = tester.getRect(dock);
@@ -71,7 +72,8 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.home);
     await tester.pumpAndSettle();
-    expect(tester.getSize(dock).height, closeTo(47, 2));
+    // 37px title bar + the 20px splitter rail that stays in the layout.
+    expect(tester.getSize(dock).height, closeTo(57, 2));
   });
 
   testWidgets('sidebar clamps to the 56px icon rail and back to 560px', (

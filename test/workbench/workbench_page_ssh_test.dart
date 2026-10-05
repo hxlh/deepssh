@@ -13,6 +13,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xterm/xterm.dart' as xterm;
+import 'package:deepssh/workbench/widgets/tab_strip.dart';
 
 class FakeSshBridgeClient implements SshBridgeClient {
   final profiles = <SshProfileItem>[];
@@ -310,7 +311,9 @@ void main() {
 
     expect(find.text('SSH Password'), findsOneWidget);
     await tester.enterText(find.bySemanticsLabel('Password'), 'typed-secret');
-    await tester.tap(find.text('Connect'));
+    await tester.tap(
+      find.descendant(of: find.byType(DeckDialog), matching: find.text('连接')),
+    );
     await tester.pumpAndSettle();
 
     expect(bridge.lastRuntimePassword, 'typed-secret');
@@ -352,7 +355,9 @@ void main() {
       find.bySemanticsLabel('Passphrase'),
       'key-passphrase',
     );
-    await tester.tap(find.text('Connect'));
+    await tester.tap(
+      find.descendant(of: find.byType(DeckDialog), matching: find.text('连接')),
+    );
     await tester.pumpAndSettle();
 
     expect(bridge.connectCount, 2);
@@ -484,7 +489,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('terminal1'), findsWidgets);
-    await tester.tap(find.byIcon(Icons.close).first);
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(TabStrip),
+            matching: find.byIcon(Icons.close),
+          )
+          .first,
+    );
     await tester.pumpAndSettle();
 
     expect(bridge.closeSessionCount, 0);

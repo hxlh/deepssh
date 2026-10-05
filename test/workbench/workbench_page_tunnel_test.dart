@@ -1,3 +1,4 @@
+import 'package:deepssh/core/widgets/deck_widgets.dart';
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/workbench/widgets/add_connection_button.dart';
 import 'package:deepssh/workbench/widgets/app_topbar.dart';
@@ -316,7 +317,9 @@ void main() {
     expect(find.text('SSH Password'), findsOneWidget);
 
     await tester.enterText(find.bySemanticsLabel('Password'), 'runtime-secret');
-    await tester.tap(find.text('Connect'));
+    await tester.tap(
+      find.descendant(of: find.byType(DeckDialog), matching: find.text('连接')),
+    );
     await tester.pumpAndSettle();
 
     expect(tunnelBridge.startCount, 1);
@@ -374,7 +377,9 @@ void main() {
     expect(find.text('Private Key Passphrase'), findsOneWidget);
 
     await tester.enterText(find.bySemanticsLabel('Passphrase'), 'key-secret');
-    await tester.tap(find.text('Connect'));
+    await tester.tap(
+      find.descendant(of: find.byType(DeckDialog), matching: find.text('连接')),
+    );
     await tester.pumpAndSettle();
 
     expect(tunnelBridge.startCount, 2);

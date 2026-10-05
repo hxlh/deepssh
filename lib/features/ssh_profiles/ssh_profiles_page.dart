@@ -80,18 +80,18 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
   Future<void> _confirmDelete(SshProfileItem profile) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除 SSH 配置'),
-        content: Text('删除「${profile.name}」后不可恢复，确定继续？'),
+      barrierColor: DeckTokens.wash(AppColors.textPrimary, 0.42),
+      builder: (context) => DeckDialog(
+        title: '删除 SSH 配置',
+        message: '删除「${profile.name}」后不可恢复，确定继续？',
         actions: [
           DeckButton(
             label: '取消',
-            style: DeckButtonStyle.ghost,
             onPressed: () => Navigator.of(context).pop(false),
           ),
           DeckButton(
             label: '删除',
-            style: DeckButtonStyle.solid,
+            style: DeckButtonStyle.danger,
             destructive: true,
             onPressed: () => Navigator.of(context).pop(true),
           ),
@@ -237,14 +237,14 @@ class _SshProfilesPageState extends State<SshProfilesPage> {
                             dense: true,
                             onPressed: () => widget.onConnect(profile),
                           ),
-                          const SizedBox(width: 5),
+                          const SizedBox(width: 6),
                           DeckButton(
                             label: '编辑',
                             dense: true,
                             style: DeckButtonStyle.ghost,
                             onPressed: () => widget.onEdit(profile),
                           ),
-                          const SizedBox(width: 5),
+                          const SizedBox(width: 6),
                           DeckButton(
                             label: '删除',
                             dense: true,
@@ -270,42 +270,27 @@ class _AuthFilterSelect extends StatelessWidget {
   final SshAuthMode? selected;
   final ValueChanged<SshAuthMode?> onChanged;
 
-  static const _options = <(String, SshAuthMode?)>[
-    ('全部认证方式', null),
-    ('密码', SshAuthMode.password),
-    ('私钥', SshAuthMode.privateKey),
+  static const _options = <SshAuthMode?>[
+    null,
+    SshAuthMode.password,
+    SshAuthMode.privateKey,
   ];
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: 150,
-      child: InputDecorator(
-        isEmpty: false,
-        isFocused: false,
-        decoration: DeckFieldStyle.decoration().copyWith(
-          contentPadding: const EdgeInsets.fromLTRB(10, 8, 28, 8),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<SshAuthMode?>(
-            key: const ValueKey('auth-filter'),
-            value: selected,
-            isExpanded: true,
-            isDense: true,
-            icon: const Icon(Icons.arrow_drop_down, size: 16),
-            style: DeckFieldStyle.text,
-            borderRadius: BorderRadius.zero,
-            hint: Text('全部认证方式', style: DeckFieldStyle.text),
-            items: [
-              for (final option in _options)
-                DropdownMenuItem<SshAuthMode?>(
-                  value: option.$2,
-                  child: Text(option.$1, style: DeckFieldStyle.text),
-                ),
-            ],
-            onChanged: onChanged,
-          ),
-        ),
+      child: DeckSelect<SshAuthMode?>(
+        key: const ValueKey('auth-filter'),
+        hint: '按认证方式筛选',
+        value: selected,
+        items: _options,
+        itemBuilder: (context, mode) => Text(switch (mode) {
+          null => '全部认证方式',
+          SshAuthMode.password => '密码',
+          SshAuthMode.privateKey => '私钥',
+        }),
+        onChanged: onChanged,
       ),
     );
   }

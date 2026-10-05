@@ -28,7 +28,7 @@ class DeckPageScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 34),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -61,8 +61,10 @@ class DeckPageScaffold extends StatelessWidget {
               ],
             ],
           ),
+          // `.page-head` sits 14px above the body; a toolbar adds its own
+          // 12px bottom margin (prototype `.toolbar{margin-bottom:12px}`).
           if (toolbar != null) ...[const SizedBox(height: 12), toolbar!],
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Expanded(child: child),
         ],
       ),
@@ -153,7 +155,10 @@ class DeckTable extends StatelessWidget {
 }
 
 /// A single table row with a status-coloured left rule.
-class DeckTableRow extends StatelessWidget {
+///
+/// Metrics mirror the prototype's `.row`: 13/15 padding, a 16px gap between
+/// the three grid columns and a `--bg` wash on hover.
+class DeckTableRow extends StatefulWidget {
   const DeckTableRow({
     super.key,
     required this.flexWeights,
@@ -174,34 +179,56 @@ class DeckTableRow extends StatelessWidget {
   final double trailingWidth;
 
   @override
+  State<DeckTableRow> createState() => _DeckTableRowState();
+}
+
+class _DeckTableRowState extends State<DeckTableRow> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: statusColor, width: 3)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 12),
-        child: Row(
-          children: [
-            for (var index = 0; index < cells.length; index++)
-              Expanded(
-                flex: flexWeights[index],
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: cells[index],
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Container(
+        decoration: BoxDecoration(
+          color: _hovered ? AppColors.background : null,
+          border: Border(left: BorderSide(color: widget.statusColor, width: 3)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+          child: Row(
+            children: [
+              for (var index = 0; index < widget.cells.length; index++)
+                Expanded(
+                  flex: widget.flexWeights[index],
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: widget.cells[index],
+                  ),
                 ),
-              ),
-            if (meta != null)
-              SizedBox(
-                width: 210,
-                child: DeckMetaCell(label: meta!.label, value: meta!.value),
-              ),
-            if (trailing != null)
-              SizedBox(
-                width: trailingWidth,
-                child: Align(alignment: Alignment.centerRight, child: trailing),
-              ),
-          ],
+              if (widget.meta != null) ...[
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: 210,
+                  child: DeckMetaCell(
+                    label: widget.meta!.label,
+                    value: widget.meta!.value,
+                  ),
+                ),
+              ],
+              if (widget.trailing != null) ...[
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: widget.trailingWidth,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: widget.trailing,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -256,7 +283,7 @@ class DeckMetaCell extends StatelessWidget {
             fontFamily: 'JetBrains Mono',
             fontFamilyFallback: DeckTokens.fontMono,
             fontSize: 11.5,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
           ),
         ),

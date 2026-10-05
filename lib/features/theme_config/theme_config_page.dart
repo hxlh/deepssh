@@ -9,6 +9,7 @@ import '../../core/storage/theme_preset_store.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/color_picker_field.dart';
+import '../../core/widgets/deck_toast.dart';
 import '../../core/widgets/css_colors.dart' as css;
 import '../../core/widgets/deck_fields.dart';
 import '../../core/widgets/deck_page.dart';
@@ -184,15 +185,7 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
   }
 
   void _showMessage(String message) {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        width: 280,
-        duration: const Duration(milliseconds: 1800),
-      ),
-    );
+    showDeckToast(context, message);
   }
 
   void _updateUi(UiThemeSettings settings) {
@@ -864,7 +857,7 @@ class _ThemePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DeckPanel(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -878,7 +871,7 @@ class _ThemePanel extends StatelessWidget {
                   fontFamily: 'Georgia',
                   fontFamilyFallback: DeckTokens.fontDisplay,
                   fontSize: 16,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),
               ),

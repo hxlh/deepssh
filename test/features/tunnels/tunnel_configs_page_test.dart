@@ -1,5 +1,6 @@
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/models/tunnel_config_item.dart';
+import 'package:deepssh/core/widgets/deck_widgets.dart';
 import 'package:deepssh/features/tunnels/tunnel_configs_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -137,10 +138,7 @@ void main() {
     await tester.tap(find.text('删除').first);
     await tester.pumpAndSettle();
     await tester.tap(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('删除'),
-      ),
+      find.descendant(of: find.byType(DeckDialog), matching: find.text('删除')),
     );
     await tester.pumpAndSettle();
     expect(deleted, stoppedTunnel);

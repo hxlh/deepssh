@@ -49,13 +49,13 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
   Future<void> _confirmDelete(TunnelConfigItem tunnel) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除转发'),
-        content: Text('删除「${tunnel.name}」后不可恢复，确定继续？'),
+      barrierColor: DeckTokens.wash(AppColors.textPrimary, 0.42),
+      builder: (context) => DeckDialog(
+        title: '删除转发',
+        message: '删除「${tunnel.name}」后不可恢复，确定继续？',
         actions: [
           DeckButton(
             label: '取消',
-            style: DeckButtonStyle.ghost,
             onPressed: () => Navigator.of(context).pop(false),
           ),
           DeckButton(
@@ -243,14 +243,14 @@ class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
                                 ? widget.onStop(tunnel)
                                 : widget.onStart(tunnel),
                           ),
-                          const SizedBox(width: 5),
+                          const SizedBox(width: 6),
                           DeckButton(
                             label: '编辑',
                             dense: true,
                             style: DeckButtonStyle.ghost,
                             onPressed: () => widget.onEdit(tunnel),
                           ),
-                          const SizedBox(width: 5),
+                          const SizedBox(width: 6),
                           DeckButton(
                             label: '删除',
                             dense: true,

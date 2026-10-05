@@ -16,12 +16,19 @@ class DeckLabel extends StatelessWidget {
     this.size = 10,
     this.color,
     this.spacing = 0.14,
+    this.weight = FontWeight.w400,
   });
 
   final String text;
   final double size;
   final Color? color;
+
+  /// Letter spacing in `em`, exactly as the prototype's CSS declares it
+  /// (`.1em`–`.16em`). Converted to logical pixels at build time because
+  /// Flutter's `letterSpacing` is absolute, not relative to the font size.
   final double spacing;
+
+  final FontWeight weight;
 
   @override
   Widget build(BuildContext context) {
@@ -32,8 +39,8 @@ class DeckLabel extends StatelessWidget {
         fontFamilyFallback: DeckTokens.fontMono,
         fontSize: size,
         height: 1.2,
-        letterSpacing: spacing,
-        fontWeight: FontWeight.w600,
+        letterSpacing: spacing * size,
+        fontWeight: weight,
         color: color ?? AppColors.textMuted,
       ),
     );
@@ -55,8 +62,8 @@ class DeckTitle extends StatelessWidget {
         fontFamily: 'Georgia',
         fontFamilyFallback: DeckTokens.fontDisplay,
         fontSize: size,
-        height: 1.2,
-        fontWeight: FontWeight.w700,
+        height: 1.15,
+        fontWeight: FontWeight.w600,
         color: AppColors.textPrimary,
       ),
     );
@@ -109,8 +116,10 @@ class DeckStatusSquare extends StatelessWidget {
 
 enum DeckButtonStyle { solid, accent, outline, ghost, danger }
 
-/// The app's only button. `solid` is reserved for the single primary action on
-/// a screen — a row never shows two of them.
+/// The app's only button, matching the prototype's `.btn` computed styles:
+/// 1px ink border, square corners, 12/7 padding (9/5 when [dense]), a 7px gap
+/// and a 2px pixel-press with no resting shadow. `accent` maps to
+/// `.btn-primary`, `ghost` to `.btn-ghost` and `danger` to `.btn-danger`.
 class DeckButton extends StatefulWidget {
   const DeckButton({
     super.key,
@@ -120,6 +129,7 @@ class DeckButton extends StatefulWidget {
     this.icon,
     this.dense = false,
     this.destructive = false,
+    this.iconOnly = false,
   });
 
   final String label;
@@ -128,6 +138,10 @@ class DeckButton extends StatefulWidget {
   final IconData? icon;
   final bool dense;
   final bool destructive;
+
+  /// The prototype's `.btn.icon`: a 30x30 square carrying only the glyph
+  /// (used by the drawer close button). [label] stays the semantics name.
+  final bool iconOnly;
 
   @override
   State<DeckButton> createState() => _DeckButtonState();
@@ -146,47 +160,74 @@ class _DeckButtonState extends State<DeckButton> {
     final Color background;
     final Color foreground;
     final Color borderColor;
-    if (widget.style == DeckButtonStyle.solid) {
-      background = _pressed
-          ? DeckTokens.darken(AppColors.textPrimary, 0.04)
-          : AppColors.textPrimary;
-      foreground = AppColors.background;
-      borderColor = AppColors.textPrimary;
-    } else if (widget.style == DeckButtonStyle.accent) {
-      background = _pressed || _hovered
-          ? AppColors.accentInk
-          : AppColors.accent;
-      foreground = AppColors.panel;
-      borderColor = _pressed || _hovered
-          ? AppColors.accentInk
-          : AppColors.accent;
-    } else if (widget.style == DeckButtonStyle.ghost) {
-      background = _hovered ? AppColors.fgSoft : Colors.transparent;
-      foreground = destructive ? DeckTokens.danger : AppColors.textPrimary;
-      borderColor = Colors.transparent;
-    } else {
-      background = _hovered ? AppColors.fgSoft : AppColors.panel;
-      foreground = destructive ? DeckTokens.danger : AppColors.textPrimary;
-      borderColor = _hovered ? AppColors.textPrimary : AppColors.border;
+    switch (widget.style) {
+      case DeckButtonStyle.solid:
+        background = AppColors.textPrimary;
+        foreground = AppColors.background;
+        borderColor = AppColors.textPrimary;
+      case DeckButtonStyle.accent:
+        background = _hovered || _pressed
+            ? AppColors.accentInk
+            : AppColors.accent;
+        foreground = AppColors.panel;
+        borderColor = background;
+      case DeckButtonStyle.ghost:
+        background = _hovered ? AppColors.fgSoft : Colors.transparent;
+        foreground = destructive
+            ? DeckTokens.danger
+            : (_hovered ? AppColors.textPrimary : AppColors.textMuted);
+        borderColor = Colors.transparent;
+      case DeckButtonStyle.outline:
+      case DeckButtonStyle.danger:
+        background = _hovered ? AppColors.fgSoft : AppColors.panel;
+        foreground = destructive ? DeckTokens.danger : AppColors.textPrimary;
+        borderColor = destructive
+            ? DeckTokens.mix(DeckTokens.danger, AppColors.textPrimary, 0.45)
+            : AppColors.textPrimary;
     }
 
-    final content = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (widget.icon != null) ...[
-          Icon(widget.icon, size: widget.dense ? 12 : 13, color: foreground),
-          const SizedBox(width: 6),
-        ],
-        Text(
-          widget.label,
-          style: TextStyle(
-            fontSize: widget.dense ? 11.5 : 12,
-            fontWeight: FontWeight.w600,
-            color: enabled ? foreground : AppColors.textMuted,
-          ),
-        ),
-      ],
+    final ink = enabled ? foreground : AppColors.textMuted;
+    final content = widget.iconOnly
+        ? Icon(widget.icon ?? Icons.close, size: 14, color: ink)
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.icon != null) ...[
+                Icon(widget.icon, size: 14, color: ink),
+                const SizedBox(width: 7),
+              ],
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: widget.dense ? 11 : 12,
+                  fontWeight: FontWeight.w600,
+                  color: ink,
+                ),
+              ),
+            ],
+          );
+
+    Widget surface = AnimatedContainer(
+      duration: const Duration(milliseconds: 80),
+      transform: _pressed
+          ? (Matrix4.identity()..translateByDouble(2, 2, 0, 1))
+          : Matrix4.identity(),
+      padding: widget.iconOnly
+          ? EdgeInsets.zero
+          : EdgeInsets.symmetric(
+              horizontal: widget.dense ? 9 : 12,
+              vertical: widget.dense ? 5 : 7,
+            ),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: background,
+        border: Border.all(color: borderColor),
+      ),
+      child: content,
     );
+    if (widget.iconOnly) {
+      surface = SizedBox(width: 30, height: 30, child: surface);
+    }
 
     return Semantics(
       button: true,
@@ -206,22 +247,7 @@ class _DeckButtonState extends State<DeckButton> {
           onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
           onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
           onTap: widget.onPressed,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 110),
-            transform: _pressed
-                ? (Matrix4.identity()..translateByDouble(1, 1, 0, 1))
-                : Matrix4.identity(),
-            padding: EdgeInsets.symmetric(
-              horizontal: widget.dense ? 8 : 11,
-              vertical: widget.dense ? 4 : 6,
-            ),
-            decoration: BoxDecoration(
-              color: background,
-              border: Border.all(color: borderColor),
-              boxShadow: _pressed || !enabled ? null : AppColors.shadowSolid,
-            ),
-            child: content,
-          ),
+          child: surface,
         ),
       ),
     );
@@ -233,7 +259,7 @@ class DeckPanel extends StatelessWidget {
   const DeckPanel({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
     this.solid = false,
     this.borderColor,
   });
@@ -293,8 +319,8 @@ class DeckBadge extends StatelessWidget {
               fontFamily: 'JetBrains Mono',
               fontFamilyFallback: DeckTokens.fontMono,
               fontSize: 10,
-              letterSpacing: 0.06,
-              fontWeight: FontWeight.w600,
+              letterSpacing: 0.6,
+              fontWeight: FontWeight.w400,
               color: fg,
             ),
           ),
@@ -352,7 +378,7 @@ class DeckEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
       decoration: BoxDecoration(
         border: Border.all(
           color: dashed ? AppColors.border : AppColors.textPrimary,
@@ -362,7 +388,7 @@ class DeckEmptyState extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 30, color: AppColors.textMuted),
-          const SizedBox(height: 10),
+          const SizedBox(height: 9),
           Text(
             title,
             textAlign: TextAlign.center,
@@ -375,7 +401,7 @@ class DeckEmptyState extends StatelessWidget {
             ),
           ),
           if (hint != null) ...[
-            const SizedBox(height: 7),
+            const SizedBox(height: 9),
             Text(
               hint!,
               textAlign: TextAlign.center,
@@ -405,7 +431,7 @@ InputDecorationTheme deckInputTheme() {
     filled: true,
     fillColor: AppColors.panel,
     isDense: true,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
     border: border(AppColors.border),
     enabledBorder: border(AppColors.border),
     focusedBorder: border(AppColors.textPrimary),
@@ -415,23 +441,93 @@ InputDecorationTheme deckInputTheme() {
       fontFamily: 'JetBrains Mono',
       fontFamilyFallback: DeckTokens.fontMono,
       fontSize: 10,
-      letterSpacing: 0.1,
+      letterSpacing: 1.0,
       color: AppColors.textMuted,
     ),
     floatingLabelStyle: TextStyle(
       fontFamily: 'JetBrains Mono',
       fontFamilyFallback: DeckTokens.fontMono,
       fontSize: 10,
-      letterSpacing: 0.1,
+      letterSpacing: 1.0,
       color: AppColors.textPrimary,
     ),
     hintStyle: TextStyle(
       fontFamily: 'JetBrains Mono',
       fontFamilyFallback: DeckTokens.fontMono,
       fontSize: 12,
-      color: AppColors.textMuted.withValues(alpha: 0.85),
+      color: AppColors.textMuted,
     ),
     prefixIconColor: AppColors.textMuted,
     suffixIconColor: AppColors.textMuted,
   );
+}
+
+/// Square modal panel matching the prototype's `.dialog`: 440px, hard border,
+/// hard offset shadow, serif title and a right-aligned action row.
+class DeckDialog extends StatelessWidget {
+  const DeckDialog({
+    super.key,
+    required this.title,
+    required this.actions,
+    this.message,
+    this.child,
+  });
+
+  final String title;
+  final String? message;
+  final Widget? child;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.all(24),
+      child: Container(
+        width: 440,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.panel,
+          border: Border.all(color: AppColors.textPrimary),
+          boxShadow: AppColors.shadowSolid,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontFamilyFallback: DeckTokens.fontDisplay,
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            if (message != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                message!,
+                style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+              ),
+            ],
+            if (child != null) ...[const SizedBox(height: 14), child!],
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                for (var index = 0; index < actions.length; index++) ...[
+                  if (index > 0) const SizedBox(width: 8),
+                  actions[index],
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
