@@ -68,13 +68,9 @@ abstract final class AppColors {
   /// Fully opaque hard shadow (dialogs, drawers, floating layers).
   static Color get shadowSolidInk => textPrimary;
 
-  static List<BoxShadow> get shadowHard => <BoxShadow>[
-    BoxShadow(color: shadowInk, offset: const Offset(2, 2)),
-  ];
+  static List<BoxShadow> get shadowHard => const <BoxShadow>[];
 
-  static List<BoxShadow> get shadowSolid => <BoxShadow>[
-    BoxShadow(color: shadowSolidInk, offset: const Offset(2, 2)),
-  ];
+  static List<BoxShadow> get shadowSolid => const <BoxShadow>[];
 
   /// Chrome that stays put whatever the preset: status colours, the terminal
   /// stage and the font stacks all read [DeckTokens] directly.

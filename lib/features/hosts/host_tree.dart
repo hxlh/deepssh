@@ -95,16 +95,7 @@ class HostTree extends StatelessWidget {
       elevation: 0,
       shadowColor: Colors.transparent,
       child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.panel,
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x33000000),
-              blurRadius: 12,
-              offset: Offset(0, 5),
-            ),
-          ],
-        ),
+        decoration: BoxDecoration(color: AppColors.panel),
         child: child,
       ),
     );

@@ -81,14 +81,6 @@ class DeckDrawer extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.panel,
                 border: Border(left: BorderSide(color: AppColors.textPrimary)),
-                // Hard shadow thrown to the left, matching the prototype's
-                // `-2px 0 0` — no blur, no spread.
-                boxShadow: [
-                  BoxShadow(
-                    color: DeckTokens.wash(AppColors.textPrimary, 0.20),
-                    offset: const Offset(-2, 0),
-                  ),
-                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -45,14 +45,11 @@ abstract final class DeckTokens {
   static Color get borderStrong => mix(border, fg, 0.35);
 
   /// Hard shadow for clickable cards and floating layers.
-  static List<BoxShadow> get shadowHard => <BoxShadow>[
-    BoxShadow(color: wash(fg, 0.20), offset: const Offset(2, 2)),
-  ];
+  /// Shadows are disabled app-wide: flat borders only, no drop shadow.
+  static List<BoxShadow> get shadowHard => const <BoxShadow>[];
 
   /// Opaque hard shadow for dialogs and drawers.
-  static List<BoxShadow> get shadowSolid => <BoxShadow>[
-    BoxShadow(color: fg, offset: const Offset(2, 2)),
-  ];
+  static List<BoxShadow> get shadowSolid => const <BoxShadow>[];
 
   // Typography. Serif is reserved for page titles and empty-state copy; mono
   // is for labels, fields and numbers only.
