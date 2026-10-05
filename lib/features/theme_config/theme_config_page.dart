@@ -445,13 +445,6 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
   }
 
   Widget _buildUiSection() {
-    final knownFamilies = {for (final option in _uiFontOptions) option.family};
-    final families = [
-      for (final option in _uiFontOptions) option.family,
-      if (uiSettings.fontFamily.isNotEmpty &&
-          !knownFamilies.contains(uiSettings.fontFamily))
-        uiSettings.fontFamily,
-    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -475,21 +468,14 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
         const SizedBox(height: 9),
         DeckFieldRow(
           children: [
-            DeckSelect<String>(
-              key: const ValueKey('ui-font-select'),
+            _FontStackField(
+              key: const ValueKey('ui-font-input'),
               label: '界面字体',
               value: uiSettings.fontFamily,
-              items: families,
-              itemBuilder: (context, family) => Text(
-                _uiFontLabel(family),
-                maxLines: 1,
-                softWrap: false,
-                overflow: TextOverflow.ellipsis,
-              ),
-              onChanged: (family) {
-                if (family == null) return;
-                _updateUi(uiSettings.copyWith(fontFamily: family));
-              },
+              fallback: 'sans-serif',
+              hint: '逗号分隔，逐级回退；末尾自动补 sans-serif',
+              onChanged: (stack) =>
+                  _updateUi(uiSettings.copyWith(fontFamily: stack)),
             ),
             _ClampedSizeField(
               key: const ValueKey('ui-size-select'),
@@ -578,21 +564,14 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
         const SizedBox(height: 9),
         DeckFieldRow(
           children: [
-            DeckSelect<String>(
-              key: const ValueKey('term-font-select'),
+            _FontStackField(
+              key: const ValueKey('term-font-input'),
               label: '字体族',
               value: termSettings.fontFamily,
-              items: [for (final option in _terminalFontOptions) option.family],
-              itemBuilder: (context, family) => Text(
-                _terminalFontLabel(family),
-                maxLines: 1,
-                softWrap: false,
-                overflow: TextOverflow.ellipsis,
-              ),
-              onChanged: (family) {
-                if (family == null) return;
-                _updateTerm(termSettings.copyWith(fontFamily: family));
-              },
+              fallback: 'monospace',
+              hint: '逗号分隔，逐级回退；末尾自动补 monospace',
+              onChanged: (stack) =>
+                  _updateTerm(termSettings.copyWith(fontFamily: stack)),
             ),
             _ClampedSizeField(
               key: const ValueKey('term-size-input'),
@@ -849,34 +828,6 @@ class _ScrollbackFieldState extends State<_ScrollbackField> {
   }
 }
 
-const _uiFontOptions = <({String label, String family})>[
-  (label: '系统默认（含中文）', family: ''),
-  (label: '苹方 / PingFang SC', family: 'PingFang SC'),
-  (label: '思源黑体 / Noto Sans SC', family: 'Noto Sans SC'),
-];
-
-const _terminalFontOptions = <({String label, String family})>[
-  (label: '系统等宽（SF Mono / Menlo）', family: ''),
-  (label: 'JetBrains Mono', family: 'JetBrains Mono'),
-  (label: 'Cascadia Mono / Consolas', family: 'Consolas'),
-  (label: '思源等宽（中文）', family: 'Noto Sans SC'),
-  (label: '霞鹜文楷等宽', family: 'Noto Sans SC'),
-];
-
-String _terminalFontLabel(String family) {
-  for (final option in _terminalFontOptions) {
-    if (option.family == family) return option.label;
-  }
-  return family;
-}
-
-String _uiFontLabel(String family) {
-  for (final option in _uiFontOptions) {
-    if (option.family == family) return option.label;
-  }
-  return family;
-}
-
 String _cursorStyleLabel(CursorStyle style) => switch (style) {
   CursorStyle.block => '方块',
   CursorStyle.underline => '下划线',
@@ -941,6 +892,100 @@ class _SectionLabel extends StatelessWidget {
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: DeckLabel(text, size: 10),
+    );
+  }
+}
+
+class _FontStackField extends StatefulWidget {
+  const _FontStackField({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.fallback,
+    required this.hint,
+    required this.onChanged,
+  });
+
+  final String label;
+
+  /// The stored, normalised stack (no auto-appended generic).
+  final String value;
+
+  /// Generic family appended when applying, e.g. `sans-serif`.
+  final String fallback;
+  final String hint;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_FontStackField> createState() => _FontStackFieldState();
+}
+
+class _FontStackFieldState extends State<_FontStackField> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value);
+    _focusNode = FocusNode()..addListener(_handleFocusChange);
+  }
+
+  void _handleFocusChange() {
+    if (!_focusNode.hasFocus) _commit();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FontStackField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_focusNode.hasFocus &&
+        oldWidget.value != widget.value &&
+        _controller.text != widget.value) {
+      _controller.text = widget.value;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode
+      ..removeListener(_handleFocusChange)
+      ..dispose();
+    super.dispose();
+  }
+
+  /// Commit rewrites the field to the normalised stack the way the size field
+  /// normalises its value, so what the box shows is what gets parsed. An
+  /// emptied field falls back to the stored value rather than leaving an empty
+  /// stack behind.
+  void _commit() {
+    final list = DeckTokens.parseFontStack(_controller.text);
+    final normalised = list.isEmpty ? widget.value : list.join(', ');
+    _controller.text = normalised;
+    widget.onChanged(normalised);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DeckField(
+      label: widget.label,
+      hint: widget.hint,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        // A font stack is never spell-checked or autocorrected — the yellow
+        // squiggle under every family name is noise.
+        autocorrect: false,
+        enableSuggestions: false,
+        style: DeckFieldStyle.text,
+        decoration: DeckFieldStyle.decoration(),
+        onChanged: (raw) {
+          final list = DeckTokens.parseFontStack(raw);
+          if (list.isNotEmpty) widget.onChanged(list.join(', '));
+        },
+        onEditingComplete: _commit,
+        onSubmitted: (_) => _commit(),
+      ),
     );
   }
 }
@@ -1130,10 +1175,14 @@ class _MiniTerminalPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mono = settings.fontFamily.isEmpty ? null : settings.fontFamily;
+    final (mono, fallback) = DeckTokens.resolveFontStack(
+      settings.fontFamily,
+      DeckTokens.fontMono,
+      'monospace',
+    );
     TextStyle style(Color color) => TextStyle(
       fontFamily: mono,
-      fontFamilyFallback: DeckTokens.fontMono,
+      fontFamilyFallback: fallback,
       fontSize: 11.5,
       height: 1.55,
       color: color,

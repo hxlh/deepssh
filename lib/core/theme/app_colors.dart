@@ -28,6 +28,23 @@ abstract final class AppColors {
   static Color tabInactive = Colors.transparent;
   static Color tabHover = DeckTokens.fgSoft;
 
+  /// The first family in the comma-separated [fontFamily] stack, or null when
+  /// the stack is empty (platform default). Flutter's [TextStyle] takes one
+  /// family plus a fallback list, so a CSS-style stack is split here.
+  static String? get fontFamilyPrimary => DeckTokens.resolveFontStack(
+    fontFamily,
+    DeckTokens.fontBody,
+    'sans-serif',
+  ).$1;
+
+  /// The rest of the [fontFamily] stack, then the built-in body fallbacks, so
+  /// a partial stack still lands on a CJK-capable family.
+  static List<String> get fontFamilyFallback => DeckTokens.resolveFontStack(
+    fontFamily,
+    DeckTokens.fontBody,
+    'sans-serif',
+  ).$2;
+
   /// Applies a persisted UI theme, then re-derives everything that is not
   /// stored so the derived colours stay consistent with the chosen base.
   static void applyUi(UiThemeSettings settings) {

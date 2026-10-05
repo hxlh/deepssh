@@ -76,6 +76,71 @@ abstract final class DeckTokens {
     'Noto Sans SC',
   ];
 
+  /// Generic CSS families that can end a stack without naming a real font.
+  static const Set<String> genericFamilies = <String>{
+    'serif',
+    'sans-serif',
+    'monospace',
+    'system-ui',
+    'cursive',
+    'fantasy',
+    'ui-serif',
+    'ui-sans-serif',
+    'ui-monospace',
+    'math',
+    'emoji',
+    'fangsong',
+  };
+
+  /// Splits a comma-separated font stack, trimming each entry and dropping one
+  /// layer of wrapping quotes so `"Fira Code", monospace` parses the same
+  /// whether or not the user quoted the family. Empty entries are dropped.
+  static List<String> parseFontStack(String raw) {
+    final out = <String>[];
+    for (final part in raw.split(',')) {
+      var name = part.trim();
+      if (name.length >= 2 &&
+          ((name.startsWith('"') && name.endsWith('"')) ||
+              (name.startsWith("'") && name.endsWith("'")))) {
+        name = name.substring(1, name.length - 1).trim();
+      }
+      if (name.isNotEmpty) out.add(name);
+    }
+    return out;
+  }
+
+  /// Appends [generic] only when the stack does not already end in a generic
+  /// family, so an unresolvable stack still lands on something deliberate.
+  static String joinFontStack(List<String> stack, String generic) {
+    final hasGeneric = stack.any(
+      (name) => genericFamilies.contains(name.toLowerCase()),
+    );
+    return (hasGeneric ? stack : <String>[...stack, generic]).join(', ');
+  }
+
+  /// Splits a stored stack into the `(primary, fallback)` pair Flutter wants:
+  /// the first family becomes `fontFamily`, the rest plus [defaults] become the
+  /// fallback chain, and [generic] is appended when nothing generic is named —
+  /// the safety net is applied but never written back into the stored value.
+  static (String?, List<String>) resolveFontStack(
+    String raw,
+    List<String> defaults,
+    String generic,
+  ) {
+    final stack = parseFontStack(raw);
+    final fb = <String>[];
+    for (final family in stack.skip(1)) {
+      if (!fb.contains(family)) fb.add(family);
+    }
+    for (final family in defaults) {
+      if (!fb.contains(family)) fb.add(family);
+    }
+    if (!fb.any((f) => genericFamilies.contains(f.toLowerCase()))) {
+      fb.add(generic);
+    }
+    return (stack.isEmpty ? null : stack.first, fb);
+  }
+
   /// Mixes [a] toward [b] by [amount] in OKLab space.
   ///
   /// For tinting a colour toward its own background pass the background as [b];

@@ -10,6 +10,7 @@ import 'package:xterm/xterm.dart' as xterm;
 
 import '../../core/models/theme_settings.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
 import '../local_terminal/local_terminal_bridge.dart';
 import '../ssh/ssh_bridge.dart';
 import 'terminal_find.dart';
@@ -766,6 +767,11 @@ class _TerminalViewState extends State<TerminalView> {
     // Calling it in build() creates a rebuild loop: terminal change →
     // setState (offset) → rebuild → scheduleUpdate → setState → rebuild…
     final settings = widget.terminalThemeSettings;
+    final (termFamily, termFallback) = DeckTokens.resolveFontStack(
+      settings.fontFamily,
+      DeckTokens.fontMono,
+      'monospace',
+    );
     return Container(
       // The prototype's term-wrap is the terminal background edge to edge; the
       // inner padding belongs to the terminal, so a panel-coloured border here
@@ -814,7 +820,8 @@ class _TerminalViewState extends State<TerminalView> {
                       : _regexForegroundForRow,
                   textStyle: xterm.TerminalStyle(
                     fontSize: settings.fontSize.toDouble(),
-                    fontFamily: settings.fontFamily,
+                    fontFamily: termFamily ?? 'monospace',
+                    fontFamilyFallback: termFallback,
                     normalFontWeight: _fontWeightFromConfig(
                       settings.normalFontWeight,
                     ),

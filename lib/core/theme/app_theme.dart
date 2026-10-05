@@ -170,14 +170,8 @@ abstract final class AppTheme {
     if (style == null) return null;
     final baseFontSize = style.fontSize;
     return style.copyWith(
-      fontFamily: AppColors.fontFamily,
-      fontFamilyFallback: const <String>[
-        '-apple-system',
-        'Segoe UI',
-        'PingFang SC',
-        'Microsoft YaHei',
-        'Noto Sans SC',
-      ],
+      fontFamily: AppColors.fontFamilyPrimary,
+      fontFamilyFallback: AppColors.fontFamilyFallback,
       fontSize: baseFontSize == null
           ? AppColors.fontSize.toDouble()
           : baseFontSize * AppColors.fontSize / 14,
