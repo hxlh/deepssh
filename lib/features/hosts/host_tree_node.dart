@@ -80,8 +80,8 @@ class _TerminalRow extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(24, 2, 8, 2),
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          // Zero radius is a global rule (spec §2.3); this legacy row still
-          // drew a 6px corner.
+          // Zero radius is a global rule in the prototype; this legacy row
+          // still drew a 6px corner.
           color: selected ? AppColors.selection : Colors.transparent,
         ),
         child: Row(
