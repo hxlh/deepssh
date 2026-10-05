@@ -515,65 +515,71 @@ class _DeckSelectMenuState<T> extends State<_DeckSelectMenu<T>> {
           child: Focus(
             autofocus: true,
             onKeyEvent: (_, event) => _handleKey(event),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.panel,
-                border: Border.all(color: AppColors.textPrimary),
-                boxShadow: AppColors.shadowHard,
-              ),
-              padding: const EdgeInsets.all(4),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: height),
-                child: ListView.builder(
-                  controller: _scroll,
-                  shrinkWrap: true,
-                  padding: EdgeInsets.zero,
-                  itemExtent: _DeckSelectMenu.rowHeight,
-                  itemCount: widget.items.length,
-                  itemBuilder: (context, index) {
-                    final item = widget.items[index];
-                    final selected = item == widget.selected;
-                    final active = index == _highlight || index == _hovered;
-                    return MouseRegion(
-                      onEnter: (_) => setState(() => _hovered = index),
-                      onExit: (_) => setState(() {
-                        if (_hovered == index) _hovered = null;
-                      }),
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => widget.onPick(item),
-                        child: Container(
-                          height: _DeckSelectMenu.rowHeight,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: selected || active
-                                ? AppColors.background
-                                : null,
-                            border: Border(
-                              left: BorderSide(
-                                color: selected
-                                    ? AppColors.accent
-                                    : Colors.transparent,
-                                width: 3,
+            // The overlay lives above the app's Material, so without this
+            // wrapper each item inherits Flutter's fallback (debug) text style
+            // — a yellow underline warning "no Material ancestor".
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.panel,
+                  border: Border.all(color: AppColors.textPrimary),
+                  boxShadow: AppColors.shadowHard,
+                ),
+                padding: const EdgeInsets.all(4),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: height),
+                  child: ListView.builder(
+                    controller: _scroll,
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    itemExtent: _DeckSelectMenu.rowHeight,
+                    itemCount: widget.items.length,
+                    itemBuilder: (context, index) {
+                      final item = widget.items[index];
+                      final selected = item == widget.selected;
+                      final active = index == _highlight || index == _hovered;
+                      return MouseRegion(
+                        onEnter: (_) => setState(() => _hovered = index),
+                        onExit: (_) => setState(() {
+                          if (_hovered == index) _hovered = null;
+                        }),
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => widget.onPick(item),
+                          child: Container(
+                            height: _DeckSelectMenu.rowHeight,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: selected || active
+                                  ? AppColors.background
+                                  : null,
+                              border: Border(
+                                left: BorderSide(
+                                  color: selected
+                                      ? AppColors.accent
+                                      : Colors.transparent,
+                                  width: 3,
+                                ),
                               ),
                             ),
-                          ),
-                          alignment: Alignment.centerLeft,
-                          child: DefaultTextStyle.merge(
-                            style: TextStyle(
-                              fontFamily: 'JetBrains Mono',
-                              fontFamilyFallback: DeckTokens.fontMono,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w400,
-                              color: AppColors.textPrimary,
-                              overflow: TextOverflow.ellipsis,
+                            alignment: Alignment.centerLeft,
+                            child: DefaultTextStyle.merge(
+                              style: TextStyle(
+                                fontFamily: 'JetBrains Mono',
+                                fontFamilyFallback: DeckTokens.fontMono,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                color: AppColors.textPrimary,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              child: widget.itemBuilder(context, item),
                             ),
-                            child: widget.itemBuilder(context, item),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
