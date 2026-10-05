@@ -205,14 +205,13 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
           // One border only: the container draws it, and the inner field is
           // completely undecorated so no second box or fill can show through.
           child: Container(
-            height: 30,
             decoration: BoxDecoration(
               border: Border.all(color: AppColors.border),
             ),
-            alignment: Alignment.centerLeft,
             child: TextField(
               controller: controller,
               cursorColor: AppColors.accent,
+              textAlignVertical: TextAlignVertical.center,
               style: TextStyle(
                 color: AppColors.textPrimary,
                 fontFamily: 'monospace',
@@ -220,9 +219,14 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
               ),
               decoration: const InputDecoration(
                 isDense: true,
-                isCollapsed: true,
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                // Symmetric padding is what centres the value; a fixed outer
+                // height leaves the font's descent space hanging below and the
+                // text reads high.
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 7,
+                ),
               ),
               onChanged: onChanged,
               onSubmitted: onChanged,
