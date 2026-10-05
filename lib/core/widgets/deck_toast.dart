@@ -47,6 +47,11 @@ class _ToastChannel {
                   for (var index = 0; index < messages.length; index++) ...[
                     if (index > 0) const SizedBox(height: 8),
                     _DeckToast(
+                      // Keyed by message id: without it, expiring an earlier
+                      // toast shifts the survivors one slot up and the reused
+                      // element keeps the *previous* toast's state — whose
+                      // timer already fired — so the survivor never expires.
+                      key: ValueKey(messages[index].id),
                       // The toast owns its dismissal timer, so disposing the
                       // tree (tests, app shutdown) cancels it instead of
                       // leaving a pending timer behind.
@@ -92,7 +97,7 @@ class _ToastChannel {
 }
 
 class _DeckToast extends StatefulWidget {
-  const _DeckToast({required this.message, required this.onExpired});
+  const _DeckToast({super.key, required this.message, required this.onExpired});
 
   final String message;
   final VoidCallback onExpired;
@@ -143,7 +148,15 @@ class _DeckToastState extends State<_DeckToast> {
             const SizedBox(width: 9),
             Text(
               widget.message,
-              style: TextStyle(fontSize: 12, color: AppColors.background),
+              // Overlay entries do not sit under the page's DefaultTextStyle,
+              // so name the deck UI font explicitly or the label falls back
+              // to the platform font (yellow debug underline in dev builds).
+              style: TextStyle(
+                fontFamily: AppColors.fontFamilyPrimary,
+                fontFamilyFallback: AppColors.fontFamilyFallback,
+                fontSize: 12,
+                color: AppColors.background,
+              ),
             ),
           ],
         ),
