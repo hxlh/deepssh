@@ -164,11 +164,10 @@ label.check input{width:14px;height:14px;accent-color:var(--accent);margin:0}
 .brand-text b{font-family:var(--font-display);font-size:15px;letter-spacing:.02em}
 .brand-text span{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 
-.page-nav{display:flex;align-items:center;gap:2px;margin-left:6px;flex:none}
+.page-nav{display:flex;align-items:center;gap:2px;margin-left:6px}
 .page-nav button{
   display:inline-flex;align-items:center;gap:7px;padding:6px 10px;background:transparent;border:1px solid transparent;
   color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;border-radius:0;
-  white-space:nowrap;flex:none;
 }
 .page-nav button:hover{color:var(--fg);background:var(--fg-soft)}
 .page-nav button[aria-current="page"]{color:var(--fg);background:var(--bg);border-color:var(--border)}
@@ -277,6 +276,7 @@ label.check input{width:14px;height:14px;accent-color:var(--accent);margin:0}
 .ex-gtag{font-family:var(--font-mono);font-size:9.5px;color:var(--muted);border:1px solid var(--border);padding:0 4px;flex:none}
 .ex-gtag.ok{color:var(--ok);border-color:color-mix(in oklch, var(--ok) 40%, var(--border))}
 .ex-items{padding:2px 0}
+.ex-items.pressing{user-select:none;-webkit-user-select:none}
 .ex-sec.collapsed .ex-items{display:none}
 .ex-row{
   display:flex;align-items:center;gap:8px;height:32px;margin:2px 8px 2px 24px;padding:0 10px;
@@ -311,10 +311,12 @@ label.check input{width:14px;height:14px;accent-color:var(--accent);margin:0}
   background:color-mix(in oklch, var(--accent) 10%, transparent);pointer-events:none}
 .ex-shade.in-row{left:24px;right:8px}
 
-/* Session reorder inside a block — the same ReorderableDragStartListener grip,
-   but the drop scope is one .ex-items: a session never leaves its config. The
-   negative margins tuck the handle into the row's own left padding, so the
-   icon and name keep the alignment they had without a handle. */
+/* Session reorder inside a block — host_tree.dart wraps the whole row in a
+   ReorderableDragStartListener, so a press anywhere on the row lifts it, and
+   the grip below is the affordance plus the keyboard target. The drop scope is
+   one .ex-items: a session never leaves its config. The negative margins tuck
+   the handle into the row's own left padding, so the icon and name keep the
+   alignment they had without a handle. */
 .ex-sgrip{display:flex;align-items:center;justify-content:center;width:14px;height:22px;
   margin:0 -8px 0 -14px;flex:none;color:var(--muted);cursor:grab;touch-action:none;
   border:0;background:none;padding:0}
@@ -335,7 +337,7 @@ label.check input{width:14px;height:14px;accent-color:var(--accent);margin:0}
 .ex-x .ico{width:13px;height:13px;pointer-events:none}
 .ex-x:focus-visible{outline:2px solid var(--accent);outline-offset:1px;opacity:1}
 .ex-items.reordering{position:relative}
-.ex-items .ex-row.dragging{position:relative;z-index:6;background:var(--surface);box-shadow:var(--shadow-hard)}
+.ex-items .ex-row.dragging{position:relative;z-index:6;background:var(--surface);box-shadow:var(--shadow-hard);cursor:grabbing}
 .ex-items .ex-row.dragging .ex-sgrip{cursor:grabbing;color:var(--accent-ink)}
 
 /* Tree empty state — the tree only empties out when every block was closed. */
@@ -1178,16 +1180,14 @@ worker-01      Up 5 hours
             <div class="grid2" style="margin-top:9px">
               <div class="field">
                 <label for="uiFont">界面字体</label>
-                <select class="input" id="uiFont">
-                  <option>系统默认（含中文）</option>
-                  <option>苹方 / PingFang SC</option>
-                  <option>思源黑体 / Noto Sans CJK</option>
-                </select>
+                <input class="input" id="uiFont" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" aria-describedby="uiFontHint"
+                  value="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, Noto Sans CJK SC, system-ui, sans-serif">
+                <span class="hint" id="uiFontHint">逗号分隔，逐级回退；末尾自动补 sans-serif</span>
               </div>
               <div class="field">
                 <label for="uiSize">基准字号</label>
-                <input class="input" id="uiSize" type="number" min="12" max="18" step="1" value="13" inputmode="numeric" aria-describedby="uiSizeHint">
-                <span class="hint" id="uiSizeHint">12–18 整数，超界自动钳制</span>
+                <input class="input" id="uiSize" type="number" min="12" max="18" step="0.5" value="13" inputmode="decimal" aria-describedby="uiSizeHint">
+                <span class="hint" id="uiSizeHint">12–18，可填小数，超界自动钳制</span>
               </div>
             </div>
           </div>
@@ -1235,18 +1235,14 @@ worker-01      Up 5 hours
             <div class="grid2" style="margin-top:9px">
               <div class="field">
                 <label for="termFont">字体族</label>
-                <select class="input" id="termFont">
-                  <option value="ui-monospace, &#39;SF Mono&#39;, Menlo, Consolas, monospace">系统等宽（SF Mono / Menlo）</option>
-                  <option value="&#39;JetBrains Mono&#39;, ui-monospace, Menlo, monospace">JetBrains Mono</option>
-                  <option value="&#39;Cascadia Mono&#39;, Consolas, ui-monospace, monospace">Cascadia Mono / Consolas</option>
-                  <option value="&#39;Source Han Mono SC&#39;, &#39;Noto Sans Mono CJK SC&#39;, monospace">思源等宽（中文）</option>
-                  <option value="&#39;LXGW WenKai Mono&#39;, &#39;Noto Sans Mono CJK SC&#39;, monospace">霞鹜文楷等宽</option>
-                </select>
+                <input class="input" id="termFont" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" aria-describedby="termFontHint"
+                  value="ui-monospace, SF Mono, Menlo, Consolas, monospace">
+                <span class="hint" id="termFontHint">逗号分隔，逐级回退；末尾自动补 monospace</span>
               </div>
               <div class="field">
                 <label for="termSize">字号（px）</label>
-                <input class="input" id="termSize" type="number" min="8" max="32" step="1" value="13" inputmode="numeric" aria-describedby="termSizeHint">
-                <span class="hint" id="termSizeHint">8–32 整数，超界自动钳制</span>
+                <input class="input" id="termSize" type="number" min="8" max="32" step="0.5" value="13" inputmode="decimal" aria-describedby="termSizeHint">
+                <span class="hint" id="termSizeHint">8–32，可填小数，超界自动钳制</span>
               </div>
             </div>
           </div>
@@ -1644,15 +1640,17 @@ worker-01      Up 5 hours
   /* ---------- Font size inputs: #termSize and #uiSize are one component.
      The band is read from each input's own min/max, so the terminal keeps its
      wide 8-32 range and the UI base a narrower one — the control is shared,
-     the range never is. ---------- */
+     the range never is. Both take fractional sizes (the ↑/↓ step is 0.5). ---------- */
   function sizeClamp(input, raw){
-    var n = parseInt(raw, 10);
+    var n = parseFloat(raw);
     if(isNaN(n)){ return null; }
-    var min = parseInt(input.min, 10);
-    var max = parseInt(input.max, 10);
+    var min = parseFloat(input.min);
+    var max = parseFloat(input.max);
     if(isNaN(min)){ min = -Infinity; }
     if(isNaN(max)){ max = Infinity; }
-    return Math.min(max, Math.max(min, n));
+    /* Fractional sizes are allowed; the applied value is still clamped to the
+       input's own band and rounded to two decimals so the field stays tight. */
+    return Math.round(Math.min(max, Math.max(min, n)) * 100) / 100;
   }
 
   function bindSizeInput(input, onApply){
@@ -1666,7 +1664,7 @@ worker-01      Up 5 hours
        the field no longer shows. */
     function commit(){
       var n = sizeClamp(input, input.value);
-      input.value = (n === null ? (parseInt(input.defaultValue, 10) || 13) : n);
+      input.value = (n === null ? (parseFloat(input.defaultValue) || 13) : n);
       apply();
     }
     input.addEventListener('input', apply);
@@ -1674,22 +1672,70 @@ worker-01      Up 5 hours
     apply();
   }
 
-  /* Terminal family and size land on the live preview — it is the only surface
-     in the prototype where those two settings are observable. */
-  function applyTermFont(){
-    var pv = $('#termPreview'), fam = $('#termFont');
-    if(!pv || !fam){ return; }
-    pv.style.fontFamily = fam.value;
+  /* ---------- Font stack inputs: #uiFont and #termFont are one component,
+     the same way the two size inputs are. Both take a comma-separated CSS
+     font stack rather than a choice from a fixed list: the browser walks the
+     list left to right and renders with the first family it can resolve, so
+     the entries after the first are exactly the fallbacks. Typing applies on
+     every keystroke; commit only rewrites the field. ---------- */
+  var GENERIC_FAMILY = /^(serif|sans-serif|monospace|system-ui|cursive|fantasy|ui-serif|ui-sans-serif|ui-monospace|math|emoji|fangsong)$/i;
+
+  /* Splits on commas, trims, and drops one layer of wrapping quotes — a user
+     who pastes "Fira Code", monospace gets the same stack either way. */
+  function stackParse(raw){
+    var parts = String(raw == null ? '' : raw).split(',');
+    var list = [];
+    for(var i = 0; i < parts.length; i++){
+      var name = parts[i].trim().replace(/^['"]|['"]$/g, '').trim();
+      if(name){ list.push(name); }
+    }
+    return list.length ? list : null;
   }
 
-  $('#termFont').addEventListener('change', applyTermFont);
+  /* Appends the generic family only when the user left it out, so a stack of
+     fonts this machine cannot resolve still lands on something deliberate
+     instead of whatever the OS picks. */
+  function stackJoin(list, generic){
+    var hasGeneric = list.some(function(name){ return GENERIC_FAMILY.test(name); });
+    return (hasGeneric ? list : list.concat(generic)).join(', ');
+  }
+
+  function bindStackInput(input, generic, onApply){
+    function apply(){
+      var list = stackParse(input.value);
+      if(list){ onApply(stackJoin(list, generic)); }
+    }
+    /* Same rule as the size inputs: commit rewrites the field to the normalised
+       spacing, so what the box shows is what gets parsed. An emptied field goes
+       back to the authored default rather than leaving an empty stack behind.
+       The appended generic family is applied but not written back — it is the
+       component's safety net, not something the user typed. */
+    function commit(){
+      var list = stackParse(input.value);
+      input.value = list ? list.join(', ') : (input.defaultValue || '');
+      apply();
+    }
+    input.addEventListener('input', apply);
+    input.addEventListener('change', commit);
+    apply();
+  }
+
+  /* Each field drives the surface it names and nothing else, matching what the
+     setting means in the product: the terminal family restyles the live
+     preview, the UI family restyles the interface text via --font-body. The UI
+     base size stays unbound — the prototype has no scalable UI type scale, so
+     it only normalises its own value. */
+  bindStackInput($('#termFont'), 'monospace', function(css){
+    var pv = $('#termPreview');
+    if(pv){ pv.style.fontFamily = css; }
+  });
+  bindStackInput($('#uiFont'), 'sans-serif', function(css){
+    document.documentElement.style.setProperty('--font-body', css);
+  });
   bindSizeInput($('#termSize'), function(px){
     var pv = $('#termPreview');
     if(pv){ pv.style.fontSize = px + 'px'; }
   });
-  /* 界面基准字号与终端字号同一形态（可键入、上下键步进、超界钳制、清空回落），
-     但原型里没有可对照的界面文本面，所以它只归一化取值、不驱动布局 ——
-     和它旁边的界面字体一样属于演示态。 */
   bindSizeInput($('#uiSize'), null);
   window.addEventListener('resize', function(){ if(selState){ selCloseMenu(false); } });
 
@@ -1741,6 +1787,10 @@ worker-01      Up 5 hours
     });
     var x = $('.x', tab);
     if(x){ x.addEventListener('click', function(e){ e.stopPropagation(); closeTab(tab); }); }
+    tab.addEventListener('contextmenu', function(e){
+      e.preventDefault();
+      openTabMenu(tab, e.clientX, e.clientY);
+    });
   }
 
   function closeTab(tab){
@@ -1756,6 +1806,46 @@ worker-01      Up 5 hours
       $('#terminal').innerHTML = '<span class="t-dim">没有活动的会话。请从左侧资源管理器打开一个终端。</span>';
       $$('#exTree .ex-row').forEach(function(r){ r.classList.remove('active'); });
     }
+  }
+
+  /* ---------- Tab strip context menu ----------
+     Close to the left / to the right / the others. Like the tab's own ×, this
+     is a tab-strip operation: the Explorer tree keeps its session rows, so a
+     tab closed here is still reachable from the tree. */
+  function closeTabsAround(tab, mode){
+    var tabs = $$('#tabStrip .tab');
+    var i = tabs.indexOf(tab);
+    if(i < 0){ return; }
+    var targets;
+    if(mode === 'left'){ targets = tabs.slice(0, i); }
+    else if(mode === 'right'){ targets = tabs.slice(i + 1); }
+    else { targets = tabs.filter(function(t){ return t !== tab; }); }
+    if(!targets.length){
+      toast(mode === 'left' ? '左侧没有可关闭的标签'
+        : mode === 'right' ? '右侧没有可关闭的标签' : '没有其他标签可关闭');
+      return;
+    }
+    var active = $('#tabStrip .tab.active');
+    targets.forEach(function(t){ closeTab(t); });
+    /* closeTab() hands focus to a neighbour when the active tab goes away —
+       possibly one that is itself about to be removed. The clicked tab always
+       survives, so it settles the result once the old active tab is gone. */
+    if(tab.parentNode && (!active || !active.parentNode)){ activateTab(tab.dataset.tab); }
+    toast('已关闭 ' + targets.length + ' 个标签');
+  }
+
+  function openTabMenu(tab, x, y){
+    /* Shift+F10 / the Menu key fires contextmenu with no useful coordinates. */
+    if(!x && !y){
+      var r = tab.getBoundingClientRect();
+      x = r.left + Math.min(24, r.width / 2);
+      y = r.bottom - 4;
+    }
+    openCtx(x, y, [
+      { label: '关闭左侧标签', run: function(){ closeTabsAround(tab, 'left'); } },
+      { label: '关闭右侧标签', run: function(){ closeTabsAround(tab, 'right'); } },
+      { label: '关闭其他标签', run: function(){ closeTabsAround(tab, 'others'); } }
+    ]);
   }
 
   function createTab(id, label){
@@ -1789,6 +1879,9 @@ worker-01      Up 5 hours
   $$('#tabStrip .tab').forEach(bindTab);
 
   /* ---------- Explorer rows: open + right-click menu ---------- */
+  /* Set by an armed session drag so the click that follows the release does
+     not also open the row: pointer capture makes that click target the row. */
+  var suppressRowClick = false;
   function bindRow(row){
     if(!$('.ex-sgrip', row)){
       var grip = document.createElement('button');
@@ -1807,7 +1900,7 @@ worker-01      Up 5 hours
       row.appendChild(x);
     }
     row.addEventListener('click', function(e){
-      if(e.target.closest('.ex-sgrip, .ex-x')){ return; }
+      if(e.target.closest('.ex-sgrip, .ex-x') || suppressRowClick){ return; }
       openSession(row.dataset.session);
     });
     row.addEventListener('keydown', function(e){
@@ -1937,6 +2030,7 @@ worker-01      Up 5 hours
 
   (function(){
     var drag = null, shade = null;
+    var ARM = 4; /* px of travel before a press elsewhere on the row lifts it */
 
     function update(y){
       var list = drag.list;
@@ -1960,45 +2054,68 @@ worker-01      Up 5 hours
       shade.style.top = top + 'px';
     }
 
-    exTree.addEventListener('pointerdown', function(e){
-      var grip = e.target.closest('.ex-sgrip');
-      if(!grip || e.button !== 0){ return; }
-      var row = grip.closest('.ex-row');
-      var list = row && row.parentElement;
-      if(!row || !list.classList.contains('ex-items')){ return; }
-      e.preventDefault();
-      drag = { row: row, list: list, from: sessionRows(list).indexOf(row),
-        startY: e.clientY, startScroll: list.scrollTop, id: e.pointerId, to: null };
-      row.classList.add('dragging');
-      if(grip.setPointerCapture){ grip.setPointerCapture(e.pointerId); }
-      list.classList.add('reordering');
+    /* Lift the row once the press is committed: the 6-dot handle arms at once
+       (that is its whole job), a press anywhere else on the row arms after
+       ARM px so a plain click still focuses and opens the session. The close
+       button is excluded from the drag entirely. */
+    function arm(target, e){
+      drag.armed = true;
+      drag.row.classList.add('dragging');
+      if(target.setPointerCapture){ target.setPointerCapture(e.pointerId); }
+      drag.list.classList.add('reordering');
       shade = document.createElement('div');
       shade.className = 'ex-shade in-row';
       shade.setAttribute('aria-hidden', 'true');
-      shade.style.height = row.offsetHeight + 'px';
-      list.insertBefore(shade, list.firstChild);
+      shade.style.height = drag.row.offsetHeight + 'px';
+      drag.list.insertBefore(shade, drag.list.firstChild);
       update(e.clientY);
+    }
+
+    exTree.addEventListener('pointerdown', function(e){
+      if(e.button !== 0 || e.target.closest('.ex-x')){ return; }
+      suppressRowClick = false;
+      var grip = e.target.closest('.ex-sgrip');
+      var row = (grip || e.target).closest('.ex-row');
+      if(!row){ return; }
+      var list = row.parentElement;
+      if(!list || !list.classList.contains('ex-items')){ return; }
+      drag = { row: row, list: list, from: sessionRows(list).indexOf(row),
+        startX: e.clientX, startY: e.clientY, startScroll: list.scrollTop,
+        id: e.pointerId, to: null, armed: false };
+      list.classList.add('pressing');
+      if(grip){ e.preventDefault(); arm(grip, e); }
     });
 
     exTree.addEventListener('pointermove', function(e){
       if(!drag || e.pointerId !== drag.id){ return; }
+      if(!drag.armed){
+        var dx = Math.abs(e.clientX - drag.startX), dy = Math.abs(e.clientY - drag.startY);
+        if(Math.max(dx, dy) < ARM){ return; }
+        e.preventDefault();
+        arm(drag.row, e);
+      }
       update(e.clientY);
     });
 
     function end(e){
       if(!drag || (e && e.pointerId !== drag.id)){ return; }
-      var from = drag.from, to = drag.to, row = drag.row, list = drag.list;
+      var from = drag.from, to = drag.to, row = drag.row, list = drag.list, armed = drag.armed;
+      drag = null;
+      list.classList.remove('pressing');
+      if(shade){ shade.remove(); shade = null; }
+      if(!armed){ return; }
+      suppressRowClick = true;
       row.classList.remove('dragging');
       row.removeAttribute('style');
       list.classList.remove('reordering');
-      if(shade){ shade.remove(); shade = null; }
-      drag = null;
       if(typeof to === 'number' && to !== from){ moveSession(list, from, to); }
       else { renumberRows(list); }
     }
 
-    exTree.addEventListener('pointerup', end);
-    exTree.addEventListener('pointercancel', end);
+    /* window, not exTree: an unarmed press has no pointer capture yet, so a
+       release outside the tree must still clear the pending candidate. */
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
   })();
 
   /* Keyboard equivalent of both drags — a prototype enhancement, the Flutter
