@@ -437,6 +437,65 @@ void main() {
     await tester.pump();
     expect(previewSpan().style?.fontSize, 20);
   });
+
+  testWidgets('size fields take decimals, clamp the band and round to 2dp', (
+    tester,
+  ) async {
+    UiThemeSettings? savedUi;
+    TerminalThemeSettings? savedTerminal;
+
+    await _pumpPage(
+      tester,
+      onUiSaved: (settings) => savedUi = settings,
+      onTerminalSaved: (settings) => savedTerminal = settings,
+    );
+
+    // The prototype's inputs are decimal fields (`step="0.5"`), so a
+    // fractional size is kept as typed.
+    await tester.enterText(
+      find.byKey(const ValueKey('ui-size-select')),
+      '13.5',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
+    await tester.pump();
+    expect(savedUi?.fontSize, 13.5);
+
+    // Over-precise input rounds to two decimals, like the prototype's
+    // `sizeClamp` does on every pass.
+    await tester.enterText(
+      find.byKey(const ValueKey('ui-size-select')),
+      '13.456',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
+    await tester.pump();
+    expect(savedUi?.fontSize, 13.46);
+
+    // Out-of-band input clamps to the field's own band, and the live
+    // terminal preview follows the fractional size.
+    await tester.enterText(
+      find.byKey(const ValueKey('term-size-input')),
+      '12.5',
+    );
+    await tester.pump();
+    final rich = tester.widget<RichText>(
+      find.byKey(const ValueKey('term-preview')),
+    );
+    expect((rich.text as TextSpan).style?.fontSize, 12.5);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('term-size-input')),
+      '40.777',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
+    await tester.pump();
+    expect(savedTerminal?.fontSize, 32);
+  });
 }
 
 Future<void> _pumpPage(

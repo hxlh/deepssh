@@ -483,7 +483,7 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
               value: uiSettings.fontSize,
               min: 12,
               max: 18,
-              hint: '12–18 整数，超界自动钳制',
+              hint: '12–18，可填小数，超界自动钳制',
               onChanged: (size) =>
                   _updateUi(uiSettings.copyWith(fontSize: size)),
             ),
@@ -579,7 +579,7 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
               value: termSettings.fontSize,
               min: 8,
               max: 32,
-              hint: '8–32 整数，超界自动钳制',
+              hint: '8–32，可填小数，超界自动钳制',
               onChanged: (size) =>
                   _updateTerm(termSettings.copyWith(fontSize: size)),
             ),
@@ -1002,11 +1002,11 @@ class _ClampedSizeField extends StatefulWidget {
   });
 
   final String label;
-  final int value;
-  final int min;
-  final int max;
+  final double value;
+  final double min;
+  final double max;
   final String hint;
-  final ValueChanged<int> onChanged;
+  final ValueChanged<double> onChanged;
 
   @override
   State<_ClampedSizeField> createState() => _ClampedSizeFieldState();
@@ -1019,7 +1019,7 @@ class _ClampedSizeFieldState extends State<_ClampedSizeField> {
   @override
   void initState() {
     super.initState();
-    _controller = deckEditingController('${widget.value}');
+    _controller = deckEditingController(_format(widget.value));
     _focusNode = FocusNode()..addListener(_handleFocusChange);
   }
 
@@ -1032,8 +1032,8 @@ class _ClampedSizeFieldState extends State<_ClampedSizeField> {
     super.didUpdateWidget(oldWidget);
     if (!_focusNode.hasFocus &&
         oldWidget.value != widget.value &&
-        _controller.text != '${widget.value}') {
-      deckSetText(_controller, '${widget.value}');
+        _controller.text != _format(widget.value)) {
+      deckSetText(_controller, _format(widget.value));
     }
   }
 
@@ -1046,10 +1046,29 @@ class _ClampedSizeFieldState extends State<_ClampedSizeField> {
     super.dispose();
   }
 
+  /// The prototype keeps fractional sizes to two decimals and drops a whole
+  /// number's trailing `.0`, so `13.5` shows as `13.5` and `14` (not `14.0`)
+  /// after a round trip through the field.
+  static String _format(double value) {
+    final rounded = _round(value);
+    return rounded == rounded.roundToDouble()
+        ? rounded.toInt().toString()
+        : rounded.toString();
+  }
+
+  static double _round(double value) => (value * 100).round() / 100;
+
+  /// Clamps to the field's own band and rounds to two decimals — the same
+  /// normalisation the prototype's `sizeClamp` applies on every pass.
+  double _normalise(String raw) {
+    final parsed = double.tryParse(raw.trim());
+    final clamped = (parsed ?? widget.value).clamp(widget.min, widget.max);
+    return _round(clamped.toDouble());
+  }
+
   void _commit() {
-    final parsed = int.tryParse(_controller.text);
-    final value = (parsed ?? widget.value).clamp(widget.min, widget.max);
-    deckSetText(_controller, '$value');
+    final value = _normalise(_controller.text);
+    deckSetText(_controller, _format(value));
     widget.onChanged(value);
   }
 
@@ -1061,14 +1080,17 @@ class _ClampedSizeFieldState extends State<_ClampedSizeField> {
       child: TextField(
         controller: _controller,
         focusNode: _focusNode,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        // The prototype's inputs take decimals (`step="0.5"`,
+        // `inputmode="decimal"`); the live pass clamps and rounds exactly
+        // like the commit pass, so the box and the applied value never
+        // disagree.
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
         style: DeckFieldStyle.text,
         decoration: DeckFieldStyle.decoration(),
         onChanged: (raw) {
-          final parsed = int.tryParse(raw);
-          if (parsed != null) {
-            widget.onChanged(parsed.clamp(widget.min, widget.max));
+          if (double.tryParse(raw) != null) {
+            widget.onChanged(_normalise(raw));
           }
         },
         onEditingComplete: _commit,
@@ -1183,7 +1205,7 @@ class _MiniTerminalPreview extends StatelessWidget {
     // The preview exists to show the effect of the terminal font controls,
     // so it has to follow both the family stack and the font size. A fixed
     // size here made the size field look like it did nothing.
-    final fontSize = settings.fontSize.toDouble();
+    final fontSize = settings.fontSize;
     TextStyle style(Color color) => TextStyle(
       fontFamily: mono,
       fontFamilyFallback: fallback,

@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:xterm/src/core/buffer/cell_offset.dart';
+import 'package:xterm/src/core/buffer/line.dart';
 import 'package:xterm/src/core/mouse/button.dart';
 import 'package:xterm/src/core/mouse/button_state.dart';
+import 'package:xterm/src/terminal.dart';
 import 'package:xterm/src/terminal_view.dart';
 import 'package:xterm/src/ui/controller.dart';
 import 'package:xterm/src/ui/gesture/gesture_detector.dart';
@@ -65,7 +67,17 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
 
   RenderTerminal get renderTerminal => terminalView.renderTerminal;
 
+  Terminal get _terminal => terminalView.widget.terminal;
+
+  /// Cell where the current drag selection started, kept both as a raw
+  /// offset and as an anchor. Buffer mutations during the drag shift line
+  /// indexes — a full-screen app streaming output into a full scrollback
+  /// drops one line per appended line — moving the grabbed content away from
+  /// the raw offset while the anchor tracks it. The raw offset is the
+  /// fallback for when the anchor's line itself is gone.
   CellOffset? _dragStartCell;
+
+  CellAnchor? _dragStartAnchor;
 
   Offset? _latestDragPosition;
 
@@ -98,7 +110,23 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
   @override
   void dispose() {
     _stopEdgeAutoScroll();
+    _dragStartAnchor?.dispose();
     super.dispose();
+  }
+
+  /// The drag start cell resolved through the anchor, so it follows the
+  /// grabbed line when the buffer shifts mid-drag. Falls back to the raw
+  /// snapshot when the anchor's line was dropped or its index left the
+  /// buffer (e.g. a clear-scrollback that never detached the line).
+  CellOffset? get _resolvedDragStartCell {
+    final anchor = _dragStartAnchor;
+    if (anchor != null && anchor.attached) {
+      final cell = anchor.offset;
+      if (cell.y >= 0 && cell.y < _terminal.buffer.lines.length) {
+        return cell;
+      }
+    }
+    return _dragStartCell;
   }
 
   bool get _shouldSendTapEvent =>
@@ -197,16 +225,19 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
   // void onLongPressUp() {}
 
   void onDragStart(DragStartDetails details) {
-    _dragStartCell = renderTerminal.getCellOffset(details.localPosition);
+    final cell = renderTerminal.getCellOffset(details.localPosition);
+    _dragStartCell = cell;
+    _dragStartAnchor?.dispose();
+    _dragStartAnchor = _terminal.buffer.createAnchorFromOffset(cell);
     _latestDragPosition = details.localPosition;
 
     details.kind == PointerDeviceKind.mouse
-        ? renderTerminal.selectCharactersFromCell(_dragStartCell!)
+        ? renderTerminal.selectCharactersFromCell(cell)
         : renderTerminal.selectWord(details.localPosition);
   }
 
   void onDragUpdate(DragUpdateDetails details) {
-    final dragStartCell = _dragStartCell;
+    final dragStartCell = _resolvedDragStartCell;
     if (dragStartCell == null) return;
     _latestDragPosition = details.localPosition;
     renderTerminal.selectCharactersFromCell(
@@ -247,7 +278,7 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
   }
 
   void _autoScrollSelection() {
-    final dragStartCell = _dragStartCell;
+    final dragStartCell = _resolvedDragStartCell;
     final latestPosition = _latestDragPosition;
     if (dragStartCell == null || latestPosition == null) {
       _stopEdgeAutoScroll();
@@ -275,6 +306,8 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
 
   void _endDragSelection() {
     _dragStartCell = null;
+    _dragStartAnchor?.dispose();
+    _dragStartAnchor = null;
     _latestDragPosition = null;
     _stopEdgeAutoScroll();
   }

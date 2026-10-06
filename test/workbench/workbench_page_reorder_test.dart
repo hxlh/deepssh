@@ -239,4 +239,45 @@ void main() {
 
     expect(tester.getTopLeft(firstRow).dy, closeTo(top + slot * 2, 1));
   });
+
+  testWidgets('every drag lifts the row, not just the first one', (
+    tester,
+  ) async {
+    await _pumpWithLocalTerminals(tester, 3);
+
+    final firstRow = find.byKey(const ValueKey('local-local-terminal-1'));
+    final secondRow = find.byKey(const ValueKey('local-local-terminal-2'));
+    final thirdRow = find.byKey(const ValueKey('local-local-terminal-3'));
+    double topOf(Finder row) => tester.getTopLeft(row).dy;
+
+    // First drag: row 2 above row 1, dashed slot visible mid-drag.
+    var gesture = await tester.startGesture(
+      tester.getTopLeft(secondRow) + const Offset(70, 18),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump();
+    await gesture.moveBy(const Offset(0, -46));
+    await tester.pump();
+    expect(find.byKey(sessionDropShadeKey), findsOneWidget);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(topOf(secondRow), lessThan(topOf(firstRow)));
+
+    // Second drag: row 1 below row 3. The drag bookkeeping used to survive
+    // the first drop, so this drag never began: no lifted row, no dashed
+    // slot, and the drop reordered the previously dragged row instead.
+    gesture = await tester.startGesture(
+      tester.getTopLeft(firstRow) + const Offset(70, 18),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump();
+    await gesture.moveBy(const Offset(0, 36 * 2 + 20));
+    await tester.pump();
+    expect(find.byKey(sessionDropShadeKey), findsOneWidget);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(topOf(firstRow), greaterThan(topOf(thirdRow)));
+    expect(topOf(secondRow), lessThan(topOf(thirdRow)));
+  });
 }

@@ -17,17 +17,17 @@ struct ThemeStore {
     initialized: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ThemeSettings {
     pub ui: UiTheme,
     pub terminal: TerminalTheme,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct UiTheme {
     pub preset_name: String,
     pub font_family: String,
-    pub font_size: u32,
+    pub font_size: f64,
     pub normal_font_weight: u32,
     pub bold_font_weight: u32,
     pub background: String,
@@ -38,11 +38,11 @@ pub struct UiTheme {
     pub text_muted: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TerminalTheme {
     pub preset_name: String,
     pub font_family: String,
-    pub font_size: u32,
+    pub font_size: f64,
     pub normal_font_weight: u32,
     pub bold_font_weight: u32,
     pub cursor_style: String,
@@ -94,7 +94,7 @@ fn default_terminal_bold_font_weight() -> u32 {
 struct UiThemeConfig {
     preset_name: String,
     font_family: String,
-    font_size: u32,
+    font_size: f64,
     #[serde(default = "default_ui_normal_font_weight")]
     normal_font_weight: u32,
     #[serde(default = "default_ui_bold_font_weight")]
@@ -112,7 +112,7 @@ struct UiThemeConfig {
 struct TerminalThemeConfig {
     preset_name: String,
     font_family: String,
-    font_size: u32,
+    font_size: f64,
     #[serde(default = "default_terminal_normal_font_weight")]
     normal_font_weight: u32,
     #[serde(default = "default_terminal_bold_font_weight")]
@@ -270,7 +270,7 @@ fn default_theme() -> ThemeSettings {
             preset_name: "Command Deck".to_string(),
             // Empty = platform UI font, the prototype's 「系统默认（含中文）」.
             font_family: String::new(),
-            font_size: 13,
+            font_size: 13.0,
             normal_font_weight: default_ui_normal_font_weight(),
             bold_font_weight: default_ui_bold_font_weight(),
             background: "#FAF9F5".to_string(),
@@ -283,7 +283,7 @@ fn default_theme() -> ThemeSettings {
         terminal: TerminalTheme {
             preset_name: "Command Deck".to_string(),
             font_family: "JetBrains Mono".to_string(),
-            font_size: 14,
+            font_size: 14.0,
             normal_font_weight: default_terminal_normal_font_weight(),
             bold_font_weight: default_terminal_bold_font_weight(),
             cursor_style: "bar".to_string(),
@@ -367,7 +367,7 @@ fn legacy_default_theme() -> ThemeSettings {
         ui: UiTheme {
             preset_name: "Command Deck".to_string(),
             font_family: "Inter".to_string(),
-            font_size: 14,
+            font_size: 14.0,
             normal_font_weight: default_ui_normal_font_weight(),
             bold_font_weight: default_ui_bold_font_weight(),
             background: "#FAF9F5".to_string(),
@@ -380,7 +380,7 @@ fn legacy_default_theme() -> ThemeSettings {
         terminal: TerminalTheme {
             preset_name: "Command Deck".to_string(),
             font_family: "JetBrains Mono".to_string(),
-            font_size: 14,
+            font_size: 14.0,
             normal_font_weight: default_terminal_normal_font_weight(),
             bold_font_weight: default_terminal_bold_font_weight(),
             cursor_style: "bar".to_string(),
@@ -577,7 +577,7 @@ mod tests {
             ui: UiTheme {
                 preset_name: "Custom".to_string(),
                 font_family: "Roboto".to_string(),
-                font_size: 16,
+                font_size: 16.0,
                 normal_font_weight: 300,
                 bold_font_weight: 800,
                 background: "#000000".to_string(),
@@ -590,7 +590,7 @@ mod tests {
             terminal: TerminalTheme {
                 preset_name: "Custom Term".to_string(),
                 font_family: "Fira Code".to_string(),
-                font_size: 18,
+                font_size: 18.0,
                 normal_font_weight: 400,
                 bold_font_weight: 900,
                 cursor_style: "block".to_string(),
@@ -633,7 +633,8 @@ mod tests {
         let yaml = fs::read_to_string(workspace.config_path()).unwrap();
         assert!(yaml.contains("preset_name: Custom"));
         assert!(yaml.contains("font_family: Roboto"));
-        assert!(yaml.contains("font_size: 16"));
+        // Floats are stored with serde_yaml's ryu formatting: 16.0, not 16.
+        assert!(yaml.contains("font_size: 16.0"));
         assert!(yaml.contains("normal_font_weight: 300"));
         assert!(yaml.contains("bold_font_weight: 800"));
         assert!(yaml.contains("normal_font_weight: 400"));
@@ -747,6 +748,27 @@ terminal:
 
         let loaded = load_theme().unwrap();
 
+        assert_eq!(loaded, original);
+    }
+
+    #[test]
+    fn fractional_font_size_round_trips() {
+        let _guard = clear_theme_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+        let mut original = sample_theme();
+        original.ui.font_size = 13.5;
+        original.terminal.font_size = 12.75;
+
+        save_theme(original.clone()).unwrap();
+
+        // The fraction must survive the YAML, not just the in-memory store.
+        let yaml = fs::read_to_string(workspace.config_path()).unwrap();
+        assert!(yaml.contains("font_size: 13.5"));
+        assert!(yaml.contains("font_size: 12.75"));
+
+        reset_store();
+        let loaded = load_theme().unwrap();
         assert_eq!(loaded, original);
     }
 

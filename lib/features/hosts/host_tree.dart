@@ -6,6 +6,7 @@ import '../../core/models/ssh_session_item.dart';
 import '../../core/models/terminal_item.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/deck_context_menu.dart';
 import 'host_tree_node.dart';
 import 'host_tree_state.dart';
 import 'session_reorder.dart';
@@ -73,10 +74,6 @@ class HostTree extends StatelessWidget {
   /// rides the icon colour and the active row's left rule.
   final bool compact;
 
-  /// Read through a getter so it follows the live theme.
-  static Color get _menuAccent => AppColors.accent;
-  static const double _menuItemHeight = 32;
-  static const double _menuWidth = 150;
   static const String _localSectionId = 'local';
 
   // Geometry mirrored from .ex-scroll/.ex-ghead/.ex-row in the HTML
@@ -144,54 +141,16 @@ class HostTree extends StatelessWidget {
     onSectionOrderChanged?.call(next);
   }
 
-  RelativeRect _menuPosition(BuildContext context, Offset position) {
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    return RelativeRect.fromRect(
-      Rect.fromLTWH(position.dx, position.dy, 0, 0),
-      Offset.zero & overlay.size,
-    );
-  }
-
-  Future<String?> _showStyledMenu({
-    required BuildContext context,
-    required Offset position,
-    required List<PopupMenuEntry<String>> items,
-  }) {
-    return showMenu<String>(
-      context: context,
-      position: _menuPosition(context, position),
-      color: AppColors.panel,
-      elevation: 0,
-      shadowColor: Colors.transparent,
-      surfaceTintColor: Colors.transparent,
-      menuPadding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: _menuWidth),
-      clipBehavior: Clip.none,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.zero,
-        side: BorderSide(color: AppColors.textPrimary),
-      ),
-      items: items,
-    );
-  }
-
   Future<void> _showCloseMenu({
     required BuildContext context,
     required Offset position,
     required String label,
     required Future<void> Function() onClose,
   }) async {
-    final selected = await _showStyledMenu(
+    final selected = await showDeckContextMenu(
       context: context,
-      position: position,
-      items: [
-        PopupMenuItem<String>(
-          value: 'close',
-          height: _menuItemHeight,
-          padding: EdgeInsets.zero,
-          child: _HostContextMenuItem(label: label),
-        ),
-      ],
+      globalPosition: position,
+      items: [DeckMenuItem(value: 'close', label: label)],
     );
     if (selected == 'close') {
       await onClose();
@@ -205,28 +164,13 @@ class HostTree extends StatelessWidget {
     required Future<void> Function() onDuplicate,
     required Future<void> Function() onClose,
   }) async {
-    final selected = await _showStyledMenu(
+    final selected = await showDeckContextMenu(
       context: context,
-      position: position,
+      globalPosition: position,
       items: const [
-        PopupMenuItem<String>(
-          value: 'edit-note',
-          height: _menuItemHeight,
-          padding: EdgeInsets.zero,
-          child: _HostContextMenuItem(label: '编辑备注'),
-        ),
-        PopupMenuItem<String>(
-          value: 'duplicate',
-          height: _menuItemHeight,
-          padding: EdgeInsets.zero,
-          child: _HostContextMenuItem(label: '复制'),
-        ),
-        PopupMenuItem<String>(
-          value: 'close',
-          height: _menuItemHeight,
-          padding: EdgeInsets.zero,
-          child: _HostContextMenuItem(label: '关闭 SSH 会话'),
-        ),
+        DeckMenuItem(value: 'edit-note', label: '编辑备注'),
+        DeckMenuItem(value: 'duplicate', label: '复制'),
+        DeckMenuItem(value: 'close', label: '关闭 SSH 会话'),
       ],
     );
     switch (selected) {
@@ -525,54 +469,6 @@ class HostTree extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _HostContextMenuItem extends StatefulWidget {
-  const _HostContextMenuItem({required this.label});
-
-  final String label;
-
-  @override
-  State<_HostContextMenuItem> createState() => _HostContextMenuItemState();
-}
-
-class _HostContextMenuItemState extends State<_HostContextMenuItem> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Container(
-        width: HostTree._menuWidth,
-        height: HostTree._menuItemHeight,
-        color: _hovered ? AppColors.fgSoft : Colors.transparent,
-        child: Row(
-          children: [
-            Container(
-              width: 3,
-              height: double.infinity,
-              color: _hovered ? HostTree._menuAccent : Colors.transparent,
-            ),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Text(
-                widget.label,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: _hovered ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

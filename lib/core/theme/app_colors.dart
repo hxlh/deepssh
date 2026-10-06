@@ -12,7 +12,7 @@ import 'app_tokens.dart';
 /// here rather than stored, so it can never drift from the base tokens.
 abstract final class AppColors {
   static String fontFamily = 'Inter';
-  static int fontSize = 14;
+  static double fontSize = 14;
   static int normalFontWeight = 500;
   static int boldFontWeight = 700;
 
