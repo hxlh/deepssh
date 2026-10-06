@@ -176,7 +176,16 @@ class TerminalState {
       ...tabs.take(existingIndex),
       ...tabs.skip(existingIndex + 1),
     ];
-    final nextActiveId = nextTabs.isEmpty ? null : nextTabs.last.id;
+    // Closing any other tab leaves the active tab alone; only the active tab's
+    // own close hands focus on. The prototype's `closeTab` picks the tab that
+    // slides into the closed slot — the next one to the right, or the new last
+    // tab when the right-most tab went away.
+    if (tabId != activeTabId) {
+      return TerminalState(tabs: nextTabs, activeTabId: activeTabId);
+    }
+    final nextActiveId = nextTabs.isEmpty
+        ? null
+        : nextTabs[existingIndex.clamp(0, nextTabs.length - 1)].id;
     return TerminalState(tabs: nextTabs, activeTabId: nextActiveId);
   }
 

@@ -119,4 +119,84 @@ void main() {
     expect(scrollableState.position.pixels, greaterThan(0));
     expect(find.byType(RawScrollbar), findsNothing);
   });
+
+  testWidgets('right-click closes tabs to the right and settles focus', (
+    tester,
+  ) async {
+    var tabs = [_tab('a'), _tab('b'), _tab('c'), _tab('d')];
+    var active = 'c';
+    final closed = <String>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => TabStrip(
+              tabs: tabs,
+              activeTabId: active,
+              onSelect: (id) => setState(() => active = id),
+              onClose: (id) => setState(() {
+                closed.add(id);
+                tabs = [
+                  for (final tab in tabs)
+                    if (tab.id != id) tab,
+                ];
+              }),
+              onReorder: (_, __) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('b'), buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    expect(find.text('关闭左侧标签'), findsOneWidget);
+    expect(find.text('关闭右侧标签'), findsOneWidget);
+    expect(find.text('关闭其他标签'), findsOneWidget);
+
+    await tester.tap(find.text('关闭右侧标签'));
+    await tester.pumpAndSettle();
+
+    expect(closed, ['c', 'd']);
+    expect(find.text('c'), findsNothing);
+    expect(find.text('d'), findsNothing);
+    expect(find.text('a'), findsOneWidget);
+    // The old active tab was among the closed ones; the clicked tab settles
+    // the result, exactly like the prototype's closeTabsAround.
+    expect(active, 'b');
+    expect(find.text('已关闭 2 个标签'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 2600));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('an empty bulk-close choice explains itself with a toast', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TabStrip(
+            tabs: [_tab('only')],
+            activeTabId: 'only',
+            onSelect: (_) {},
+            onClose: (_) {},
+            onReorder: (_, __) {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('only'), buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('关闭其他标签'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('没有其他标签可关闭'), findsOneWidget);
+    expect(find.text('only'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 2600));
+    await tester.pumpAndSettle();
+  });
 }
