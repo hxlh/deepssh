@@ -432,7 +432,12 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   // 56px is the prototype's icon-rail width; below the compact breakpoint the
   // Explorer sheds its labels and keeps icons only.
   static const double _minSidebarWidth = 56;
-  double _sidebarWidth = AppSpacing.sidebarWidth;
+  /// Live width for the splitter drag. The sidebar and the handle listen to
+  /// this instead of the page state, so dragging rebuilds only them — never
+  /// the terminal stage or the dock.
+  final ValueNotifier<double> _sidebarWidthLive = ValueNotifier<double>(
+    AppSpacing.sidebarWidth,
+  );
 
   /// True while the Explorer splitter is under the pointer. The terminal
   /// listens (through [ExplorerResizeHold]) and holds its width for the
@@ -494,6 +499,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       subscription.cancel();
     }
     _explorerResizeHold.dispose();
+    _sidebarWidthLive.dispose();
     super.dispose();
   }
 
@@ -1654,6 +1660,14 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     _persistTheme();
   }
 
+  /// Applies a width from the splitter or its keyboard shortcuts. Updating
+  /// the notifier alone keeps the frame cheap: only the sidebar column and
+  /// the handle rebuild, everything to the right merely relayouts.
+  void _setSidebarWidth(double width) {
+    final clamped = width.clamp(_minSidebarWidth, 560).toDouble();
+    _sidebarWidthLive.value = clamped;
+  }
+
   void _handleTerminalThemeChanged(TerminalThemeSettings settings) {
     AppColors.applyTerminal(settings);
     setState(() {
@@ -1745,59 +1759,72 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                         child: Row(
                           children: [
                             if (_showExplorer) ...[
-                              Sidebar(
-                                width: _sidebarWidth,
-                                // The prototype collapses the Explorer into an icon rail once
-                                // the column gets too narrow to carry labels.
-                                compact:
-                                    _sidebarWidth <= Sidebar.compactBreakpoint,
-                                onAddConnectionSelected: _handleAddConnection,
-                                child: HostTree(
-                                  state: hostTreeState,
-                                  selectedTerminalId: terminalState.activeTabId,
-                                  onToggleHost: _handleHostToggle,
-                                  onTerminalTap: _handleTerminalTap,
-                                  localTerminals: localTerminals,
-                                  localExpanded: localExpanded,
-                                  onToggleLocal: _handleLocalToggle,
-                                  onLocalTerminalTap: _handleLocalTerminalTap,
-                                  sshProfiles: sshProfiles,
-                                  sshSessionsByProfileId:
-                                      sshSessionsByProfileId,
-                                  onSshProfileTap: (_) {},
-                                  onSshSessionTap: _handleSshSessionTap,
-                                  onEditSshSessionNote:
-                                      _handleEditSshSessionNote,
-                                  onCloseSshSession: _handleCloseSshSession,
-                                  onDuplicateSshSession:
-                                      _handleDuplicateSshSession,
-                                  onCloseLocalTerminal:
-                                      _handleCloseLocalTerminal,
-                                  onOpenThemeConfig: _handleOpenThemeConfig,
-                                  themeConfigActive:
-                                      contentMode ==
-                                      WorkbenchContentMode.themeConfig,
-                                  onToggleMemoryDock: _handleToggleMemoryDock,
-                                  memoryDockVisible: _memoryDockVisible,
-                                  onReorderSessions: _handleReorderSessions,
-                                  onReorderLocalTerminals:
-                                      _handleReorderLocalTerminals,
-                                  sectionOrder: explorerSectionOrder,
-                                  onSectionOrderChanged:
-                                      _handleExplorerSectionOrderChanged,
+                              // The width lives in a notifier so a splitter
+                              // drag rebuilds only the sidebar and the handle;
+                              // a page-level setState would re-run the whole
+                              // workbench (stage, terminal and dock included)
+                              // on every frame, which is what made this
+                              // splitter feel slow next to the dock grip.
+                              ValueListenableBuilder<double>(
+                                valueListenable: _sidebarWidthLive,
+                                builder: (context, sidebarWidth, _) => Sidebar(
+                                  width: sidebarWidth,
+                                  // The prototype collapses the Explorer into an icon rail once
+                                  // the column gets too narrow to carry labels.
                                   compact:
-                                      _sidebarWidth <=
-                                      Sidebar.compactBreakpoint,
+                                      sidebarWidth <= Sidebar.compactBreakpoint,
+                                  onAddConnectionSelected: _handleAddConnection,
+                                  child: HostTree(
+                                    state: hostTreeState,
+                                    selectedTerminalId:
+                                        terminalState.activeTabId,
+                                    onToggleHost: _handleHostToggle,
+                                    onTerminalTap: _handleTerminalTap,
+                                    localTerminals: localTerminals,
+                                    localExpanded: localExpanded,
+                                    onToggleLocal: _handleLocalToggle,
+                                    onLocalTerminalTap: _handleLocalTerminalTap,
+                                    sshProfiles: sshProfiles,
+                                    sshSessionsByProfileId:
+                                        sshSessionsByProfileId,
+                                    onSshProfileTap: (_) {},
+                                    onSshSessionTap: _handleSshSessionTap,
+                                    onEditSshSessionNote:
+                                        _handleEditSshSessionNote,
+                                    onCloseSshSession: _handleCloseSshSession,
+                                    onDuplicateSshSession:
+                                        _handleDuplicateSshSession,
+                                    onCloseLocalTerminal:
+                                        _handleCloseLocalTerminal,
+                                    onOpenThemeConfig: _handleOpenThemeConfig,
+                                    themeConfigActive:
+                                        contentMode ==
+                                        WorkbenchContentMode.themeConfig,
+                                    onToggleMemoryDock: _handleToggleMemoryDock,
+                                    memoryDockVisible: _memoryDockVisible,
+                                    onReorderSessions: _handleReorderSessions,
+                                    onReorderLocalTerminals:
+                                        _handleReorderLocalTerminals,
+                                    sectionOrder: explorerSectionOrder,
+                                    onSectionOrderChanged:
+                                        _handleExplorerSectionOrderChanged,
+                                    compact:
+                                        sidebarWidth <=
+                                        Sidebar.compactBreakpoint,
+                                  ),
                                 ),
                               ),
-                              ResizeHandle(
-                                value: _sidebarWidth,
-                                min: _minSidebarWidth,
-                                max: 560,
-                                onChanged: (width) =>
-                                    setState(() => _sidebarWidth = width),
-                                onDraggingChanged: (dragging) =>
-                                    _explorerResizeHold.value = dragging,
+                              ValueListenableBuilder<double>(
+                                valueListenable: _sidebarWidthLive,
+                                builder: (context, sidebarWidth, _) =>
+                                    ResizeHandle(
+                                      value: sidebarWidth,
+                                      min: _minSidebarWidth,
+                                      max: 560,
+                                      onChanged: _setSidebarWidth,
+                                      onDraggingChanged: (dragging) =>
+                                          _explorerResizeHold.value = dragging,
+                                    ),
                               ),
                             ],
                             Expanded(

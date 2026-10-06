@@ -628,120 +628,146 @@ class _ExplorerSessionRowState extends State<_ExplorerSessionRow> {
     final nameColor = widget.local && selected
         ? AppColors.accentInk
         : AppColors.textPrimary;
-    final row = InkWell(
-      onTap: widget.onTap,
-      onSecondaryTapDown: widget.onSecondaryTapDown,
-      child: Container(
-        height: HostTree._rowHeight,
-        // `.ex-sgrip` sits in the row's own left padding via negative margins
-        // (`margin:0 -8px 0 -14px`) so the glyph and name keep the alignment
-        // they would have without a handle. Flutter has no negative margins,
-        // so the row starts 4px earlier instead: grip [20,34], glyph at 34 —
-        // the same boxes the prototype computes.
-        margin: widget.compact
-            ? const EdgeInsets.fromLTRB(4, 2, 4, 2)
-            : const EdgeInsets.fromLTRB(
-                HostTree._rowLeft,
-                HostTree._rowGap,
-                HostTree._rowRight,
-                HostTree._rowGap,
+    if (widget.compact) {
+      return MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: InkWell(
+          onTap: widget.onTap,
+          onSecondaryTapDown: widget.onSecondaryTapDown,
+          child: Container(
+            height: HostTree._rowHeight,
+            margin: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(
+                  color: selected ? groupColor : Colors.transparent,
+                  width: 3,
+                ),
               ),
-        padding: widget.compact
-            ? EdgeInsets.zero
-            : const EdgeInsets.fromLTRB(10, 0, 4, 0),
-        decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(
-              color: selected ? groupColor : Colors.transparent,
-              width: 3,
+              color: background,
+            ),
+            child: Center(
+              child: Tooltip(
+                message: widget.label,
+                child: Icon(
+                  widget.icon,
+                  size: 16,
+                  color: selected ? AppColors.accentInk : iconColor,
+                ),
+              ),
             ),
           ),
-          color: background,
         ),
-        child: widget.compact
-            ? Center(
-                child: Tooltip(
-                  message: widget.label,
-                  child: Icon(
-                    widget.icon,
-                    size: 16,
-                    color: selected ? AppColors.accentInk : iconColor,
-                  ),
-                ),
-              )
-            : Stack(
-                // expand so the Row fills the 32px row and its own
-                // crossAxisAlignment.center centres the label; loose would
-                // top-align the shorter Row and push the text up.
-                fit: StackFit.expand,
-                clipBehavior: Clip.none,
-                children: [
-                  Row(
-                    children: [
-                      Icon(widget.icon, size: 15, color: iconColor),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          widget.label,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: nameColor,
-                            fontWeight: selected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                          ),
-                        ),
+      );
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: SizedBox(
+        height: HostTree._rowHeight + HostTree._rowGap * 2,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: HostTree._rowLeft,
+              right: HostTree._rowRight,
+              top: HostTree._rowGap,
+              bottom: HostTree._rowGap,
+              child: InkWell(
+                onTap: widget.onTap,
+                onSecondaryTapDown: widget.onSecondaryTapDown,
+                child: Container(
+                  height: HostTree._rowHeight,
+                  padding: const EdgeInsets.fromLTRB(10, 0, 4, 0),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(
+                        color: selected ? groupColor : Colors.transparent,
+                        width: 3,
                       ),
-                      AnimatedOpacity(
-                        duration: const Duration(milliseconds: 120),
-                        opacity: _hovered || _closeFocused ? 1 : 0,
-                        child: Tooltip(
-                          message: widget.closeTooltip,
-                          child: GestureDetector(
-                            onTap: widget.onClose,
-                            child: Focus(
-                              onFocusChange: (focused) =>
-                                  setState(() => _closeFocused = focused),
-                              child: SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: Icon(
-                                  Icons.close,
-                                  size: 13,
-                                  color: AppColors.textMuted,
+                    ),
+                    color: background,
+                  ),
+                  child: Stack(
+                    // expand so the Row fills the 32px row and its own
+                    // crossAxisAlignment.center centres the label; loose
+                    // would top-align the shorter Row and push the text up.
+                    fit: StackFit.expand,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(widget.icon, size: 15, color: iconColor),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              widget.label,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: nameColor,
+                                fontWeight: selected
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                              ),
+                            ),
+                          ),
+                          AnimatedOpacity(
+                            duration: const Duration(milliseconds: 120),
+                            opacity: _hovered || _closeFocused ? 1 : 0,
+                            child: Tooltip(
+                              message: widget.closeTooltip,
+                              child: GestureDetector(
+                                onTap: widget.onClose,
+                                child: Focus(
+                                  onFocusChange: (focused) =>
+                                      setState(() => _closeFocused = focused),
+                                  child: SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: Icon(
+                                      Icons.close,
+                                      size: 13,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
-                  Positioned(
-                    left: -24,
-                    top: 5,
-                    child: ReorderableDragStartListener(
-                      index: widget.reorderIndex,
-                      child: SizedBox(
-                        width: 14,
-                        height: 22,
-                        child: Icon(
-                          Icons.drag_indicator,
-                          size: 12,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
+            ),
+            // The grip is painted in the row's left gutter, so it has to be a
+            // child of this full-width stack. The previous layout parked it
+            // at `Positioned(left: -24)` inside the inset row stack: that
+            // renders through `Clip.none` but stacks never hit-test outside
+            // their own bounds, so pointer events never reached it and the
+            // rows could not be dragged at all.
+            Positioned(
+              left: HostTree._rowLeft - 11,
+              top: HostTree._rowGap + 5,
+              child: ReorderableDragStartListener(
+                index: widget.reorderIndex,
+                child: SizedBox(
+                  width: 14,
+                  height: 22,
+                  child: Icon(
+                    Icons.drag_indicator,
+                    size: 12,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    );
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: row,
     );
   }
 }
