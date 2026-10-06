@@ -1,6 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
 
-import 'package:characters/characters.dart';
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/models/theme_settings.dart';
 import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
@@ -212,6 +212,45 @@ void main() {
     );
 
     expect(padding.padding, const EdgeInsets.fromLTRB(12, 12, 12, 17));
+  });
+
+  testWidgets('terminal stage fills its box with the terminal background', (
+    tester,
+  ) async {
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: xterm.Terminal(maxLines: 3000),
+    );
+    final settings = _defaultTerminalTheme.copyWith(
+      terminalBackground: const Color(0xFF101820),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: RecordingSshBridgeClient(),
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            terminalThemeSettings: settings,
+          ),
+        ),
+      ),
+    );
+
+    final container = tester.widget<Container>(
+      find
+          .ancestor(
+            of: find.byType(xterm.TerminalView),
+            matching: find.byType(Container),
+          )
+          .first,
+    );
+
+    expect(container.color, const Color(0xFF101820));
   });
 
   testWidgets('seeds full multi-line find query from terminal selection', (
@@ -598,11 +637,10 @@ void main() {
     // spanning the full 20-cell selection width.
     expect(
       tester.renderObject(find.byKey(stackKey)),
-      paints
-        ..rect(
-          rect: Rect.fromLTWH(40, 48, cellSize.width * 2, cellSize.height),
-          color: const Color(0xFFFF0000),
-        ),
+      paints..rect(
+        rect: Rect.fromLTWH(40, 48, cellSize.width * 2, cellSize.height),
+        color: const Color(0xFFFF0000),
+      ),
     );
   });
 
@@ -739,10 +777,7 @@ void main() {
     expect(
       tester.renderObject(find.byKey(stackKey)),
       paints
-        ..rect(
-          rect: const Rect.fromLTWH(40, 48, 360, 120),
-          color: Colors.black,
-        )
+        ..rect(rect: const Rect.fromLTWH(40, 48, 360, 120), color: Colors.black)
         ..rect(
           rect: Rect.fromLTWH(40, 48, cellSize.width * 2, cellSize.height),
           color: const Color(0xFFFF0000),
@@ -2393,71 +2428,70 @@ void main() {
     expect(bridge.resizeCalls.single.rows, 24);
   });
 
-  testWidgets(
-    'Ctrl+C preserves written trailing spaces when copying',
-    (tester) async {
-      final bridge = RecordingSshBridgeClient();
-      final terminal = xterm.Terminal(maxLines: 3000);
-      String? copiedText;
+  testWidgets('Ctrl+C preserves written trailing spaces when copying', (
+    tester,
+  ) async {
+    final bridge = RecordingSshBridgeClient();
+    final terminal = xterm.Terminal(maxLines: 3000);
+    String? copiedText;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'Clipboard.setData') {
+            final data = Map<String, dynamic>.from(call.arguments as Map);
+            copiedText = data['text'] as String?;
+          }
+          return null;
+        });
+    addTearDown(() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-            if (call.method == 'Clipboard.setData') {
-              final data = Map<String, dynamic>.from(call.arguments as Map);
-              copiedText = data['text'] as String?;
-            }
-            return null;
-          });
-      addTearDown(() {
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(SystemChannels.platform, null);
-      });
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
 
-      // Write lines with explicit trailing spaces (codePoint == 32). These are
-      // content: xterm's getTrimmedLength only skips codePoint == 0 cells, so
-      // the written spaces must survive into the copied text verbatim.
-      terminal.write('hello   \r\nworld   \r\n');
-      final tab = OpenTerminalTab.ssh(
-        id: 'ssh-tab-1',
-        hostName: 'host1',
-        title: 'terminal1',
-        sessionId: 'session-1',
-        terminal: terminal,
-      );
+    // Write lines with explicit trailing spaces (codePoint == 32). These are
+    // content: xterm's getTrimmedLength only skips codePoint == 0 cells, so
+    // the written spaces must survive into the copied text verbatim.
+    terminal.write('hello   \r\nworld   \r\n');
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      sessionId: 'session-1',
+      terminal: terminal,
+    );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: TerminalView(
-              tab: tab,
-              sshBridge: bridge,
-              localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
-              terminalThemeSettings: _defaultTerminalTheme,
-            ),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            tab: tab,
+            sshBridge: bridge,
+            localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
+            terminalThemeSettings: _defaultTerminalTheme,
           ),
         ),
-      );
-      await tester.tap(find.byKey(const Key('terminal-input-proxy')));
-      await tester.pump(const Duration(milliseconds: 300));
+      ),
+    );
+    await tester.tap(find.byKey(const Key('terminal-input-proxy')));
+    await tester.pump(const Duration(milliseconds: 300));
 
-      final controller = terminalView(tester).controller!;
-      controller.setSelection(
-        terminal.buffer.createAnchor(0, 0),
-        terminal.buffer.createAnchor(terminal.viewWidth - 1, 1),
-      );
-      await tester.pump();
+    final controller = terminalView(tester).controller!;
+    controller.setSelection(
+      terminal.buffer.createAnchor(0, 0),
+      terminal.buffer.createAnchor(terminal.viewWidth - 1, 1),
+    );
+    await tester.pump();
 
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyC, character: '');
-      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyC);
-      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-      await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyC, character: '');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyC);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
 
-      // Written trailing spaces (codePoint 0x20) are content and must be
-      // preserved; only never-written empty cells (codePoint 0) are dropped by
-      // getText, so each copied line keeps its three trailing spaces.
-      expect(copiedText, 'hello   \nworld   ');
-    },
-  );
+    // Written trailing spaces (codePoint 0x20) are content and must be
+    // preserved; only never-written empty cells (codePoint 0) are dropped by
+    // getText, so each copied line keeps its three trailing spaces.
+    expect(copiedText, 'hello   \nworld   ');
+  });
 
   testWidgets(
     'CopySelectionTextIntent preserves written trailing spaces when copying',
@@ -2517,7 +2551,10 @@ void main() {
         deepest = e;
         e.visitChildElements(findDeepest);
       }
-      tester.element(find.byType(xterm.TerminalView)).visitChildElements(findDeepest);
+
+      tester
+          .element(find.byType(xterm.TerminalView))
+          .visitChildElements(findDeepest);
       Actions.invoke(deepest!, CopySelectionTextIntent.copy);
       await tester.pump();
 

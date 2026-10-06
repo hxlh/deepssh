@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/ssh_profile_item.dart';
 import '../../core/models/tunnel_config_item.dart';
+import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/deck_page.dart';
+import '../../core/widgets/deck_widgets.dart';
 
-class TunnelConfigsPage extends StatelessWidget {
+/// Tunnel list. Row layout follows the prototype: name + status + direction
+/// badges over a `listen → target 经 profile` sub-line, then the listen port
+/// as the middle column, then the actions.
+class TunnelConfigsPage extends StatefulWidget {
   const TunnelConfigsPage({
     super.key,
     required this.tunnels,
@@ -26,195 +32,269 @@ class TunnelConfigsPage extends StatelessWidget {
   final ValueChanged<TunnelConfigItem> onEdit;
   final ValueChanged<TunnelConfigItem> onDelete;
 
+  @override
+  State<TunnelConfigsPage> createState() => _TunnelConfigsPageState();
+}
+
+class _TunnelConfigsPageState extends State<TunnelConfigsPage> {
+  static const double _actionsWidth = 196;
+
   String profileName(String profileId) {
-    for (final profile in profiles) {
+    for (final profile in widget.profiles) {
       if (profile.id == profileId) return profile.name;
     }
-    return 'Missing SSH profile';
+    return '未知配置';
   }
 
-  Future<void> confirmDelete(
-    BuildContext context,
-    TunnelConfigItem tunnel,
-  ) async {
+  Future<void> _confirmDelete(TunnelConfigItem tunnel) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Tunnel Connection'),
-        content: Text('Delete ${tunnel.name}?'),
+      barrierColor: DeckTokens.wash(AppColors.textPrimary, 0.42),
+      builder: (context) => DeckDialog(
+        title: '删除转发',
+        message: '删除「${tunnel.name}」后不可恢复，确定继续？',
         actions: [
-          TextButton(
+          DeckButton(
+            label: '取消',
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
           ),
-          TextButton(
+          DeckButton(
+            label: '删除',
+            style: DeckButtonStyle.danger,
+            destructive: true,
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
           ),
         ],
       ),
     );
-
-    if (confirmed == true) {
-      onDelete(tunnel);
-    }
+    if (confirmed == true) widget.onDelete(tunnel);
   }
+
+  ({Color color, String label, Color background, Color border}) _status(
+    TunnelConfigItem tunnel,
+  ) => switch (tunnel.status) {
+    TunnelRuntimeStatus.forwarding => (
+      color: DeckTokens.ok,
+      label: '运行中',
+      background: AppColors.okSoft,
+      border: DeckTokens.mix(DeckTokens.ok, AppColors.border, 0.4),
+    ),
+    TunnelRuntimeStatus.waiting => (
+      color: DeckTokens.warn,
+      label: '等待中',
+      background: AppColors.warnSoft,
+      border: DeckTokens.mix(DeckTokens.warnBar, AppColors.border, 0.45),
+    ),
+    TunnelRuntimeStatus.stopped => (
+      color: AppColors.textMuted,
+      label: '已停止',
+      background: AppColors.background,
+      border: AppColors.border,
+    ),
+  };
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
+    final running = widget.tunnels
+        .where((t) => t.status == TunnelRuntimeStatus.forwarding)
+        .length;
+
+    return DeckPageScaffold(
+      eyebrow: 'Port Forwarding',
+      title: '端口转发',
+      subtitle:
+          '基于 SSH 配置的本地与远程隧道。共 ${widget.tunnels.length} 条，'
+          '其中 $running 条运行中。',
+      actions: [
+        DeckButton(
+          label: '新增转发',
+          style: DeckButtonStyle.accent,
+          icon: Icons.add,
+          onPressed: widget.onAdd,
+        ),
+      ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Tunnel Connections',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                ),
-              ),
-              TextButton(onPressed: onAdd, child: const Text('新增')),
-            ],
-          ),
-          if (errorMessage != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              errorMessage!,
-              style: const TextStyle(color: Colors.redAccent),
-            ),
+          if (widget.errorMessage != null) ...[
+            _ErrorStrip(widget.errorMessage!),
+            const SizedBox(height: 10),
           ],
-          const SizedBox(height: 16),
-          Expanded(
-            child: ListView.separated(
-              itemCount: tunnels.length,
-              separatorBuilder: (_, _) => Divider(color: AppColors.border),
-              itemBuilder: (context, index) {
-                final tunnel = tunnels[index];
-                return _TunnelRow(
-                  tunnel: tunnel,
-                  subtitle:
-                      '${tunnel.forwardingSummary} via ${profileName(tunnel.sshProfileId)}',
-                  onStart: () => onStart(tunnel),
-                  onStop: () => onStop(tunnel),
-                  onEdit: () => onEdit(tunnel),
-                  onDelete: () => confirmDelete(context, tunnel),
-                );
-              },
+          if (widget.tunnels.isEmpty)
+            DeckEmptyState(
+              title: '还没有转发',
+              hint: '点击右上角「新增转发」，只需填写远程端口，本地端口可自动分配。',
+              icon: Icons.swap_horiz,
+            )
+          else
+            SingleChildScrollView(
+              child: DeckTable(
+                flexWeights: const [1],
+                headerLabels: const [],
+                showHeader: false,
+                trailingWidth: _actionsWidth,
+                children: [
+                  for (final tunnel in widget.tunnels)
+                    DeckTableRow(
+                      flexWeights: const [1],
+                      statusColor: switch (tunnel.status) {
+                        TunnelRuntimeStatus.forwarding => AppColors.accent,
+                        TunnelRuntimeStatus.waiting => DeckTokens.warnBar,
+                        TunnelRuntimeStatus.stopped => AppColors.border,
+                      },
+                      cells: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    tunnel.name,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // The prototype's stopped badge carries no
+                                // status dot — only 在线 / 运行中 / 等待中 do.
+                                if (tunnel.status ==
+                                    TunnelRuntimeStatus.stopped)
+                                  const DeckBadge('已停止')
+                                else
+                                  DeckStatusBadge(
+                                    label: _status(tunnel).label,
+                                    color: _status(tunnel).color,
+                                    background: _status(tunnel).background,
+                                    borderColor: _status(tunnel).border,
+                                  ),
+                                const SizedBox(width: 6),
+                                DeckBadge(
+                                  tunnel.type == TunnelForwardType.local
+                                      ? '本地转发'
+                                      : '远程转发',
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text:
+                                        '${tunnel.listenHost}:${tunnel.listenPortLabel}',
+                                  ),
+                                  TextSpan(
+                                    text: '  →  ',
+                                    style: TextStyle(
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text:
+                                        '${tunnel.targetHost}:${tunnel.targetPort}',
+                                  ),
+                                  TextSpan(
+                                    text: '  经  ',
+                                    style: TextStyle(
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: profileName(tunnel.sshProfileId),
+                                  ),
+                                ],
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'JetBrains Mono',
+                                fontFamilyFallback: DeckTokens.fontMono,
+                                fontSize: 11,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      meta: (
+                        label: '监听端口',
+                        value: tunnel.listenPort == 0
+                            ? '自动分配'
+                            : '${tunnel.listenPort}',
+                      ),
+                      trailingWidth: _actionsWidth,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          DeckButton(
+                            key: ValueKey(
+                              tunnel.isRunning
+                                  ? 'tunnel-stop-${tunnel.id}'
+                                  : 'tunnel-start-${tunnel.id}',
+                            ),
+                            label: tunnel.isRunning ? '停止' : '启动',
+                            dense: true,
+                            onPressed: () => tunnel.isRunning
+                                ? widget.onStop(tunnel)
+                                : widget.onStart(tunnel),
+                          ),
+                          const SizedBox(width: 6),
+                          DeckButton(
+                            label: '编辑',
+                            dense: true,
+                            style: DeckButtonStyle.ghost,
+                            onPressed: () => widget.onEdit(tunnel),
+                          ),
+                          const SizedBox(width: 6),
+                          DeckButton(
+                            label: '删除',
+                            dense: true,
+                            style: DeckButtonStyle.ghost,
+                            destructive: true,
+                            onPressed: () => _confirmDelete(tunnel),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 }
 
-class _TunnelRow extends StatelessWidget {
-  const _TunnelRow({
-    required this.tunnel,
-    required this.subtitle,
-    required this.onStart,
-    required this.onStop,
-    required this.onEdit,
-    required this.onDelete,
-  });
+class _ErrorStrip extends StatelessWidget {
+  const _ErrorStrip(this.message);
 
-  final TunnelConfigItem tunnel;
-  final String subtitle;
-  final VoidCallback onStart;
-  final VoidCallback onStop;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  static const Color _dotGreen = Color(0xFF3DDC84);
-  static const Color _dotRed = Color(0xFFE05252);
-  static const Color _buttonBg = Color(0xFF25282A);
-  static const Color _buttonBorder = Color(0xFF3A3A3A);
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    final running = tunnel.isRunning;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: AppColors.tabInactive,
-        borderRadius: BorderRadius.circular(6),
+        color: AppColors.dangerSoft,
+        border: Border.all(color: DeckTokens.danger),
       ),
       child: Row(
         children: [
+          const DeckStatusSquare(DeckTokens.danger),
+          const SizedBox(width: 9),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(tunnel.name, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          _TunnelActionButton(
-            key: Key(
-              running
-                  ? 'tunnel-stop-${tunnel.id}'
-                  : 'tunnel-start-${tunnel.id}',
-            ),
-            label: running ? '停止' : '启动',
-            onPressed: running ? onStop : onStart,
-          ),
-          const SizedBox(width: 8),
-          TextButton(
-            key: Key('tunnel-edit-${tunnel.id}'),
-            onPressed: onEdit,
-            child: const Text('编辑'),
-          ),
-          TextButton(
-            key: Key('tunnel-delete-${tunnel.id}'),
-            onPressed: onDelete,
-            child: const Text('删除'),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            key: Key('tunnel-status-dot-${tunnel.id}'),
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: tunnel.isForwarding ? _dotGreen : _dotRed,
-              shape: BoxShape.circle,
+            child: Text(
+              message,
+              style: const TextStyle(fontSize: 12, color: DeckTokens.danger),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _TunnelActionButton extends StatelessWidget {
-  const _TunnelActionButton({
-    super.key,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.textPrimary,
-        backgroundColor: _TunnelRow._buttonBg,
-        side: const BorderSide(color: _TunnelRow._buttonBorder),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        visualDensity: VisualDensity.compact,
-      ),
-      onPressed: onPressed,
-      child: Text(label),
     );
   }
 }

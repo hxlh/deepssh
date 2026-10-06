@@ -1,8 +1,13 @@
+import 'package:deepssh/core/widgets/deck_widgets.dart';
 import 'package:deepssh/core/models/ssh_profile_item.dart';
+import 'package:deepssh/workbench/widgets/add_connection_button.dart';
+import 'package:deepssh/workbench/widgets/app_topbar.dart';
 import 'package:deepssh/core/models/tunnel_config_item.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
 import 'package:deepssh/src/rust/ssh_auth.dart' as rust_auth;
+import 'package:deepssh/features/tunnels/tunnel_config_form_drawer.dart';
+import 'package:deepssh/features/tunnels/tunnel_configs_page.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -140,32 +145,92 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('隧道连接'));
+      await tester.tap(
+        find.byKey(addConnectionMenuKey(AddConnectionAction.tunnel)),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.text('Tunnel Connections'), findsOneWidget);
-      expect(find.text('Prod'), findsOneWidget);
+      expect(find.byKey(const ValueKey('deck-page-title')), findsOneWidget);
+      // The prototype scopes the Explorer to the workbench page, so a settings
+      // page must not leak the host tree into the foreground.
+      expect(find.text('Prod'), findsNothing);
       expect(find.text('Dev API'), findsNothing);
 
-      await tester.tap(find.text('新增'));
+      await tester.tap(find.text('新增转发'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.bySemanticsLabel('Name'), 'Dev API');
-      await tester.enterText(find.bySemanticsLabel('Listen Host'), '127.0.0.1');
-      await tester.enterText(find.bySemanticsLabel('Listen Port'), '18080');
-      await tester.enterText(find.bySemanticsLabel('Target Host'), '127.0.0.1');
-      await tester.enterText(find.bySemanticsLabel('Target Port'), '8080');
-      await tester.tap(find.text('Create'));
+      await tester.enterText(find.bySemanticsLabel('名称'), 'Dev API');
+      await tester.enterText(find.bySemanticsLabel('监听主机'), '127.0.0.1');
+      await tester.enterText(find.bySemanticsLabel('监听端口'), '18080');
+      await tester.enterText(find.bySemanticsLabel('目标主机'), '127.0.0.1');
+      await tester.enterText(find.bySemanticsLabel('目标端口'), '8080');
+      await tester.ensureVisible(find.text('创建'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('创建'));
       await tester.pumpAndSettle();
 
       expect(tunnelBridge.listCount, greaterThan(0));
       expect(find.text('Dev API'), findsOneWidget);
+      // Listen and target share one summary line under the name.
       expect(
-        find.text('LOCAL 127.0.0.1:18080 → 127.0.0.1:8080 via Prod'),
+        find.textContaining(
+          RegExp(r'127\.0\.0\.1:18080\s+→\s+127\.0\.0\.1:8080'),
+        ),
         findsOneWidget,
       );
       expect(find.text('SSH PROFILES'), findsNothing);
+
+      // Creating a tunnel must not disturb the Explorer's SSH profiles, so go
+      // back to the workbench and check the host tree is still intact.
+      await tester.tap(find.byKey(appNavKey(AppSection.workbench)));
+      await tester.pumpAndSettle();
+      expect(find.text('Prod'), findsOneWidget);
     },
   );
+
+  testWidgets('keeps the tunnels list mounted behind the form drawer', (
+    tester,
+  ) async {
+    final sshBridge = FakeSshBridgeClient();
+    final tunnelBridge = FakeTunnelBridgeClient();
+    await tunnelBridge.createTunnel(
+      name: 'Dev API',
+      type: TunnelForwardType.local,
+      sshProfileId: 'profile-1',
+      listenHost: '127.0.0.1',
+      listenPort: 18080,
+      targetHost: '127.0.0.1',
+      targetPort: 8080,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkbenchPage(sshBridge: sshBridge, tunnelBridge: tunnelBridge),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(addConnectionMenuKey(AddConnectionAction.tunnel)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(TunnelConfigFormDrawer), findsNothing);
+
+    await tester.tap(find.text('新增转发'));
+    await tester.pumpAndSettle();
+
+    // The drawer overlays the page rather than replacing it.
+    expect(find.byType(TunnelConfigFormDrawer), findsOneWidget);
+    expect(find.byType(TunnelConfigsPage), findsOneWidget);
+    expect(find.text('Dev API'), findsWidgets);
+
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TunnelConfigFormDrawer), findsNothing);
+    expect(find.text('Dev API'), findsOneWidget);
+  });
 
   testWidgets('starts and stops a saved tunnel from the workbench page', (
     tester,
@@ -191,7 +256,9 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('隧道连接'));
+    await tester.tap(
+      find.byKey(addConnectionMenuKey(AddConnectionAction.tunnel)),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('tunnel-start-tunnel-1')));
@@ -240,7 +307,9 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('隧道连接'));
+    await tester.tap(
+      find.byKey(addConnectionMenuKey(AddConnectionAction.tunnel)),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('tunnel-start-tunnel-1')));
@@ -248,7 +317,9 @@ void main() {
     expect(find.text('SSH Password'), findsOneWidget);
 
     await tester.enterText(find.bySemanticsLabel('Password'), 'runtime-secret');
-    await tester.tap(find.text('Connect'));
+    await tester.tap(
+      find.descendant(of: find.byType(DeckDialog), matching: find.text('连接')),
+    );
     await tester.pumpAndSettle();
 
     expect(tunnelBridge.startCount, 1);
@@ -296,7 +367,9 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('隧道连接'));
+    await tester.tap(
+      find.byKey(addConnectionMenuKey(AddConnectionAction.tunnel)),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('tunnel-start-tunnel-1')));
@@ -304,7 +377,9 @@ void main() {
     expect(find.text('Private Key Passphrase'), findsOneWidget);
 
     await tester.enterText(find.bySemanticsLabel('Passphrase'), 'key-secret');
-    await tester.tap(find.text('Connect'));
+    await tester.tap(
+      find.descendant(of: find.byType(DeckDialog), matching: find.text('连接')),
+    );
     await tester.pumpAndSettle();
 
     expect(tunnelBridge.startCount, 2);

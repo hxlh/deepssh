@@ -19,6 +19,24 @@ class RegexHighlight {
         color: color ?? this.color,
         note: note ?? this.note,
       );
+
+  /// Dart's message for [pattern] when it is not a valid regular expression,
+  /// or null when it is fine.
+  ///
+  /// An empty pattern means "no rule", not a broken one — the terminal skips
+  /// those silently. Anything else that fails to compile is a real typo, and
+  /// `TerminalView` used to drop it without a word, so the highlight simply
+  /// stopped working and nobody knew why. Both the theme page and the terminal
+  /// now surface this.
+  static String? patternError(String pattern) {
+    if (pattern.isEmpty) return null;
+    try {
+      RegExp(pattern);
+      return null;
+    } on FormatException catch (error) {
+      return error.message;
+    }
+  }
 }
 
 class UiThemeSettings {
@@ -76,16 +94,19 @@ class UiThemeSettings {
 
   static UiThemeSettings commandDeck() => const UiThemeSettings(
     presetName: 'Command Deck',
-    fontFamily: 'Inter',
-    fontSize: 14,
+    // Empty means the platform UI font: the prototype's
+    // 「系统默认（含中文）」. Keeping the tag lets the settings file round-trip
+    // without inventing a family name the OS does not have.
+    fontFamily: '',
+    fontSize: 13,
     normalFontWeight: 500,
     boldFontWeight: 700,
-    background: Color(0xFF1E1E1E),
-    panel: Color(0xFF252526),
-    sidebar: Color(0xFF181818),
-    accent: Color(0xFF3794FF),
-    textPrimary: Color(0xFFE6E6E6),
-    textMuted: Color(0xFF9D9D9D),
+    background: Color(0xFFFAF9F5),
+    panel: Color(0xFFFFFFFF),
+    sidebar: Color(0xFFFAF9F5),
+    accent: Color(0xFFD97757),
+    textPrimary: Color(0xFF1F1E1D),
+    textMuted: Color(0xFF6B6862),
   );
 
   static UiThemeSettings vsCodeDark() => const UiThemeSettings(
@@ -172,46 +193,68 @@ class TerminalThemeSettings {
     boldFontWeight: 700,
     cursorStyle: CursorStyle.bar,
     cursorBlink: true,
-    foreground: Color(0xFFE6E6E6),
-    terminalBackground: Color(0xFF252526),
-    selectionColor: Color(0xFF094771),
-    cursorColor: Color(0xFF3794FF),
+    foreground: Color(0xFFDEDCD6),
+    terminalBackground: Color(0xFF17181A),
+    // Prototype 终端配色: 高亮 #D9A24B, 光标 #8FBF7F.
+    selectionColor: Color(0xFFD9A24B),
+    cursorColor: Color(0xFF8FBF7F),
     scrollbackLines: 10000,
     regexHighlights: [
       RegexHighlight(
-        pattern: 'ERROR|FATAL|Exception|Traceback',
-        color: Color(0xFFF14C4C),
-        note: '错误日志',
+        pattern:
+            r'[dlbcps-]([r-][w-][xs-]){3}|\broot\b|\bsudo\b|\bchmod\b|\bchown\b',
+        color: Color(0xFFC1794F),
+        note: 'Linux权限与用户',
       ),
       RegexHighlight(
-        pattern: 'WARN|WARNING',
-        color: Color(0xFFF5F543),
-        note: '警告日志',
+        pattern: r'(?:^|\s)(?:/[^\s]*|\./[^\s]*|\.\./[^\s]*|~[^\s]*)',
+        color: Color(0xFFE0C828),
+        note: 'Linux文件路径',
       ),
       RegexHighlight(
-        pattern: 'SUCCESS|OK|DONE',
-        color: Color(0xFF23D18B),
-        note: '成功状态',
+        pattern:
+            r'\b(if|then|else|elif|fi|case|esac|for|while|until|do|done|in|function|return|exit|break|continue)\b',
+        color: Color(0xFFFF1495),
+        note: 'Shell关键字与流程控制',
       ),
       RegexHighlight(
-        pattern: r'\b[45]\d\d\b',
-        color: Color(0xFFF14C4C),
-        note: 'HTTP 错误',
+        pattern:
+            r'\b(SUCCESS|PASS|OK|DONE|COMPLETE|ERROR|FAIL|FAILED|FATAL|CRITICAL)\b|✓|✗|❌|✅',
+        color: Color(0xFF1EBF19),
+        note: '成功/错误状态',
       ),
       RegexHighlight(
-        pattern: r'\b\d+ms\b|\b\d+\.\d+s\b',
-        color: Color(0xFF29B8DB),
-        note: '耗时',
+        pattern:
+            r'https?://[^\s]+|ftp://[^\s]+|www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:/[^\s]*)?',
+        color: Color(0xFF3F8EE8),
+        note: '网址链接',
       ),
       RegexHighlight(
-        pattern: r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
-        color: Color(0xFFD670D6),
-        note: 'IP 地址',
+        pattern: r'''"[^"]*"|'[^']*'|`[^`]*`''',
+        color: Color(0xFF5E923D),
+        note: '字符串与引号',
       ),
       RegexHighlight(
-        pattern: r'\b[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\b',
-        color: Color(0xFF3B8EEA),
-        note: 'UUID',
+        pattern: r'\$[A-Za-z_][A-Za-z0-9_]*|--?[A-Za-z][A-Za-z0-9-]*',
+        color: Color(0xFFCC703A),
+        note: '环境变量与参数',
+      ),
+      RegexHighlight(
+        pattern:
+            r'\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b|\b(?:localhost|127\.0\.0\.1)\b',
+        color: Color(0xFF459BFF),
+        note: '网络与IP地址',
+      ),
+      RegexHighlight(
+        pattern:
+            r'\b\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?\b|\b\d{2}:\d{2}(?::\d{2})?\b',
+        color: Color(0xFF7960FF),
+        note: '时间与日期',
+      ),
+      RegexHighlight(
+        pattern: r'\b\d+(?:\.\d+)?\s*(?:[KMGT]i?B|%|MB|GB|KB)?\b',
+        color: Color(0xFF1AA416),
+        note: '数字与计数',
       ),
     ],
   );

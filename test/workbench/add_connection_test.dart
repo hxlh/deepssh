@@ -5,6 +5,7 @@ import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:deepssh/workbench/widgets/add_connection_button.dart';
 
 Widget _workbenchApp() {
   return MaterialApp(
@@ -24,11 +25,11 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
 
-    expect(find.text('SSH Configurations'), findsOneWidget);
-    expect(find.text('新增'), findsOneWidget);
+    expect(find.byKey(const ValueKey('deck-page-title')), findsOneWidget);
+    expect(find.text('新增 SSH 配置'), findsOneWidget);
   });
 
   testWidgets('creates local terminals from add connection menu', (
@@ -38,7 +39,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('本地终端'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.localTerminal)));
     await tester.pumpAndSettle();
 
     expect(find.text('Local'), findsOneWidget);
@@ -47,7 +48,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('本地终端'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.localTerminal)));
     await tester.pumpAndSettle();
 
     expect(find.text('terminal2'), findsWidgets);
@@ -61,7 +62,7 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('本地终端'));
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.localTerminal)));
       await tester.pumpAndSettle();
 
       expect(find.text('Local'), findsOneWidget);
@@ -89,17 +90,17 @@ void main() {
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('SSH'));
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
       await tester.pumpAndSettle();
 
-      expect(find.text('SSH Configurations'), findsOneWidget);
+      expect(find.byKey(const ValueKey('deck-page-title')), findsOneWidget);
 
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('本地终端'));
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.localTerminal)));
       await tester.pumpAndSettle();
 
-      expect(find.text('SSH Configurations'), findsNothing);
+      expect(find.byKey(const ValueKey('deck-page-title')), findsNothing);
       expect(find.text('local · terminal1'), findsNothing);
       expect(find.text('terminal1'), findsWidgets);
     },
@@ -112,10 +113,10 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('隧道连接'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.tunnel)));
     await tester.pumpAndSettle();
 
-    expect(find.text('Tunnel Connections'), findsOneWidget);
-    expect(find.text('新增'), findsOneWidget);
+    expect(find.byKey(const ValueKey('deck-page-title')), findsOneWidget);
+    expect(find.text('新增转发'), findsOneWidget);
   });
 }

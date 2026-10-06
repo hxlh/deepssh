@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:deepssh/core/logging/app_logger.dart';
 import 'package:deepssh/core/models/ssh_profile_item.dart';
+import 'package:deepssh/workbench/widgets/add_connection_button.dart';
 import 'package:deepssh/core/models/theme_settings.dart';
 import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
@@ -72,7 +73,7 @@ void main() {
 
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -117,7 +118,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SSH'));
+    await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('连接'));
     await tester.pumpAndSettle();
@@ -178,7 +179,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('新增连接'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('SSH'));
+      await tester.tap(find.byKey(addConnectionMenuKey(AddConnectionAction.ssh)));
       await tester.pumpAndSettle();
       await tester.tap(find.text('连接'));
       await tester.pump();

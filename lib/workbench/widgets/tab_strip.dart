@@ -2,8 +2,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_colors.dart';
 import '../../features/terminal/terminal_state.dart';
 
 class TabStrip extends StatefulWidget {
@@ -70,7 +70,7 @@ class _TabStripState extends State<TabStrip> {
         height: AppSpacing.tabHeight,
         decoration: BoxDecoration(
           color: AppColors.background,
-          border: Border(bottom: BorderSide(color: AppColors.border)),
+          border: Border(bottom: BorderSide(color: AppColors.textPrimary)),
         ),
         child: ReorderableListView.builder(
           scrollController: _scrollController,
@@ -119,27 +119,28 @@ class _TabItemState extends State<_TabItem> {
   bool tabHovered = false;
   bool closeHovered = false;
 
-  static const Color _hoverInactive = Color(0xFF222426);
-
   @override
   Widget build(BuildContext context) {
     final active = widget.active;
-    final Color background = active
-        ? AppColors.tabActive
-        : (tabHovered ? _hoverInactive : AppColors.tabInactive);
+    final background = active
+        ? AppColors.panel
+        : (tabHovered ? AppColors.fgSoft : Colors.transparent);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => tabHovered = true),
       onExit: (_) => setState(() => tabHovered = false),
       child: GestureDetector(
         onTap: widget.onSelect,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          width: 220,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Container(
+          // The prototype tab hugs its label (`.tab{flex:none}`) and only the
+          // label itself is capped; a fixed row width pushed the close button
+          // far away from short titles.
+          constraints: const BoxConstraints(maxWidth: 260),
+          padding: const EdgeInsets.only(left: 12, right: 8),
           decoration: BoxDecoration(
             color: background,
             border: Border(
+              // The prototype marks the active tab with a top rule.
               top: BorderSide(
                 color: active ? AppColors.accent : Colors.transparent,
                 width: 2,
@@ -148,37 +149,49 @@ class _TabItemState extends State<_TabItem> {
             ),
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
+              Icon(Icons.terminal, size: 13, color: AppColors.textMuted),
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 190),
                 child: Text(
                   widget.tab.label,
+                  // The prototype caps each tab on one line (`.tab` is
+                  // `white-space:nowrap`). `overflow: ellipsis` only bites
+                  // when the paragraph is single-line, so maxLines/softWrap
+                  // are what actually stop long labels wrapping to two rows.
+                  maxLines: 1,
+                  softWrap: false,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: active ? AppColors.textPrimary : AppColors.textMuted,
+                    fontSize: 12.5,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                    color: active || tabHovered
+                        ? AppColors.textPrimary
+                        : AppColors.textMuted,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Tooltip(
-                message: 'Close ${widget.tab.label}',
+                message: '关闭 ${widget.tab.label}',
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   onEnter: (_) => setState(() => closeHovered = true),
                   onExit: (_) => setState(() => closeHovered = false),
                   child: GestureDetector(
                     onTap: widget.onClose,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: closeHovered
-                            ? AppColors.border
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
+                    child: Container(
+                      width: 17,
+                      height: 17,
+                      alignment: Alignment.center,
+                      color: closeHovered
+                          ? AppColors.border
+                          : Colors.transparent,
                       child: Icon(
                         Icons.close,
-                        size: 16,
+                        size: 12,
                         color: closeHovered
                             ? AppColors.textPrimary
                             : AppColors.textMuted,

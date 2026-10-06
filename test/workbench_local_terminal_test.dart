@@ -8,6 +8,8 @@ import 'package:deepssh/features/tunnels/tunnel_bridge.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:deepssh/workbench/widgets/add_connection_button.dart';
+import 'package:deepssh/workbench/widgets/tab_strip.dart';
 
 class FakeLocalTerminalBridge implements LocalTerminalBridgeClient {
   FakeLocalTerminalBridge({this.spawnError});
@@ -75,7 +77,9 @@ Future<void> pumpWorkbench(
 Future<void> createLocalTerminal(WidgetTester tester) async {
   await tester.tap(find.text('新增连接'));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('本地终端'));
+  await tester.tap(
+    find.byKey(addConnectionMenuKey(AddConnectionAction.localTerminal)),
+  );
   await tester.pump();
 }
 
@@ -200,7 +204,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final closeButton = find.byIcon(Icons.close).first;
+    // The explorer row now carries its own (prototype) .ex-x close button,
+    // so target the tab strip explicitly.
+    final closeButton = find
+        .descendant(
+          of: find.byType(TabStrip),
+          matching: find.byIcon(Icons.close),
+        )
+        .first;
     await tester.tap(closeButton);
     await tester.pumpAndSettle();
 

@@ -4,11 +4,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-OpenTerminalTab _tab(String id, {String? displayLabel}) => OpenTerminalTab.local(
-  id: id,
-  title: id,
-  displayLabel: displayLabel,
-);
+OpenTerminalTab _tab(String id, {String? displayLabel}) =>
+    OpenTerminalTab.local(id: id, title: id, displayLabel: displayLabel);
 
 void main() {
   testWidgets('TabStrip renders resolved tab labels', (tester) async {
@@ -33,6 +30,52 @@ void main() {
     expect(find.text('b'), findsOneWidget);
     expect(find.text('top'), findsOneWidget);
     expect(find.text('local · a'), findsNothing);
+  });
+
+  testWidgets('tab hugs its label and keeps the close button at the edge', (
+    tester,
+  ) async {
+    const shortLabel = 'top';
+    const longLabel = r'PS C:\Users\hxlh';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              TabStrip(
+                tabs: [
+                  _tab('a', displayLabel: shortLabel),
+                  _tab('b', displayLabel: longLabel),
+                ],
+                activeTabId: 'a',
+                onSelect: (_) {},
+                onClose: (_) {},
+                onReorder: (_, __) {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    Rect tabRect(String label) => tester.getRect(
+      find
+          .ancestor(of: find.text(label), matching: find.byType(Container))
+          .first,
+    );
+
+    final shortTab = tabRect(shortLabel);
+    final longTab = tabRect(longLabel);
+    expect(
+      shortTab.width,
+      lessThan(160),
+      reason: 'a short label must not stretch the tab to the maximum width',
+    );
+    expect(longTab.width, lessThanOrEqualTo(260));
+    expect(longTab.width, greaterThan(shortTab.width));
+
+    final closeRect = tester.getRect(find.byTooltip('关闭 $shortLabel'));
+    expect(shortTab.right - closeRect.right, closeTo(8, 1));
   });
 
   testWidgets('scrolls tabs horizontally with normal mouse wheel', (

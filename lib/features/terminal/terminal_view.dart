@@ -10,8 +10,11 @@ import 'package:xterm/xterm.dart' as xterm;
 
 import '../../core/models/theme_settings.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/deck_fields.dart';
 import '../local_terminal/local_terminal_bridge.dart';
 import '../ssh/ssh_bridge.dart';
+import '../../workbench/widgets/resize_handle.dart';
 import 'terminal_find.dart';
 import 'terminal_state.dart';
 
@@ -35,6 +38,7 @@ class TerminalView extends StatefulWidget {
     this.findUseRegex = false,
     this.onFindOpened,
     this.onFindClosed,
+    this.onRegexRuleError,
     this.onFindQueryChanged,
     this.onFindCaseSensitiveChanged,
     this.onFindWholeWordChanged,
@@ -47,6 +51,10 @@ class TerminalView extends StatefulWidget {
   final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String>? onSshInput;
   final SshTerminalInputWriter? onSshTerminalInput;
+
+  /// Reports a rule whose pattern is not a valid regular expression. Without
+  /// it the rule is dropped in silence and the highlight just stops working.
+  final void Function(String pattern, String message)? onRegexRuleError;
   final ValueChanged<String>? onLocalInput;
   final ValueChanged<String>? onPreviewLabelChanged;
   final bool findVisible;
@@ -224,16 +232,21 @@ class _TerminalViewState extends State<TerminalView> {
     final rules = <_CompiledRegexHighlight>[];
     for (final rule in widget.terminalThemeSettings.regexHighlights) {
       if (rule.pattern.isEmpty) continue;
-      try {
-        rules.add(
-          _CompiledRegexHighlight(
-            regex: RegExp(rule.pattern),
-            foreground: rule.color,
-          ),
-        );
-      } on FormatException {
+      final error = RegexHighlight.patternError(rule.pattern);
+      if (error != null) {
+        // Deferred: this runs from initState, and the host may already be
+        // building.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) widget.onRegexRuleError?.call(rule.pattern, error);
+        });
         continue;
       }
+      rules.add(
+        _CompiledRegexHighlight(
+          regex: RegExp(rule.pattern),
+          foreground: rule.color,
+        ),
+      );
     }
     return rules;
   }
@@ -756,84 +769,97 @@ class _TerminalViewState extends State<TerminalView> {
     // Calling it in build() creates a rebuild loop: terminal change →
     // setState (offset) → rebuild → scheduleUpdate → setState → rebuild…
     final settings = widget.terminalThemeSettings;
+    final (termFamily, termFallback) = DeckTokens.resolveFontStack(
+      settings.fontFamily,
+      DeckTokens.fontMono,
+      'monospace',
+    );
     return Container(
-      color: AppColors.panel,
+      // The prototype's term-wrap is the terminal background edge to edge; the
+      // inner padding belongs to the terminal, so a panel-coloured border here
+      // made the stage look inset instead of filling the workbench.
+      color: settings.terminalBackground,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 17),
       child: Stack(
         key: _terminalStackKey,
         children: [
           Positioned.fill(
-            child: Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerDown: (event) {
-                if (event.buttons == kSecondaryButton) {
-                  _showContextMenu(context, event.position);
-                } else {
-                  _focusTerminalInput();
-                }
-              },
-              child: Scrollbar(
-                controller: _findScrollController,
-                child: xterm.TerminalView(
-                  terminal,
-                  key: _xtermTerminalViewKey,
-                  controller: terminalController,
-                  scrollController: _findScrollController,
-                  focusNode: inputFocusNode,
-                  autofocus: _isMacOS,
-                  hardwareKeyboardOnly: !_isMacOS,
-                  onKeyEvent: _handleTerminalKeyEvent,
-                // macOS Cmd+C flows through xterm's TerminalActions -> onCopy.
-                // `text` is already buffer.getText(), which clamps each line to
-                // its last content cell: trailing empty cells are dropped and
-                // written spaces are preserved. Same semantics as the Ctrl+C /
-                // context-menu path above, on all platforms.
-                onCopy: (text) {
-                  if (text.isNotEmpty) {
-                    Clipboard.setData(ClipboardData(text: text));
+            child: _HoldWidthDuringExplorerResize(
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (event) {
+                  if (event.buttons == kSecondaryButton) {
+                    _showContextMenu(context, event.position);
+                  } else {
+                    _focusTerminalInput();
                   }
                 },
-                cursorType: _xtermCursorType(settings.cursorStyle),
-                alwaysShowCursor: false,
-                cursorBlinkVisible: _cursorVisible,
-                foregroundColorResolver: _compiledRegexHighlights.isEmpty
-                    ? null
-                    : _regexForegroundForRow,
-                textStyle: xterm.TerminalStyle(
-                  fontSize: settings.fontSize.toDouble(),
-                  fontFamily: settings.fontFamily,
-                  normalFontWeight: _fontWeightFromConfig(
-                    settings.normalFontWeight,
+                child: Scrollbar(
+                  controller: _findScrollController,
+                  child: xterm.TerminalView(
+                    terminal,
+                    key: _xtermTerminalViewKey,
+                    controller: terminalController,
+                    scrollController: _findScrollController,
+                    focusNode: inputFocusNode,
+                    autofocus: _isMacOS,
+                    hardwareKeyboardOnly: !_isMacOS,
+                    onKeyEvent: _handleTerminalKeyEvent,
+                    // macOS Cmd+C flows through xterm's TerminalActions -> onCopy.
+                    // `text` is already buffer.getText(), which clamps each line to
+                    // its last content cell: trailing empty cells are dropped and
+                    // written spaces are preserved. Same semantics as the Ctrl+C /
+                    // context-menu path above, on all platforms.
+                    onCopy: (text) {
+                      if (text.isNotEmpty) {
+                        Clipboard.setData(ClipboardData(text: text));
+                      }
+                    },
+                    cursorType: _xtermCursorType(settings.cursorStyle),
+                    alwaysShowCursor: false,
+                    cursorBlinkVisible: _cursorVisible,
+                    foregroundColorResolver: _compiledRegexHighlights.isEmpty
+                        ? null
+                        : _regexForegroundForRow,
+                    textStyle: xterm.TerminalStyle(
+                      fontSize: settings.fontSize.toDouble(),
+                      fontFamily: termFamily ?? 'monospace',
+                      fontFamilyFallback: termFallback,
+                      normalFontWeight: _fontWeightFromConfig(
+                        settings.normalFontWeight,
+                      ),
+                      boldFontWeight: _fontWeightFromConfig(
+                        settings.boldFontWeight,
+                      ),
+                    ),
+                    theme: xterm.TerminalTheme(
+                      cursor: settings.cursorColor,
+                      selection: _terminalSelectionColor(settings),
+                      foreground: settings.foreground,
+                      background: settings.terminalBackground,
+                      black: const Color(0xFF000000),
+                      red: const Color(0xFFCD3131),
+                      green: const Color(0xFF0DBC79),
+                      yellow: const Color(0xFFE5E510),
+                      blue: const Color(0xFF2472C8),
+                      magenta: const Color(0xFFBC3FBC),
+                      cyan: const Color(0xFF11A8CD),
+                      white: const Color(0xFFE5E5E5),
+                      brightBlack: const Color(0xFF666666),
+                      brightRed: const Color(0xFFF14C4C),
+                      brightGreen: const Color(0xFF23D18B),
+                      brightYellow: const Color(0xFFF5F543),
+                      brightBlue: const Color(0xFF3B8EEA),
+                      brightMagenta: const Color(0xFFD670D6),
+                      brightCyan: const Color(0xFF29B8DB),
+                      brightWhite: const Color(0xFFE5E5E5),
+                      searchHitBackground: AppColors.accent.withOpacity(0.3),
+                      searchHitBackgroundCurrent: AppColors.accent.withOpacity(
+                        0.7,
+                      ),
+                      searchHitForeground: settings.foreground,
+                    ),
                   ),
-                  boldFontWeight: _fontWeightFromConfig(
-                    settings.boldFontWeight,
-                  ),
-                ),
-                theme: xterm.TerminalTheme(
-                  cursor: settings.cursorColor,
-                  selection: _terminalSelectionColor(settings),
-                  foreground: settings.foreground,
-                  background: settings.terminalBackground,
-                  black: const Color(0xFF000000),
-                  red: const Color(0xFFCD3131),
-                  green: const Color(0xFF0DBC79),
-                  yellow: const Color(0xFFE5E510),
-                  blue: const Color(0xFF2472C8),
-                  magenta: const Color(0xFFBC3FBC),
-                  cyan: const Color(0xFF11A8CD),
-                  white: const Color(0xFFE5E5E5),
-                  brightBlack: const Color(0xFF666666),
-                  brightRed: const Color(0xFFF14C4C),
-                  brightGreen: const Color(0xFF23D18B),
-                  brightYellow: const Color(0xFFF5F543),
-                  brightBlue: const Color(0xFF3B8EEA),
-                  brightMagenta: const Color(0xFFD670D6),
-                  brightCyan: const Color(0xFF29B8DB),
-                  brightWhite: const Color(0xFFE5E5E5),
-                  searchHitBackground: AppColors.accent.withOpacity(0.3),
-                  searchHitBackgroundCurrent: AppColors.accent.withOpacity(0.7),
-                  searchHitForeground: settings.foreground,
-                ),
                 ),
               ),
             ),
@@ -857,8 +883,7 @@ class _TerminalViewState extends State<TerminalView> {
                     textInputAction: TextInputAction.none,
                     enableSuggestions: false,
                     autocorrect: false,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
+                    decoration: deckBareInputDecoration(
                       contentPadding: EdgeInsets.zero,
                     ),
                     style: const TextStyle(color: Colors.transparent),
@@ -972,6 +997,66 @@ class _TerminalContextMenuItemState extends State<_TerminalContextMenuItem> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Holds the terminal's width while the Explorer splitter is being dragged.
+///
+/// Changing the terminal's width forces a full-buffer reflow in the xterm
+/// engine; changing its height does not. On a deep scrollback the per-frame
+/// reflow costs milliseconds and the splitter stutters, while the dock
+/// splitter — which only moves along the cheap axis — stays smooth. While the
+/// pointer is down the box below keeps the last laid-out width, paints it in
+/// place and clips the strip, then the terminal resizes exactly once when the
+/// drag ends (where the reflow also happens just once).
+class _HoldWidthDuringExplorerResize extends StatelessWidget {
+  const _HoldWidthDuringExplorerResize({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final hold = ExplorerResizeHold.maybeOf(context);
+    if (hold == null) return child;
+    return _HeldWidthBox(holding: hold.value, child: child);
+  }
+}
+
+class _HeldWidthBox extends StatefulWidget {
+  const _HeldWidthBox({required this.holding, required this.child});
+
+  final bool holding;
+  final Widget child;
+
+  @override
+  State<_HeldWidthBox> createState() => _HeldWidthBoxState();
+}
+
+class _HeldWidthBoxState extends State<_HeldWidthBox> {
+  /// The width the terminal was last laid out at; captured on every free
+  /// layout so the first held frame has the pre-drag value.
+  double? _width;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!widget.holding) {
+          _width = constraints.maxWidth;
+          return widget.child;
+        }
+        final width = _width ?? constraints.maxWidth;
+        _width = width;
+        return ClipRect(
+          child: OverflowBox(
+            alignment: Alignment.topLeft,
+            minWidth: width,
+            maxWidth: width,
+            child: widget.child,
+          ),
+        );
+      },
     );
   }
 }

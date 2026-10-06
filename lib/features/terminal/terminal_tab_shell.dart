@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../core/models/theme_settings.dart';
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
 import '../../workbench/widgets/empty_state.dart';
 import '../../workbench/widgets/tab_strip.dart';
 import '../local_terminal/local_terminal_bridge.dart';
 import '../ssh/ssh_bridge.dart';
 import 'terminal_state.dart';
+import 'terminal_status_bar.dart';
 import 'terminal_view.dart';
 
 class TerminalTabShell extends StatefulWidget {
@@ -19,6 +20,7 @@ class TerminalTabShell extends StatefulWidget {
     required this.sshBridge,
     required this.localTerminalBridge,
     required this.terminalThemeSettings,
+    this.onRegexRuleError,
     this.onSshInput,
     this.onSshTerminalInput,
     this.onPreviewLabelChanged,
@@ -33,6 +35,9 @@ class TerminalTabShell extends StatefulWidget {
   final TerminalThemeSettings terminalThemeSettings;
   final ValueChanged<String>? onSshInput;
   final SshTerminalInputWriter? onSshTerminalInput;
+
+  /// See [TerminalView.onRegexRuleError].
+  final void Function(String pattern, String message)? onRegexRuleError;
   final ValueChanged<String>? onPreviewLabelChanged;
 
   @override
@@ -64,7 +69,7 @@ class _TerminalTabShellState extends State<TerminalTabShell> {
     final activeTab = widget.state.activeTab;
     if (activeTab == null) {
       return DecoratedBox(
-        decoration: BoxDecoration(color: AppColors.panel),
+        decoration: const BoxDecoration(color: DeckTokens.termBg),
         child: const EmptyState(),
       );
     }
@@ -80,7 +85,7 @@ class _TerminalTabShellState extends State<TerminalTabShell> {
         ),
         Expanded(
           child: DecoratedBox(
-            decoration: BoxDecoration(color: AppColors.panel),
+            decoration: const BoxDecoration(color: DeckTokens.termBg),
             child: TerminalView(
               key: ValueKey(activeTab.id),
               tab: activeTab,
@@ -89,6 +94,7 @@ class _TerminalTabShellState extends State<TerminalTabShell> {
               terminalThemeSettings: widget.terminalThemeSettings,
               onSshInput: widget.onSshInput,
               onSshTerminalInput: widget.onSshTerminalInput,
+              onRegexRuleError: widget.onRegexRuleError,
               onPreviewLabelChanged: widget.onPreviewLabelChanged,
               findVisible: _findVisible,
               findQuery: _findQuery,
@@ -106,6 +112,14 @@ class _TerminalTabShellState extends State<TerminalTabShell> {
                   setState(() => _findUseRegex = value),
             ),
           ),
+        ),
+        TerminalStatusBar(
+          tab: activeTab,
+          // A remote tab is "connected" once the backend handed back a
+          // session; local terminals are live from the start.
+          connected:
+              activeTab.sourceType == TerminalSourceType.local ||
+              activeTab.sessionId != null,
         ),
       ],
     );

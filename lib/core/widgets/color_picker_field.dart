@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import 'css_colors.dart';
+import 'deck_fields.dart';
 
 class ColorPickerField extends StatelessWidget {
   const ColorPickerField({
@@ -63,12 +64,24 @@ class ColorPickerField extends StatelessWidget {
   }
 
   void _showDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) =>
-          _ColorPickerDialog(initialColor: value, onChanged: onChanged),
-    );
+    showColorPickerDialog(context, initialColor: value, onChanged: onChanged);
   }
+}
+
+/// Opens the shared HSV picker and reports every change.
+///
+/// The theme page's swatch cards need the same picker without the bordered
+/// field chrome, so the dialog lives behind this entry point.
+Future<void> showColorPickerDialog(
+  BuildContext context, {
+  required Color initialColor,
+  required ValueChanged<Color> onChanged,
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (_) =>
+        _ColorPickerDialog(initialColor: initialColor, onChanged: onChanged),
+  );
 }
 
 class _ColorPickerDialog extends StatefulWidget {
@@ -87,24 +100,17 @@ class _ColorPickerDialog extends StatefulWidget {
 class _ColorPickerDialogState extends State<_ColorPickerDialog> {
   late HSVColor hsvColor;
   late TextEditingController hexController;
-  late TextEditingController htmlController;
 
   @override
   void initState() {
     super.initState();
     hsvColor = HSVColor.fromColor(widget.initialColor);
-    hexController = TextEditingController(
-      text: colorToHex(widget.initialColor),
-    );
-    htmlController = TextEditingController(
-      text: cssColorName(widget.initialColor) ?? '',
-    );
+    hexController = deckEditingController(colorToHex(widget.initialColor));
   }
 
   @override
   void dispose() {
     hexController.dispose();
-    htmlController.dispose();
     super.dispose();
   }
 
@@ -112,8 +118,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
     setState(() {
       hsvColor = hsv;
       final color = hsv.toColor();
-      hexController.text = colorToHex(color);
-      htmlController.text = cssColorName(color) ?? '';
+      deckSetText(hexController, colorToHex(color));
     });
     widget.onChanged(hsv.toColor());
   }
@@ -123,17 +128,6 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
     if (color == null) return;
     setState(() {
       hsvColor = HSVColor.fromColor(color);
-      htmlController.text = cssColorName(color) ?? '';
-    });
-    widget.onChanged(color);
-  }
-
-  void _updateFromHtml(String text) {
-    final color = parseCssColorName(text);
-    if (color == null) return;
-    setState(() {
-      hsvColor = HSVColor.fromColor(color);
-      hexController.text = colorToHex(color);
     });
     widget.onChanged(color);
   }
@@ -176,8 +170,6 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                 children: [
                   _buildInputRow('Hex', hexController, _updateFromHex),
                   const SizedBox(height: 8),
-                  _buildInputRow('HTML', htmlController, _updateFromHtml),
-                  const SizedBox(height: 8),
                   Container(
                     height: 20,
                     decoration: BoxDecoration(
@@ -210,35 +202,33 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
           ),
         ),
         Expanded(
-          child: TextField(
-            controller: controller,
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontFamily: 'monospace',
-              fontSize: 13,
+          // One border only: the container draws it, and the inner field is
+          // completely undecorated so no second box or fill can show through.
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
             ),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: AppColors.background,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 6,
+            child: TextField(
+              controller: controller,
+              cursorColor: AppColors.accent,
+              textAlignVertical: TextAlignVertical.center,
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontFamily: 'monospace',
+                fontSize: 13,
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: AppColors.border),
+              decoration: deckBareInputDecoration(
+                // Symmetric padding is what centres the value; a fixed outer
+                // height leaves the font's descent space hanging below and the
+                // text reads high.
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 7,
+                ),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: AppColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(4)),
-                borderSide: BorderSide(color: AppColors.accent),
-              ),
+              onChanged: onChanged,
+              onSubmitted: onChanged,
             ),
-            onChanged: onChanged,
-            onSubmitted: onChanged,
           ),
         ),
       ],

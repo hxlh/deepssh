@@ -7,6 +7,7 @@ import 'core/logging/app_logger.dart';
 import 'core/logging/frontend_error_hooks.dart';
 import 'core/models/ssh_profile_item.dart';
 import 'core/models/theme_settings.dart';
+import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'features/ssh/ssh_bridge.dart';
 import 'features/theme/theme_bridge.dart';
@@ -101,7 +102,21 @@ class _DeepSshAppState extends State<DeepSshApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'DeepSSH',
-      theme: AppTheme.dark(),
+      theme: AppTheme.deck(),
+      // 基准字号 (12–18, default 13) scales every piece of UI text. The deck
+      // widgets hard-code their sizes, so the theme-level fontSize alone had
+      // no visible effect; a text scaler is the one switch that reaches them
+      // all. Terminal text is painted by xterm from its own font settings and
+      // is deliberately not scaled here.
+      builder: (context, child) => ValueListenableBuilder<double>(
+        valueListenable: AppColors.textScale,
+        builder: (context, scale, _) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(scale)),
+          child: child!,
+        ),
+      ),
       home: WorkbenchPage(
         sshBridge: _sshBridge,
         themeBridge: _themeBridge,

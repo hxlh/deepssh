@@ -1,10 +1,27 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/models/theme_presets.dart';
 import '../../core/models/theme_settings.dart';
+import '../../core/storage/theme_preset_store.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/color_picker_field.dart';
+import '../../core/widgets/deck_toast.dart';
+import '../../core/widgets/css_colors.dart' as css;
+import '../../core/widgets/deck_fields.dart';
+import '../../core/widgets/deck_page.dart';
+import '../../core/widgets/deck_widgets.dart';
 
+/// Appearance page, rebuilt from `design/deepssh-prototype.html#page-theme`.
+///
+/// Edits are buffered in this page and land in the app when 保存主题 is
+/// pressed; 恢复默认 swaps the draft back to the Command Deck baseline. The
+/// preset list itself (custom entries and hidden built-ins) persists through
+/// [ThemePresetStore] as soon as it changes, matching the prototype where
+/// localStorage updates immediately.
 class ThemeConfigPage extends StatefulWidget {
   const ThemeConfigPage({
     super.key,
@@ -13,6 +30,7 @@ class ThemeConfigPage extends StatefulWidget {
     required this.onUiSettingsChanged,
     required this.onTerminalSettingsChanged,
     required this.onBack,
+    this.presetStore,
   });
 
   final UiThemeSettings uiSettings;
@@ -20,6 +38,7 @@ class ThemeConfigPage extends StatefulWidget {
   final ValueChanged<UiThemeSettings> onUiSettingsChanged;
   final ValueChanged<TerminalThemeSettings> onTerminalSettingsChanged;
   final VoidCallback onBack;
+  final ThemePresetStore? presetStore;
 
   @override
   State<ThemeConfigPage> createState() => _ThemeConfigPageState();
@@ -28,6 +47,11 @@ class ThemeConfigPage extends StatefulWidget {
 class _ThemeConfigPageState extends State<ThemeConfigPage> {
   late UiThemeSettings uiSettings;
   late TerminalThemeSettings termSettings;
+  late final ThemePresetStore _presetStore;
+  late final ThemePresetLibrary _library;
+
+  String? _uiPresetId;
+  String? _terminalPresetId;
   final _regexRuleKeys = <Key>[];
 
   @override
@@ -35,7 +59,12 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
     super.initState();
     uiSettings = widget.uiSettings;
     termSettings = widget.terminalSettings;
+    _presetStore = widget.presetStore ?? FileThemePresetStore();
+    _library = ThemePresetLibrary.empty();
     _syncRegexRuleKeys(termSettings.regexHighlights.length);
+    _uiPresetId = _matchUiPreset(uiSettings);
+    _terminalPresetId = _matchTerminalPreset(termSettings);
+    unawaited(_loadPresetLibrary());
   }
 
   @override
@@ -59,55 +88,358 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
     }
   }
 
+  Future<void> _loadPresetLibrary() async {
+    final loaded = await _presetStore.load();
+    if (!mounted) return;
+    setState(() {
+      _library.uiCustom
+        ..clear()
+        ..addAll(loaded.uiCustom);
+      _library.terminalCustom
+        ..clear()
+        ..addAll(loaded.terminalCustom);
+      _library.hiddenUiIds
+        ..clear()
+        ..addAll(loaded.hiddenUiIds);
+      _library.hiddenTerminalIds
+        ..clear()
+        ..addAll(loaded.hiddenTerminalIds);
+      // A stored settings file can match a custom preset; only now is the
+      // library available to name it.
+      _uiPresetId ??= _matchUiPreset(uiSettings);
+      _terminalPresetId ??= _matchTerminalPreset(termSettings);
+    });
+  }
+
+  Future<void> _persistPresetLibrary() async {
+    try {
+      await _presetStore.save(_library);
+    } catch (_) {
+      // Presets are a convenience; a read-only config directory must not break
+      // theme editing.
+    }
+  }
+
+  String? _matchUiPreset(UiThemeSettings settings) {
+    for (final preset in builtInUiPresets()) {
+      if (preset.ui != null && _sameUi(preset.ui!, settings)) return preset.id;
+    }
+    for (final preset in _library.uiCustom) {
+      if (preset.ui != null && _sameUi(preset.ui!, settings)) return preset.id;
+    }
+    return null;
+  }
+
+  String? _matchTerminalPreset(TerminalThemeSettings settings) {
+    for (final preset in builtInTerminalPresets()) {
+      if (preset.terminal != null &&
+          _sameTerminal(preset.terminal!, settings)) {
+        return preset.id;
+      }
+    }
+    for (final preset in _library.terminalCustom) {
+      if (preset.terminal != null &&
+          _sameTerminal(preset.terminal!, settings)) {
+        return preset.id;
+      }
+    }
+    return null;
+  }
+
+  bool _sameUi(UiThemeSettings a, UiThemeSettings b) =>
+      a.fontFamily == b.fontFamily &&
+      a.fontSize == b.fontSize &&
+      a.normalFontWeight == b.normalFontWeight &&
+      a.boldFontWeight == b.boldFontWeight &&
+      a.background == b.background &&
+      a.panel == b.panel &&
+      a.sidebar == b.sidebar &&
+      a.accent == b.accent &&
+      a.textPrimary == b.textPrimary &&
+      a.textMuted == b.textMuted;
+
+  bool _sameTerminal(TerminalThemeSettings a, TerminalThemeSettings b) =>
+      a.fontFamily == b.fontFamily &&
+      a.fontSize == b.fontSize &&
+      a.normalFontWeight == b.normalFontWeight &&
+      a.boldFontWeight == b.boldFontWeight &&
+      a.cursorStyle == b.cursorStyle &&
+      a.cursorBlink == b.cursorBlink &&
+      a.foreground == b.foreground &&
+      a.terminalBackground == b.terminalBackground &&
+      a.selectionColor == b.selectionColor &&
+      a.cursorColor == b.cursorColor &&
+      a.scrollbackLines == b.scrollbackLines &&
+      _sameRules(a.regexHighlights, b.regexHighlights);
+
+  bool _sameRules(List<RegexHighlight> a, List<RegexHighlight> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].pattern != b[i].pattern ||
+          a[i].color != b[i].color ||
+          a[i].note != b[i].note) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _showMessage(String message) {
+    showDeckToast(context, message);
+  }
+
   void _updateUi(UiThemeSettings settings) {
     setState(() => uiSettings = settings);
-    widget.onUiSettingsChanged(settings);
   }
 
   void _updateTerm(TerminalThemeSettings settings) {
-    setState(() => termSettings = settings);
-    widget.onTerminalSettingsChanged(settings);
+    setState(() {
+      termSettings = settings;
+      _syncRegexRuleKeys(settings.regexHighlights.length);
+    });
   }
+
+  void _save() {
+    widget.onUiSettingsChanged(uiSettings);
+    widget.onTerminalSettingsChanged(termSettings);
+    _showMessage('已保存主题');
+  }
+
+  void _reset() {
+    setState(() {
+      uiSettings = UiThemeSettings.commandDeck();
+      termSettings = TerminalThemeSettings.commandDeck();
+      _uiPresetId = 'deck';
+      _terminalPresetId = 'deck';
+    });
+    _showMessage('已恢复默认主题');
+  }
+
+  void _applyUiPreset(String id) {
+    final preset = _library.uiPreset(id);
+    final settings = preset?.ui;
+    if (settings == null) return;
+    setState(() {
+      _uiPresetId = id;
+      uiSettings = settings;
+    });
+    _showMessage('界面主题已切换为 ${preset!.name}');
+  }
+
+  void _applyTerminalPreset(String id) {
+    final preset = _library.terminalPreset(id);
+    final settings = preset?.terminal;
+    if (settings == null) return;
+    setState(() {
+      _terminalPresetId = id;
+      termSettings = settings;
+      _syncRegexRuleKeys(settings.regexHighlights.length);
+    });
+    _showMessage(
+      '终端主题已切换为 ${preset!.name}，高亮规则共 ${settings.regexHighlights.length} 条',
+    );
+  }
+
+  void _createPreset({required bool terminal}) {
+    final now = DateTime.now().microsecondsSinceEpoch;
+    if (terminal) {
+      final preset = ThemePreset(
+        id: 'term-c$now',
+        name: '自定义方案 ${_library.terminalCustom.length + 1}',
+        swatch: termSettings.terminalBackground,
+        terminal: termSettings,
+        custom: true,
+      );
+      setState(() {
+        _library.terminalCustom.add(preset);
+        _terminalPresetId = preset.id;
+      });
+      _showMessage('已把当前设置存为「${preset.name}」');
+    } else {
+      final preset = ThemePreset(
+        id: 'ui-c$now',
+        name: '自定义方案 ${_library.uiCustom.length + 1}',
+        swatch: uiSettings.background,
+        ui: uiSettings,
+        custom: true,
+      );
+      setState(() {
+        _library.uiCustom.add(preset);
+        _uiPresetId = preset.id;
+      });
+      _showMessage('已把当前设置存为「${preset.name}」');
+    }
+    unawaited(_persistPresetLibrary());
+  }
+
+  void _deletePreset(String id, {required bool terminal}) {
+    if (terminal) {
+      final preset = _library.terminalPreset(id);
+      if (preset == null) return;
+      final customIndex = _library.terminalCustom.indexWhere((p) => p.id == id);
+      if (customIndex >= 0) {
+        _library.terminalCustom.removeAt(customIndex);
+      } else {
+        _library.hiddenTerminalIds.add(id);
+      }
+      setState(() {});
+      if (_terminalPresetId == id) {
+        final rest = _library.terminalPresets;
+        if (rest.isEmpty) {
+          _terminalPresetId = null;
+        } else {
+          _applyTerminalPreset(rest.first.id);
+        }
+      }
+      _showMessage(
+        '已删除方案「${preset.name}」${preset.custom ? '' : '，可从「恢复内置方案」取回'}',
+      );
+    } else {
+      final preset = _library.uiPreset(id);
+      if (preset == null) return;
+      final customIndex = _library.uiCustom.indexWhere((p) => p.id == id);
+      if (customIndex >= 0) {
+        _library.uiCustom.removeAt(customIndex);
+      } else {
+        _library.hiddenUiIds.add(id);
+      }
+      setState(() {});
+      if (_uiPresetId == id) {
+        final rest = _library.uiPresets;
+        if (rest.isEmpty) {
+          _uiPresetId = null;
+        } else {
+          _applyUiPreset(rest.first.id);
+        }
+      }
+      _showMessage(
+        '已删除方案「${preset.name}」${preset.custom ? '' : '，可从「恢复内置方案」取回'}',
+      );
+    }
+    unawaited(_persistPresetLibrary());
+  }
+
+  void _restoreBuiltIns({required bool terminal}) {
+    final hidden = terminal ? _library.hiddenTerminalIds : _library.hiddenUiIds;
+    if (hidden.isEmpty) return;
+    final count = hidden.length;
+    setState(hidden.clear);
+    _showMessage('已恢复 $count 个内置方案');
+    unawaited(_persistPresetLibrary());
+  }
+
+  String _copyName(String name) {
+    final base = name.replaceAll(RegExp(r'( 副本)+$'), '');
+    final count = RegExp(' 副本').allMatches(name).length;
+    return '$base${' 副本' * (count + 1)}';
+  }
+
+  void _copyPreset(String id, {required bool terminal}) {
+    if (terminal) {
+      final source = _library.terminalPreset(id);
+      final settings = source?.terminal;
+      if (source == null || settings == null) return;
+      final copy = ThemePreset(
+        id: 'term-c${DateTime.now().microsecondsSinceEpoch}',
+        name: _copyName(source.name),
+        swatch: source.swatch,
+        terminal: settings,
+        custom: true,
+      );
+      setState(() {
+        final index = _library.terminalCustom.indexWhere((p) => p.id == id);
+        if (index >= 0) {
+          _library.terminalCustom.insert(index + 1, copy);
+        } else {
+          _library.terminalCustom.insert(0, copy);
+        }
+        _terminalPresetId = copy.id;
+      });
+      _showMessage('已复制方案「${source.name}」');
+    } else {
+      final source = _library.uiPreset(id);
+      final settings = source?.ui;
+      if (source == null || settings == null) return;
+      final copy = ThemePreset(
+        id: 'ui-c${DateTime.now().microsecondsSinceEpoch}',
+        name: _copyName(source.name),
+        swatch: source.swatch,
+        ui: settings,
+        custom: true,
+      );
+      setState(() {
+        final index = _library.uiCustom.indexWhere((p) => p.id == id);
+        if (index >= 0) {
+          _library.uiCustom.insert(index + 1, copy);
+        } else {
+          _library.uiCustom.insert(0, copy);
+        }
+        _uiPresetId = copy.id;
+      });
+      _showMessage('已复制方案「${source.name}」');
+    }
+    unawaited(_persistPresetLibrary());
+  }
+
+  ThemePreset? get _currentUiPreset =>
+      _uiPresetId == null ? null : _library.uiPreset(_uiPresetId!);
+
+  ThemePreset? get _currentTerminalPreset => _terminalPresetId == null
+      ? null
+      : _library.terminalPreset(_terminalPresetId!);
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: widget.onBack,
-                icon: const Icon(Icons.arrow_back, size: 18),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                style: IconButton.styleFrom(
-                  foregroundColor: AppColors.textMuted,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                '主题配置',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _SectionCard(title: '界面主题', child: _buildUiSection()),
-                  const SizedBox(height: 20),
-                  _SectionCard(title: '终端主题', child: _buildTerminalSection()),
-                ],
-              ),
-            ),
-          ),
-        ],
+    return DeckPageScaffold(
+      eyebrow: 'Appearance',
+      title: '主题配置',
+      subtitle: '分别设置界面外观与终端渲染，并配置基于正则的输出高亮规则。',
+      actions: [
+        DeckButton(
+          key: const ValueKey('theme-reset'),
+          label: '恢复默认',
+          style: DeckButtonStyle.outline,
+          onPressed: _reset,
+        ),
+        DeckButton(
+          key: const ValueKey('theme-save'),
+          label: '保存主题',
+          style: DeckButtonStyle.accent,
+          onPressed: _save,
+        ),
+      ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final uiPanel = _ThemePanel(
+            title: '界面主题',
+            icon: Icons.palette_outlined,
+            child: _buildUiSection(),
+          );
+          final terminalPanel = _ThemePanel(
+            title: '终端主题',
+            icon: Icons.terminal,
+            child: _buildTerminalSection(),
+          );
+          return SingleChildScrollView(
+            child: constraints.maxWidth < 980
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      uiPanel,
+                      const SizedBox(height: 16),
+                      terminalPanel,
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: uiPanel),
+                      const SizedBox(width: 16),
+                      Expanded(child: terminalPanel),
+                    ],
+                  ),
+          );
+        },
       ),
     );
   }
@@ -116,64 +448,86 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _PresetSelector(
-          options: const ['Command Deck', 'VS Code Dark'],
-          selected: uiSettings.presetName,
-          onSelect: (name) {
-            final preset = name == 'VS Code Dark'
-                ? UiThemeSettings.vsCodeDark()
-                : UiThemeSettings.commandDeck();
-            _updateUi(preset);
-          },
+        _PresetDropdown(
+          kind: _PresetKind.ui,
+          entries: _library.uiPresets,
+          selectedId: _uiPresetId,
+          currentName:
+              _currentUiPreset?.name ??
+              (uiSettings.presetName.isEmpty ? '自定义方案' : uiSettings.presetName),
+          custom: _currentUiPreset?.custom ?? _currentUiPreset == null,
+          onPick: _applyUiPreset,
+          onCreate: () => _createPreset(terminal: false),
+          onDelete: (id) => _deletePreset(id, terminal: false),
+          onCopy: (id) => _copyPreset(id, terminal: false),
+          onRestore: () => _restoreBuiltIns(terminal: false),
+          hiddenCount: _library.hiddenUiIds.length,
         ),
         const SizedBox(height: 16),
-        _FontRow(
-          family: uiSettings.fontFamily,
-          size: uiSettings.fontSize,
-          normalWeight: uiSettings.normalFontWeight,
-          boldWeight: uiSettings.boldFontWeight,
-          weightHint: '界面文字默认/强调状态使用不同 weight',
-          onFamilyChanged: (v) => _updateUi(uiSettings.copyWith(fontFamily: v)),
-          onSizeChanged: (v) => _updateUi(uiSettings.copyWith(fontSize: v)),
-          onNormalWeightChanged: (v) =>
-              _updateUi(uiSettings.copyWith(normalFontWeight: v)),
-          onBoldWeightChanged: (v) =>
-              _updateUi(uiSettings.copyWith(boldFontWeight: v)),
+        const _SectionLabel('字体'),
+        const SizedBox(height: 9),
+        DeckFieldRow(
+          children: [
+            _FontStackField(
+              key: const ValueKey('ui-font-input'),
+              label: '界面字体',
+              value: uiSettings.fontFamily,
+              fallback: 'sans-serif',
+              hint: '逗号分隔，逐级回退；末尾自动补 sans-serif',
+              onChanged: (stack) =>
+                  _updateUi(uiSettings.copyWith(fontFamily: stack)),
+            ),
+            _ClampedSizeField(
+              key: const ValueKey('ui-size-select'),
+              label: '基准字号',
+              value: uiSettings.fontSize,
+              min: 12,
+              max: 18,
+              hint: '12–18 整数，超界自动钳制',
+              onChanged: (size) =>
+                  _updateUi(uiSettings.copyWith(fontSize: size)),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         const _SectionLabel('配色'),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
+        const SizedBox(height: 9),
+        _SwatchGrid(
+          columns: 3,
           children: [
-            _ColorField(
+            _SwatchCard(
+              key: const ValueKey('swatch-ui-background'),
               label: '背景',
               value: uiSettings.background,
               onChanged: (c) => _updateUi(uiSettings.copyWith(background: c)),
             ),
-            _ColorField(
+            _SwatchCard(
+              key: const ValueKey('swatch-ui-panel'),
               label: '面板',
               value: uiSettings.panel,
               onChanged: (c) => _updateUi(uiSettings.copyWith(panel: c)),
             ),
-            _ColorField(
+            _SwatchCard(
+              key: const ValueKey('swatch-ui-sidebar'),
               label: '侧栏',
               value: uiSettings.sidebar,
               onChanged: (c) => _updateUi(uiSettings.copyWith(sidebar: c)),
             ),
-            _ColorField(
+            _SwatchCard(
+              key: const ValueKey('swatch-ui-accent'),
               label: '强调',
               value: uiSettings.accent,
               onChanged: (c) => _updateUi(uiSettings.copyWith(accent: c)),
             ),
-            _ColorField(
-              label: '文字',
+            _SwatchCard(
+              key: const ValueKey('swatch-ui-text-primary'),
+              label: '主文本',
               value: uiSettings.textPrimary,
               onChanged: (c) => _updateUi(uiSettings.copyWith(textPrimary: c)),
             ),
-            _ColorField(
-              label: '次要文字',
+            _SwatchCard(
+              key: const ValueKey('swatch-ui-text-muted'),
+              label: '次要文本',
               value: uiSettings.textMuted,
               onChanged: (c) => _updateUi(uiSettings.copyWith(textMuted: c)),
             ),
@@ -187,79 +541,115 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _PresetSelector(
-          options: const ['Command Deck', 'One Dark', 'Solarized'],
-          selected: termSettings.presetName,
-          onSelect: (name) {
-            final preset = switch (name) {
-              'One Dark' => TerminalThemeSettings.oneDark(),
-              'Solarized' => TerminalThemeSettings.solarized(),
-              _ => TerminalThemeSettings.commandDeck(),
-            };
-            _updateTerm(preset);
-          },
+        _PresetDropdown(
+          kind: _PresetKind.terminal,
+          entries: _library.terminalPresets,
+          selectedId: _terminalPresetId,
+          currentName:
+              _currentTerminalPreset?.name ??
+              (termSettings.presetName.isEmpty
+                  ? '自定义方案'
+                  : termSettings.presetName),
+          custom:
+              _currentTerminalPreset?.custom ?? _currentTerminalPreset == null,
+          onPick: _applyTerminalPreset,
+          onCreate: () => _createPreset(terminal: true),
+          onDelete: (id) => _deletePreset(id, terminal: true),
+          onCopy: (id) => _copyPreset(id, terminal: true),
+          onRestore: () => _restoreBuiltIns(terminal: true),
+          hiddenCount: _library.hiddenTerminalIds.length,
         ),
         const SizedBox(height: 16),
+        const _SectionLabel('字体'),
+        const SizedBox(height: 9),
+        DeckFieldRow(
+          children: [
+            _FontStackField(
+              key: const ValueKey('term-font-input'),
+              label: '字体族',
+              value: termSettings.fontFamily,
+              fallback: 'monospace',
+              hint: '逗号分隔，逐级回退；末尾自动补 monospace',
+              onChanged: (stack) =>
+                  _updateTerm(termSettings.copyWith(fontFamily: stack)),
+            ),
+            _ClampedSizeField(
+              key: const ValueKey('term-size-input'),
+              label: '字号（px）',
+              value: termSettings.fontSize,
+              min: 8,
+              max: 32,
+              hint: '8–32 整数，超界自动钳制',
+              onChanged: (size) =>
+                  _updateTerm(termSettings.copyWith(fontSize: size)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const _SectionLabel('实时预览'),
+        const SizedBox(height: 9),
+        _MiniTerminalPreview(settings: termSettings),
+        const SizedBox(height: 16),
+        const _SectionLabel('光标'),
+        const SizedBox(height: 9),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
-              child: _FontRow(
-                family: termSettings.fontFamily,
-                size: termSettings.fontSize,
-                normalWeight: termSettings.normalFontWeight,
-                boldWeight: termSettings.boldFontWeight,
-                weightHint: '普通文本与 ANSI bold 分开控制',
-                onFamilyChanged: (v) =>
-                    _updateTerm(termSettings.copyWith(fontFamily: v)),
-                onSizeChanged: (v) =>
-                    _updateTerm(termSettings.copyWith(fontSize: v)),
-                onNormalWeightChanged: (v) =>
-                    _updateTerm(termSettings.copyWith(normalFontWeight: v)),
-                onBoldWeightChanged: (v) =>
-                    _updateTerm(termSettings.copyWith(boldFontWeight: v)),
+              child: DeckSelect<CursorStyle>(
+                key: const ValueKey('cursor-style-select'),
+                label: '样式',
+                value: termSettings.cursorStyle,
+                items: CursorStyle.values,
+                itemBuilder: (context, style) => Text(_cursorStyleLabel(style)),
+                onChanged: (style) {
+                  if (style == null) return;
+                  _updateTerm(termSettings.copyWith(cursorStyle: style));
+                },
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _CursorRow(
-                style: termSettings.cursorStyle,
-                blink: termSettings.cursorBlink,
-                onStyleChanged: (v) =>
-                    _updateTerm(termSettings.copyWith(cursorStyle: v)),
-                onBlinkChanged: (v) =>
-                    _updateTerm(termSettings.copyWith(cursorBlink: v)),
+            const SizedBox(width: 12),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: _DeckCheckbox(
+                label: '光标闪烁',
+                value: termSettings.cursorBlink,
+                onChanged: (value) =>
+                    _updateTerm(termSettings.copyWith(cursorBlink: value)),
               ),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        const _SectionLabel('配色'),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
+        const _SectionLabel('终端配色'),
+        const SizedBox(height: 9),
+        _SwatchGrid(
+          columns: 2,
           children: [
-            _ColorField(
-              label: '前景色',
+            _SwatchCard(
+              key: const ValueKey('swatch-term-foreground'),
+              label: '前景',
               value: termSettings.foreground,
               onChanged: (c) =>
                   _updateTerm(termSettings.copyWith(foreground: c)),
             ),
-            _ColorField(
-              label: '背景色',
+            _SwatchCard(
+              key: const ValueKey('swatch-term-background'),
+              label: '背景',
               value: termSettings.terminalBackground,
               onChanged: (c) =>
                   _updateTerm(termSettings.copyWith(terminalBackground: c)),
             ),
-            _ColorField(
-              label: '高亮色',
+            _SwatchCard(
+              key: const ValueKey('swatch-term-selection'),
+              label: '高亮',
               value: termSettings.selectionColor,
               onChanged: (c) =>
                   _updateTerm(termSettings.copyWith(selectionColor: c)),
             ),
-            _ColorField(
-              label: '光标色',
+            _SwatchCard(
+              key: const ValueKey('swatch-term-cursor'),
+              label: '光标',
               value: termSettings.cursorColor,
               onChanged: (c) =>
                   _updateTerm(termSettings.copyWith(cursorColor: c)),
@@ -269,74 +659,89 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
         const SizedBox(height: 16),
         const _SectionLabel('正则高亮'),
         const SizedBox(height: 8),
-        SizedBox(
-          height: termSettings.regexHighlights.length * 40,
-          child: ReorderableListView.builder(
-            buildDefaultDragHandles: false,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: termSettings.regexHighlights.length,
-            onReorder: (oldIndex, newIndex) {
-              final highlights = List<RegexHighlight>.from(
-                termSettings.regexHighlights,
-              );
-              if (oldIndex < newIndex) newIndex -= 1;
-              final item = highlights.removeAt(oldIndex);
-              final key = _regexRuleKeys.removeAt(oldIndex);
-              highlights.insert(newIndex, item);
-              _regexRuleKeys.insert(newIndex, key);
-              _updateTerm(termSettings.copyWith(regexHighlights: highlights));
-            },
-            itemBuilder: (context, index) {
-              final highlight = termSettings.regexHighlights[index];
-              return _RegexRuleRow(
-                key: _regexRuleKeys[index],
-                index: index,
-                pattern: highlight.pattern,
-                note: highlight.note,
-                color: highlight.color,
-                onPatternChanged: (v) {
-                  final highlights = List<RegexHighlight>.from(
-                    termSettings.regexHighlights,
-                  );
-                  highlights[index] = highlight.copyWith(pattern: v);
-                  _updateTerm(
-                    termSettings.copyWith(regexHighlights: highlights),
-                  );
-                },
-                onNoteChanged: (v) {
-                  final highlights = List<RegexHighlight>.from(
-                    termSettings.regexHighlights,
-                  );
-                  highlights[index] = highlight.copyWith(note: v);
-                  _updateTerm(
-                    termSettings.copyWith(regexHighlights: highlights),
-                  );
-                },
-                onColorChanged: (c) {
-                  final highlights = List<RegexHighlight>.from(
-                    termSettings.regexHighlights,
-                  );
-                  highlights[index] = highlight.copyWith(color: c);
-                  _updateTerm(
-                    termSettings.copyWith(regexHighlights: highlights),
-                  );
-                },
-                onRemove: () {
-                  final highlights = List<RegexHighlight>.from(
-                    termSettings.regexHighlights,
-                  )..removeAt(index);
-                  _regexRuleKeys.removeAt(index);
-                  _updateTerm(
-                    termSettings.copyWith(regexHighlights: highlights),
-                  );
-                },
-              );
-            },
+        if (termSettings.regexHighlights.isEmpty)
+          const _RegexEmptyState()
+        else
+          SizedBox(
+            // 40px per row, plus the inline error line on whichever rules are
+            // currently broken.
+            height:
+                termSettings.regexHighlights.length * 40 +
+                (termSettings.regexHighlights
+                        .where(
+                          (rule) =>
+                              RegexHighlight.patternError(rule.pattern) != null,
+                        )
+                        .length *
+                    18),
+            child: ReorderableListView.builder(
+              buildDefaultDragHandles: false,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: termSettings.regexHighlights.length,
+              onReorder: (oldIndex, newIndex) {
+                final highlights = List<RegexHighlight>.from(
+                  termSettings.regexHighlights,
+                );
+                if (oldIndex < newIndex) newIndex -= 1;
+                final item = highlights.removeAt(oldIndex);
+                final key = _regexRuleKeys.removeAt(oldIndex);
+                highlights.insert(newIndex, item);
+                _regexRuleKeys.insert(newIndex, key);
+                _updateTerm(termSettings.copyWith(regexHighlights: highlights));
+              },
+              itemBuilder: (context, index) {
+                final highlight = termSettings.regexHighlights[index];
+                return _RegexRuleRow(
+                  key: _regexRuleKeys[index],
+                  index: index,
+                  pattern: highlight.pattern,
+                  note: highlight.note,
+                  color: highlight.color,
+                  patternError: RegexHighlight.patternError(highlight.pattern),
+                  onPatternChanged: (v) {
+                    final highlights = List<RegexHighlight>.from(
+                      termSettings.regexHighlights,
+                    );
+                    highlights[index] = highlight.copyWith(pattern: v);
+                    _updateTerm(
+                      termSettings.copyWith(regexHighlights: highlights),
+                    );
+                  },
+                  onNoteChanged: (v) {
+                    final highlights = List<RegexHighlight>.from(
+                      termSettings.regexHighlights,
+                    );
+                    highlights[index] = highlight.copyWith(note: v);
+                    _updateTerm(
+                      termSettings.copyWith(regexHighlights: highlights),
+                    );
+                  },
+                  onColorChanged: (c) {
+                    final highlights = List<RegexHighlight>.from(
+                      termSettings.regexHighlights,
+                    );
+                    highlights[index] = highlight.copyWith(color: c);
+                    _updateTerm(
+                      termSettings.copyWith(regexHighlights: highlights),
+                    );
+                  },
+                  onRemove: () {
+                    final highlights = List<RegexHighlight>.from(
+                      termSettings.regexHighlights,
+                    )..removeAt(index);
+                    _regexRuleKeys.removeAt(index);
+                    _updateTerm(
+                      termSettings.copyWith(regexHighlights: highlights),
+                    );
+                  },
+                );
+              },
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         TextButton.icon(
+          key: const ValueKey('regex-add'),
           onPressed: () {
             _regexRuleKeys.add(UniqueKey());
             _updateTerm(
@@ -354,56 +759,118 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
           },
           icon: const Icon(Icons.add, size: 16),
           label: const Text('添加规则'),
-          style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.textMuted,
+            shape: const RoundedRectangleBorder(),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          ),
         ),
-        const SizedBox(height: 16),
-        const _SectionLabel('其他'),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            SizedBox(
-              width: 160,
-              child: _NumberInput(
-                label: 'Scrollback lines',
-                value: termSettings.scrollbackLines,
-                onChanged: (v) =>
-                    _updateTerm(termSettings.copyWith(scrollbackLines: v)),
-              ),
-            ),
-          ],
+        const SizedBox(height: 12),
+        SizedBox(
+          width: 220,
+          child: _ScrollbackField(
+            value: termSettings.scrollbackLines,
+            onChanged: (lines) =>
+                _updateTerm(termSettings.copyWith(scrollbackLines: lines)),
+          ),
         ),
       ],
     );
   }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
 }
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.child});
+class _ScrollbackField extends StatefulWidget {
+  const _ScrollbackField({required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  State<_ScrollbackField> createState() => _ScrollbackFieldState();
+}
+
+class _ScrollbackFieldState extends State<_ScrollbackField> {
+  late final TextEditingController _controller = deckEditingController(
+    '${widget.value}',
+  );
+
+  @override
+  void didUpdateWidget(covariant _ScrollbackField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = '${widget.value}';
+    if (_controller.text != next) deckSetText(_controller, next);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DeckTextField(
+      key: const ValueKey('scrollback-input'),
+      label: '回滚缓冲行数',
+      controller: _controller,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      onChanged: (value) {
+        final lines = int.tryParse(value);
+        if (lines != null) widget.onChanged(lines);
+      },
+    );
+  }
+}
+
+String _cursorStyleLabel(CursorStyle style) => switch (style) {
+  CursorStyle.block => '方块',
+  CursorStyle.underline => '下划线',
+  CursorStyle.bar => '竖线',
+};
+
+enum _PresetKind { ui, terminal }
+
+class _ThemePanel extends StatelessWidget {
+  const _ThemePanel({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
 
   final String title;
+  final IconData icon;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E0F0F),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.border),
-      ),
+    return DeckPanel(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Color(0xFFD6C7B8),
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            children: [
+              Icon(icon, size: 16, color: AppColors.accentInk),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontFamily: 'Georgia',
+                  fontFamilyFallback: DeckTokens.fontDisplay,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 15),
           child,
         ],
       ),
@@ -418,522 +885,226 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: Color(0xFFD6C7B8),
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
+      child: DeckLabel(text, size: 10),
     );
   }
 }
 
-class _PresetSelector extends StatelessWidget {
-  const _PresetSelector({
-    required this.options,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final List<String> options;
-  final String selected;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionLabel('预设方案'),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: options.map((option) {
-            return _PresetOption(
-              label: option,
-              selected: option == selected,
-              onTap: () => onSelect(option),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-}
-
-class _PresetOption extends StatefulWidget {
-  const _PresetOption({
+class _FontStackField extends StatefulWidget {
+  const _FontStackField({
+    super.key,
     required this.label,
-    required this.selected,
-    required this.onTap,
+    required this.value,
+    required this.fallback,
+    required this.hint,
+    required this.onChanged,
   });
 
   final String label;
-  final bool selected;
-  final VoidCallback onTap;
+
+  /// The stored, normalised stack (no auto-appended generic).
+  final String value;
+
+  /// Generic family appended when applying, e.g. `sans-serif`.
+  final String fallback;
+  final String hint;
+  final ValueChanged<String> onChanged;
 
   @override
-  State<_PresetOption> createState() => _PresetOptionState();
+  State<_FontStackField> createState() => _FontStackFieldState();
 }
 
-class _PresetOptionState extends State<_PresetOption> {
-  bool hovered = false;
+class _FontStackFieldState extends State<_FontStackField> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
 
   @override
-  Widget build(BuildContext context) {
-    final selected = widget.selected;
-    final highlight = selected || hovered;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => hovered = true),
-      onExit: (_) => setState(() => hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: selected
-                ? const Color(0xFF1A1B1C)
-                : (hovered ? const Color(0xFF181A1B) : const Color(0xFF121314)),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: selected
-                  ? const Color(0xFFFFB280)
-                  : (hovered
-                        ? const Color(0xFF3A3A3A)
-                        : const Color(0xFF262626)),
-            ),
-          ),
-          child: Text(
-            widget.label,
-            style: TextStyle(
-              color: highlight
-                  ? const Color(0xFFFFF2D9)
-                  : const Color(0xFFB8ADA6),
-              fontSize: 13,
-              fontWeight: highlight ? FontWeight.w600 : FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
+  void initState() {
+    super.initState();
+    _controller = deckEditingController(widget.value);
+    _focusNode = FocusNode()..addListener(_handleFocusChange);
   }
-}
 
-class _FontRow extends StatelessWidget {
-  const _FontRow({
-    required this.family,
-    required this.size,
-    required this.normalWeight,
-    required this.boldWeight,
-    required this.weightHint,
-    required this.onFamilyChanged,
-    required this.onSizeChanged,
-    required this.onNormalWeightChanged,
-    required this.onBoldWeightChanged,
-  });
-
-  final String family;
-  final int size;
-  final int normalWeight;
-  final int boldWeight;
-  final String weightHint;
-  final ValueChanged<String> onFamilyChanged;
-  final ValueChanged<int> onSizeChanged;
-  final ValueChanged<int> onNormalWeightChanged;
-  final ValueChanged<int> onBoldWeightChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionLabel('字体'),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _TextInput(value: family, onChanged: onFamilyChanged),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 80,
-              child: _NumberInput(
-                label: '',
-                value: size,
-                onChanged: onSizeChanged,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.end,
-          children: [
-            SizedBox(
-              width: 104,
-              child: _NumberInput(
-                label: '常规字重',
-                value: normalWeight,
-                onChanged: onNormalWeightChanged,
-              ),
-            ),
-            SizedBox(
-              width: 104,
-              child: _NumberInput(
-                label: '粗体字重',
-                value: boldWeight,
-                onChanged: onBoldWeightChanged,
-              ),
-            ),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 240),
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 7),
-                child: Text(
-                  weightHint,
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
+  void _handleFocusChange() {
+    if (!_focusNode.hasFocus) _commit();
   }
-}
-
-class _CursorRow extends StatelessWidget {
-  const _CursorRow({
-    required this.style,
-    required this.blink,
-    required this.onStyleChanged,
-    required this.onBlinkChanged,
-  });
-
-  final CursorStyle style;
-  final bool blink;
-  final ValueChanged<CursorStyle> onStyleChanged;
-  final ValueChanged<bool> onBlinkChanged;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionLabel('光标'),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _CursorStyleSelector(
-                value: style,
-                onChanged: onStyleChanged,
-              ),
-            ),
-            const SizedBox(width: 8),
-            _BlinkCheckbox(value: blink, onChanged: onBlinkChanged),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-String _cursorStyleLabel(CursorStyle s) {
-  return switch (s) {
-    CursorStyle.block => '█ block',
-    CursorStyle.underline => '_ underline',
-    CursorStyle.bar => '▏ bar',
-  };
-}
-
-class _CursorStyleSelector extends StatefulWidget {
-  const _CursorStyleSelector({required this.value, required this.onChanged});
-
-  final CursorStyle value;
-  final ValueChanged<CursorStyle> onChanged;
-
-  @override
-  State<_CursorStyleSelector> createState() => _CursorStyleSelectorState();
-}
-
-class _CursorStyleSelectorState extends State<_CursorStyleSelector> {
-  static const Color _amberAccent = Color(0xFFFFB280);
-  static const Color _triggerHoverBg = Color(0xFF232528);
-  static const Duration _hoverDuration = Duration(milliseconds: 120);
-
-  final LayerLink _layerLink = LayerLink();
-  OverlayEntry? _overlayEntry;
-  bool _triggerHovered = false;
-  double _triggerWidth = 0;
-
-  bool get _isOpen => _overlayEntry != null;
-
-  void _toggleOverlay() {
-    if (_isOpen) {
-      _hideOverlay();
-    } else {
-      _showOverlay();
+  void didUpdateWidget(covariant _FontStackField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_focusNode.hasFocus &&
+        oldWidget.value != widget.value &&
+        _controller.text != widget.value) {
+      deckSetText(_controller, widget.value);
     }
-  }
-
-  void _showOverlay() {
-    final renderBox = context.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
-    _triggerWidth = renderBox.size.width;
-    final entry = OverlayEntry(builder: _buildOverlay);
-    _overlayEntry = entry;
-    Overlay.of(context).insert(entry);
-    setState(() {});
-  }
-
-  void _hideOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
+    _controller.dispose();
+    _focusNode
+      ..removeListener(_handleFocusChange)
+      ..dispose();
     super.dispose();
   }
 
-  Widget _buildOverlay(BuildContext _) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: _hideOverlay,
-          ),
-        ),
-        CompositedTransformFollower(
-          link: _layerLink,
-          showWhenUnlinked: false,
-          targetAnchor: Alignment.bottomLeft,
-          followerAnchor: Alignment.topLeft,
-          offset: const Offset(0, 4),
-          child: SizedBox(
-            width: _triggerWidth,
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.panel,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x66000000),
-                      blurRadius: 12,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final s in CursorStyle.values)
-                      _CursorStyleItem(
-                        label: _cursorStyleLabel(s),
-                        selected: s == widget.value,
-                        onTap: () {
-                          widget.onChanged(s);
-                          _hideOverlay();
-                        },
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+  /// Commit rewrites the field to the normalised stack the way the size field
+  /// normalises its value, so what the box shows is what gets parsed. An
+  /// emptied field falls back to the stored value rather than leaving an empty
+  /// stack behind.
+  void _commit() {
+    final list = DeckTokens.parseFontStack(_controller.text);
+    final normalised = list.isEmpty ? widget.value : list.join(', ');
+    deckSetText(_controller, normalised);
+    widget.onChanged(normalised);
   }
 
   @override
   Widget build(BuildContext context) {
-    final highlight = _isOpen || _triggerHovered;
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _triggerHovered = true),
-        onExit: (_) => setState(() => _triggerHovered = false),
-        child: GestureDetector(
-          onTap: _toggleOverlay,
-          behavior: HitTestBehavior.opaque,
-          child: AnimatedContainer(
-            duration: _hoverDuration,
-            height: 32,
-            decoration: BoxDecoration(
-              color: highlight ? _triggerHoverBg : AppColors.background,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: highlight ? _amberAccent : AppColors.border,
-              ),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _cursorStyleLabel(widget.value),
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 13,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                AnimatedRotation(
-                  turns: _isOpen ? 0.5 : 0,
-                  duration: _hoverDuration,
-                  child: Icon(
-                    Icons.keyboard_arrow_down,
-                    size: 16,
-                    color: highlight ? _amberAccent : AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+    return DeckField(
+      label: widget.label,
+      hint: widget.hint,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        // A font stack is never spell-checked or autocorrected — the yellow
+        // squiggle under every family name is noise.
+        autocorrect: false,
+        enableSuggestions: false,
+        style: DeckFieldStyle.text,
+        decoration: DeckFieldStyle.decoration(),
+        onChanged: (raw) {
+          final list = DeckTokens.parseFontStack(raw);
+          if (list.isNotEmpty) widget.onChanged(list.join(', '));
+        },
+        onEditingComplete: _commit,
+        onSubmitted: (_) => _commit(),
       ),
     );
   }
 }
 
-class _CursorStyleItem extends StatefulWidget {
-  const _CursorStyleItem({
+class _ClampedSizeField extends StatefulWidget {
+  const _ClampedSizeField({
+    super.key,
     required this.label,
-    required this.selected,
-    required this.onTap,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.hint,
+    required this.onChanged,
   });
 
   final String label;
-  final bool selected;
-  final VoidCallback onTap;
+  final int value;
+  final int min;
+  final int max;
+  final String hint;
+  final ValueChanged<int> onChanged;
 
   @override
-  State<_CursorStyleItem> createState() => _CursorStyleItemState();
+  State<_ClampedSizeField> createState() => _ClampedSizeFieldState();
 }
 
-class _CursorStyleItemState extends State<_CursorStyleItem> {
-  static const Color _amberAccent = Color(0xFFFFB280);
-  bool _hovered = false;
+class _ClampedSizeFieldState extends State<_ClampedSizeField> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = deckEditingController('${widget.value}');
+    _focusNode = FocusNode()..addListener(_handleFocusChange);
+  }
+
+  void _handleFocusChange() {
+    if (!_focusNode.hasFocus) _commit();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ClampedSizeField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_focusNode.hasFocus &&
+        oldWidget.value != widget.value &&
+        _controller.text != '${widget.value}') {
+      deckSetText(_controller, '${widget.value}');
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode
+      ..removeListener(_handleFocusChange)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _commit() {
+    final parsed = int.tryParse(_controller.text);
+    final value = (parsed ?? widget.value).clamp(widget.min, widget.max);
+    deckSetText(_controller, '$value');
+    widget.onChanged(value);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final highlight = _hovered;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          height: 32,
-          color: highlight ? AppColors.tabHover : Colors.transparent,
-          child: Row(
-            children: [
-              Container(
-                width: 3,
-                height: double.infinity,
-                color: highlight ? _amberAccent : Colors.transparent,
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  widget.label,
-                  style: TextStyle(
-                    color: highlight || widget.selected
-                        ? AppColors.textPrimary
-                        : AppColors.textMuted,
-                    fontSize: 13,
-                    fontWeight: highlight ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+    return DeckField(
+      label: widget.label,
+      hint: widget.hint,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        style: DeckFieldStyle.text,
+        decoration: DeckFieldStyle.decoration(),
+        onChanged: (raw) {
+          final parsed = int.tryParse(raw);
+          if (parsed != null) {
+            widget.onChanged(parsed.clamp(widget.min, widget.max));
+          }
+        },
+        onEditingComplete: _commit,
+        onSubmitted: (_) => _commit(),
       ),
     );
   }
 }
 
-class _BlinkCheckbox extends StatefulWidget {
-  const _BlinkCheckbox({required this.value, required this.onChanged});
+class _SwatchGrid extends StatelessWidget {
+  const _SwatchGrid({required this.columns, required this.children});
 
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  State<_BlinkCheckbox> createState() => _BlinkCheckboxState();
-}
-
-class _BlinkCheckboxState extends State<_BlinkCheckbox> {
-  bool hovered = false;
+  final int columns;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => hovered = true),
-      onExit: (_) => setState(() => hovered = false),
-      child: GestureDetector(
-        onTap: () => widget.onChanged(!widget.value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: hovered ? AppColors.accent : AppColors.border,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                widget.value ? Icons.check_box : Icons.check_box_outline_blank,
-                size: 16,
-                color: widget.value ? AppColors.accent : AppColors.textMuted,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '光标闪烁',
-                style: TextStyle(
-                  color: widget.value
-                      ? AppColors.textPrimary
-                      : AppColors.textMuted,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 10.0;
+        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final child in children) SizedBox(width: width, child: child),
+          ],
+        );
+      },
     );
   }
 }
 
-class _ColorField extends StatelessWidget {
-  const _ColorField({
+class _SwatchCard extends StatelessWidget {
+  const _SwatchCard({
+    super.key,
     required this.label,
     required this.value,
     required this.onChanged,
@@ -945,19 +1116,215 @@ class _ColorField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(color: Color(0xFFB8ADA6), fontSize: 11),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => showColorPickerDialog(
+          context,
+          initialColor: value,
+          onChanged: onChanged,
         ),
-        const SizedBox(height: 4),
-        SizedBox(
-          width: 120,
-          child: ColorPickerField(value: value, onChanged: onChanged),
+        child: Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 24,
+                decoration: BoxDecoration(
+                  color: value,
+                  border: Border.all(color: AppColors.textPrimary),
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'JetBrains Mono',
+                  fontFamilyFallback: DeckTokens.fontMono,
+                  fontSize: 10,
+                  letterSpacing: 0.5,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              Text(
+                css.colorToHex(value),
+                style: TextStyle(
+                  fontFamily: 'JetBrains Mono',
+                  fontFamilyFallback: DeckTokens.fontMono,
+                  fontSize: 11,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _MiniTerminalPreview extends StatelessWidget {
+  const _MiniTerminalPreview({required this.settings});
+
+  final TerminalThemeSettings settings;
+
+  @override
+  Widget build(BuildContext context) {
+    final (mono, fallback) = DeckTokens.resolveFontStack(
+      settings.fontFamily,
+      DeckTokens.fontMono,
+      'monospace',
+    );
+    // The preview exists to show the effect of the terminal font controls,
+    // so it has to follow both the family stack and the font size. A fixed
+    // size here made the size field look like it did nothing.
+    final fontSize = settings.fontSize.toDouble();
+    TextStyle style(Color color) => TextStyle(
+      fontFamily: mono,
+      fontFamilyFallback: fallback,
+      fontSize: fontSize,
+      height: 1.55,
+      color: color,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: settings.terminalBackground,
+        border: Border.all(color: AppColors.textPrimary),
+      ),
+      child: RichText(
+        key: const ValueKey('term-preview'),
+        text: TextSpan(
+          style: style(settings.foreground),
+          children: [
+            TextSpan(text: r'$ ', style: style(settings.foreground)),
+            TextSpan(
+              text: 'deploy@prod-web-01',
+              style: style(DeckTokens.termGreen),
+            ),
+            TextSpan(text: ':', style: style(settings.foreground)),
+            TextSpan(text: '~', style: style(DeckTokens.termBlue)),
+            TextSpan(
+              text: r'$ tail -f app.log',
+              style: style(settings.foreground),
+            ),
+            TextSpan(text: '\n', style: style(settings.foreground)),
+            TextSpan(text: 'INFO', style: style(DeckTokens.termCyan)),
+            TextSpan(
+              text: '  server listening on :8080',
+              style: style(settings.foreground),
+            ),
+            TextSpan(text: '\n', style: style(settings.foreground)),
+            TextSpan(text: 'WARN', style: style(DeckTokens.termAmber)),
+            TextSpan(
+              text: '  cache miss for key ',
+              style: style(settings.foreground),
+            ),
+            TextSpan(text: 'user:184213', style: style(DeckTokens.termBlue)),
+            TextSpan(text: '\n', style: style(settings.foreground)),
+            TextSpan(text: 'ERROR', style: style(DeckTokens.termRed)),
+            TextSpan(
+              text: ' upstream timeout after 3.0s',
+              style: style(settings.foreground),
+            ),
+            TextSpan(text: '  ', style: style(settings.foreground)),
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Container(
+                width: fontSize * 0.61,
+                height: fontSize * 1.13,
+                color: settings.cursorColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DeckCheckbox extends StatelessWidget {
+  const _DeckCheckbox({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => onChanged(!value),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: value ? AppColors.accent : Colors.transparent,
+                border: Border.all(
+                  color: value ? AppColors.accent : AppColors.textPrimary,
+                ),
+              ),
+              child: value
+                  ? Icon(Icons.check, size: 11, color: AppColors.panel)
+                  : null,
+            ),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RegexEmptyState extends StatelessWidget {
+  const _RegexEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '当前预设没有高亮规则',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '添加规则后按从上到下的顺序逐条匹配，先命中者着色。',
+            style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -973,12 +1340,17 @@ class _RegexRuleRow extends StatelessWidget {
     required this.onNoteChanged,
     required this.onColorChanged,
     required this.onRemove,
+    required this.patternError,
   });
 
   final int index;
   final String pattern;
   final String note;
   final Color color;
+
+  /// Non-null when [pattern] is not a valid regular expression. The rule keeps
+  /// its slot in the list so the user can fix it instead of losing it.
+  final String? patternError;
   final ValueChanged<String> onPatternChanged;
   final ValueChanged<String> onNoteChanged;
   final ValueChanged<Color> onColorChanged;
@@ -988,212 +1360,695 @@ class _RegexRuleRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ReorderableDragStartListener(
-            index: index,
-            child: Tooltip(
-              message: '拖动调整优先级',
-              child: Icon(
-                Icons.drag_indicator,
-                size: 18,
-                color: AppColors.textMuted,
+          // Exact prototype `.rx`: 40px row, 18px grip, pattern ≤280,
+          // note ≤150, auto colour cell, 32px delete, 8px gaps.
+          SizedBox(
+            height: 32,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 32,
+                  child: Center(
+                    child: ReorderableDragStartListener(
+                      index: index,
+                      child: Tooltip(
+                        message: '拖动调整优先级',
+                        child: Icon(
+                          Icons.drag_indicator,
+                          size: 15,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  flex: 280,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    child: _RuleInput(
+                      key: ValueKey('regex-pattern-$index'),
+                      value: pattern,
+                      hint: '正则表达式',
+                      mono: true,
+                      isError: patternError != null,
+                      onChanged: onPatternChanged,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  flex: 150,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 150),
+                    child: _RuleInput(
+                      key: ValueKey('regex-note-$index'),
+                      value: note,
+                      hint: '备注',
+                      onChanged: onNoteChanged,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _RuleColorButton(value: color, onChanged: onColorChanged),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: '移除正则规则',
+                  child: _RuleDeleteButton(onPressed: onRemove),
+                ),
+              ],
+            ),
+          ),
+          if (patternError != null) ...[
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.only(left: 26),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 12,
+                    color: DeckTokens.danger,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      '正则无效：$patternError',
+                      style: const TextStyle(
+                        fontFamily: 'JetBrains Mono',
+                        fontFamilyFallback: DeckTokens.fontMono,
+                        fontSize: 10.5,
+                        color: DeckTokens.danger,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 280),
-              child: _TextInput(value: pattern, onChanged: onPatternChanged),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 150),
-              child: _TextInput(value: note, onChanged: onNoteChanged),
-            ),
-          ),
-          const SizedBox(width: 8),
-          ColorPickerField(
-            value: color,
-            onChanged: onColorChanged,
-            compact: true,
-          ),
-          const SizedBox(width: 8),
-          Tooltip(
-            message: '移除正则规则',
-            child: IconButton(
-              onPressed: onRemove,
-              icon: const Icon(Icons.close, size: 16),
-              color: AppColors.textMuted,
-              hoverColor: AppColors.tabHover,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-            ),
-          ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _TextInput extends StatefulWidget {
-  const _TextInput({required this.value, required this.onChanged});
+class _RuleInput extends StatefulWidget {
+  const _RuleInput({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.hint,
+    this.mono = false,
+    this.isError = false,
+  });
 
   final String value;
   final ValueChanged<String> onChanged;
+  final String? hint;
+  final bool mono;
+  final bool isError;
 
   @override
-  State<_TextInput> createState() => _TextInputState();
+  State<_RuleInput> createState() => _RuleInputState();
 }
 
-class _TextInputState extends State<_TextInput> {
-  late final TextEditingController controller;
+class _RuleInputState extends State<_RuleInput> {
+  late final TextEditingController _controller = deckEditingController(
+    widget.value,
+  );
+  final FocusNode _focusNode = FocusNode();
+  bool _focused = false;
 
   @override
   void initState() {
     super.initState();
-    controller = TextEditingController(text: widget.value);
+    _focusNode.addListener(_handleFocusChanged);
+  }
+
+  void _handleFocusChanged() {
+    if (mounted) setState(() => _focused = _focusNode.hasFocus);
   }
 
   @override
-  void didUpdateWidget(covariant _TextInput oldWidget) {
+  void didUpdateWidget(covariant _RuleInput oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.value != oldWidget.value && controller.text != widget.value) {
-      controller.text = widget.value;
+    if (widget.value != _controller.text) {
+      deckSetText(_controller, widget.value);
     }
   }
 
   @override
   void dispose() {
-    controller.dispose();
+    _focusNode.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    final borderColor = widget.isError
+        ? DeckTokens.danger
+        : (_focused ? AppColors.accent : AppColors.border);
+    return Container(
       height: 32,
-      child: TextFormField(
-        controller: controller,
-        style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: AppColors.background,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: _focused ? AppColors.panel : AppColors.background,
+        border: Border.all(color: borderColor),
+      ),
+      child: TextField(
+        focusNode: _focusNode,
+        controller: _controller,
+        onChanged: widget.onChanged,
+        textAlignVertical: TextAlignVertical.center,
+        // A forced 1em strut pins the line box to the font size instead of
+        // the font's (asymmetric) ascent/descent, so the glyphs land in the
+        // optical centre of the 32px frame on every engine and font stack.
+        strutStyle: StrutStyle(
+          fontFamily: 'JetBrains Mono',
+          fontFamilyFallback: DeckTokens.fontMono,
+          fontSize: widget.mono ? 11.5 : 12.5,
+          height: 1,
+          forceStrutHeight: true,
+        ),
+        style: widget.mono
+            ? TextStyle(
+                fontFamily: 'JetBrains Mono',
+                fontFamilyFallback: DeckTokens.fontMono,
+                fontSize: 11.5,
+                color: AppColors.textPrimary,
+              )
+            : TextStyle(fontSize: 12.5, color: AppColors.textPrimary),
+        decoration: deckBareInputDecoration(
+          hint: widget.hint,
+          hintStyle: widget.mono
+              ? TextStyle(
+                  fontFamily: 'JetBrains Mono',
+                  fontFamilyFallback: DeckTokens.fontMono,
+                  fontSize: 11.5,
+                  color: AppColors.textMuted,
+                )
+              : TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+          // Symmetric vertical padding is what keeps the text optically
+          // centred in the fixed 32px frame across engines and fonts: the
+          // intrinsic-height + isCollapsed route leaves the font's descent
+          // hanging below the glyphs (the same skew the colour picker field
+          // hit). The intrinsic height stays under 32px for both styles.
+          isCollapsed: false,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 8,
             vertical: 6,
           ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
-            borderSide: BorderSide(color: AppColors.border),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
-            borderSide: BorderSide(color: AppColors.border),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(4)),
-            borderSide: BorderSide(color: AppColors.accent),
-          ),
         ),
-        onChanged: widget.onChanged,
-        onFieldSubmitted: widget.onChanged,
       ),
     );
   }
 }
 
-class _NumberInput extends StatefulWidget {
-  const _NumberInput({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
+class _RuleColorButton extends StatelessWidget {
+  const _RuleColorButton({required this.value, required this.onChanged});
 
-  final String label;
-  final int value;
-  final ValueChanged<int> onChanged;
+  final Color value;
+  final ValueChanged<Color> onChanged;
 
   @override
-  State<_NumberInput> createState() => _NumberInputState();
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => showColorPickerDialog(
+          context,
+          initialColor: value,
+          onChanged: onChanged,
+        ),
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: value,
+                  border: Border.all(color: AppColors.textPrimary),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                css.colorToHex(value),
+                style: TextStyle(
+                  fontFamily: 'JetBrains Mono',
+                  fontFamilyFallback: DeckTokens.fontMono,
+                  fontSize: 11,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.keyboard_arrow_down,
+                size: 11,
+                color: AppColors.textMuted,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _NumberInputState extends State<_NumberInput> {
-  late final TextEditingController controller;
+class _RuleDeleteButton extends StatefulWidget {
+  const _RuleDeleteButton({required this.onPressed});
+
+  final VoidCallback onPressed;
 
   @override
-  void initState() {
-    super.initState();
-    controller = TextEditingController(text: widget.value.toString());
-  }
+  State<_RuleDeleteButton> createState() => _RuleDeleteButtonState();
+}
+
+class _RuleDeleteButtonState extends State<_RuleDeleteButton> {
+  bool _hovered = false;
 
   @override
-  void didUpdateWidget(covariant _NumberInput oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final text = widget.value.toString();
-    if (widget.value != oldWidget.value && controller.text != text) {
-      controller.text = text;
-    }
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onPressed,
+          child: Container(
+            decoration: BoxDecoration(
+              color: _hovered ? AppColors.background : Colors.transparent,
+              border: Border.all(
+                color: _hovered ? AppColors.border : Colors.transparent,
+              ),
+            ),
+            child: Icon(
+              Icons.close,
+              size: 13,
+              color: _hovered ? DeckTokens.danger : AppColors.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
   }
+}
+
+class _PresetDropdown extends StatefulWidget {
+  const _PresetDropdown({
+    required this.kind,
+    required this.entries,
+    required this.selectedId,
+    required this.currentName,
+    required this.custom,
+    required this.onPick,
+    required this.onCreate,
+    required this.onDelete,
+    required this.onCopy,
+    required this.onRestore,
+    required this.hiddenCount,
+  });
+
+  final _PresetKind kind;
+  final List<ThemePreset> entries;
+  final String? selectedId;
+  final String currentName;
+  final bool custom;
+  final ValueChanged<String> onPick;
+  final VoidCallback onCreate;
+  final ValueChanged<String> onDelete;
+  final ValueChanged<String> onCopy;
+  final VoidCallback onRestore;
+  final int hiddenCount;
 
   @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
+  State<_PresetDropdown> createState() => _PresetDropdownState();
+}
+
+class _PresetDropdownState extends State<_PresetDropdown> {
+  final OverlayPortalController _overlay = OverlayPortalController();
+  final LayerLink _link = LayerLink();
+  double _width = 320;
+  bool _open = false;
+
+  void _toggle() {
+    setState(() {
+      _open = !_open;
+      if (_open) {
+        _overlay.show();
+      } else {
+        _overlay.hide();
+      }
+    });
   }
 
-  void _handleChanged(String value) {
-    final parsed = int.tryParse(value);
-    if (parsed != null) widget.onChanged(parsed);
+  void _close() {
+    if (!_open) return;
+    setState(() {
+      _open = false;
+      _overlay.hide();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final trigger = Container(
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        border: Border.all(
+          color: _open ? AppColors.textPrimary : AppColors.border,
+        ),
+        boxShadow: _open ? AppColors.shadowHard : null,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              color: _selectedSwatch,
+              border: Border.all(color: AppColors.textPrimary),
+            ),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              widget.currentName,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary),
+            ),
+          ),
+          if (widget.custom) ...[
+            const SizedBox(width: 6),
+            Text(
+              '自定义',
+              style: TextStyle(fontSize: 10.5, color: AppColors.textMuted),
+            ),
+          ],
+          const SizedBox(width: 6),
+          Icon(
+            Icons.keyboard_arrow_down,
+            size: 14,
+            color: _open ? AppColors.textPrimary : AppColors.textMuted,
+          ),
+        ],
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.label.isNotEmpty) ...[
-          Text(
-            widget.label,
-            style: const TextStyle(color: Color(0xFFA6998C), fontSize: 11),
-          ),
-          const SizedBox(height: 4),
-        ],
-        SizedBox(
-          height: 32,
-          child: TextFormField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: AppColors.background,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 6,
+        const _SectionLabel('预设方案'),
+        const SizedBox(height: 9),
+        TapRegion(
+          groupId: this,
+          onTapOutside: (_) => _close(),
+          child: CompositedTransformTarget(
+            link: _link,
+            child: OverlayPortal(
+              controller: _overlay,
+              overlayChildBuilder: (context) => CompositedTransformFollower(
+                link: _link,
+                showWhenUnlinked: false,
+                targetAnchor: Alignment.bottomLeft,
+                followerAnchor: Alignment.topLeft,
+                offset: const Offset(0, 4),
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: TapRegion(
+                    groupId: this,
+                    child: SizedBox(width: _width, child: _menu(context)),
+                  ),
+                ),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: AppColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(4)),
-                borderSide: BorderSide(color: AppColors.accent),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  _width = constraints.maxWidth;
+                  return MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      key: ValueKey(
+                        widget.kind == _PresetKind.ui
+                            ? 'preset-trigger-ui'
+                            : 'preset-trigger-terminal',
+                      ),
+                      onTap: _toggle,
+                      child: trigger,
+                    ),
+                  );
+                },
               ),
             ),
-            onChanged: _handleChanged,
-            onFieldSubmitted: _handleChanged,
           ),
         ),
       ],
+    );
+  }
+
+  Color get _selectedSwatch {
+    for (final preset in widget.entries) {
+      if (preset.id == widget.selectedId) return preset.swatch;
+    }
+    return widget.kind == _PresetKind.ui
+        ? AppColors.background
+        : DeckTokens.termBg;
+  }
+
+  Widget _menu(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        border: Border.all(color: AppColors.textPrimary),
+        boxShadow: AppColors.shadowSolid,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.entries.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                '暂无方案，可从下方新建。',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+            )
+          else
+            for (final preset in widget.entries)
+              _PresetRow(
+                preset: preset,
+                selected: preset.id == widget.selectedId,
+                onPick: () {
+                  widget.onPick(preset.id);
+                  _close();
+                },
+                onDelete: () => widget.onDelete(preset.id),
+                onCopy: () => widget.onCopy(preset.id),
+              ),
+          Container(
+            margin: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: 4),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _MenuAction(
+                  icon: Icons.add,
+                  label: '新建自定义方案',
+                  onTap: widget.onCreate,
+                ),
+                if (widget.hiddenCount > 0)
+                  _MenuAction(
+                    icon: Icons.restore,
+                    label: '恢复内置方案（${widget.hiddenCount}）',
+                    onTap: widget.onRestore,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PresetRow extends StatefulWidget {
+  const _PresetRow({
+    required this.preset,
+    required this.selected,
+    required this.onPick,
+    required this.onDelete,
+    required this.onCopy,
+  });
+
+  final ThemePreset preset;
+  final bool selected;
+  final VoidCallback onPick;
+  final VoidCallback onDelete;
+  final VoidCallback onCopy;
+
+  @override
+  State<_PresetRow> createState() => _PresetRowState();
+}
+
+class _PresetRowState extends State<_PresetRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            onEnter: (_) => setState(() => _hovered = true),
+            onExit: (_) => setState(() => _hovered = false),
+            child: GestureDetector(
+              onTap: widget.onPick,
+              onSecondaryTap: widget.onCopy,
+              child: Container(
+                height: 34,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: widget.selected || _hovered
+                      ? AppColors.background
+                      : Colors.transparent,
+                  border: Border(
+                    left: BorderSide(
+                      color: widget.selected
+                          ? AppColors.accent
+                          : Colors.transparent,
+                      width: 3,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: widget.preset.swatch,
+                        border: Border.all(color: AppColors.textPrimary),
+                      ),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        widget.preset.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    if (widget.preset.custom)
+                      Text(
+                        '自定义',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Tooltip(
+          message: widget.preset.custom ? '删除此自定义方案' : '从列表中移除此内置方案',
+          child: IconButton(
+            onPressed: widget.onDelete,
+            icon: const Icon(Icons.close, size: 13),
+            color: AppColors.textMuted,
+            hoverColor: AppColors.fgSoft,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MenuAction extends StatefulWidget {
+  const _MenuAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  State<_MenuAction> createState() => _MenuActionState();
+}
+
+class _MenuActionState extends State<_MenuAction> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: _hovered ? AppColors.accent : Colors.transparent,
+            ),
+            color: _hovered ? AppColors.accentSoft : Colors.transparent,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                widget.icon,
+                size: 14,
+                color: _hovered ? AppColors.accentInk : AppColors.textMuted,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _hovered ? AppColors.accentInk : AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

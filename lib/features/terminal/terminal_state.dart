@@ -16,6 +16,7 @@ class OpenTerminalTab {
     this.sessionId,
     this.history = '',
     this.terminal,
+    this.termType,
   });
 
   factory OpenTerminalTab.fromItems(HostItem host, TerminalItem terminal) {
@@ -55,6 +56,7 @@ class OpenTerminalTab {
     String? sessionId,
     String history = '',
     xterm.Terminal? terminal,
+    String? termType,
   }) {
     return OpenTerminalTab(
       id: id,
@@ -66,6 +68,7 @@ class OpenTerminalTab {
       sessionId: sessionId,
       history: history,
       terminal: terminal,
+      termType: termType,
     );
   }
 
@@ -79,11 +82,16 @@ class OpenTerminalTab {
   final String history;
   final xterm.Terminal? terminal;
 
+  /// Negotiated terminal type, surfaced in the status bar. Null for local
+  /// terminals, which have no SSH term-type negotiation.
+  final String? termType;
+
   OpenTerminalTab copyWith({
     String? displayLabel,
     String? sessionId,
     String? history,
     xterm.Terminal? terminal,
+    String? termType,
   }) {
     return OpenTerminalTab(
       id: id,
@@ -95,6 +103,7 @@ class OpenTerminalTab {
       sessionId: sessionId ?? this.sessionId,
       history: history ?? this.history,
       terminal: terminal ?? this.terminal,
+      termType: termType,
     );
   }
 
