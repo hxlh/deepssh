@@ -507,6 +507,101 @@ void main() {
     await gesture.up();
   });
 
+  testWidgets(
+    'drag selection tracks the grabbed line when output shifts the buffer '
+    'mid-drag',
+    (tester) async {
+      // A capped scrollback is the steady state of a long-lived terminal —
+      // e.g. a full-screen TUI streaming output: every appended line drops
+      // the oldest and shifts every surviving line down by one index. The
+      // drag start used to be kept as a raw cell snapshot, so such a shift
+      // silently moved the selection start a few rows below the grabbed
+      // text, pinning the highlight away from what the user grabbed.
+      final terminal = xterm.Terminal(maxLines: 100);
+      final tab = OpenTerminalTab.ssh(
+        id: 'ssh-tab-1',
+        hostName: 'host1',
+        title: 'terminal1',
+        sessionId: 'session-1',
+        terminal: terminal,
+      );
+
+      await tester.pumpWidget(
+        _terminalApp(
+          width: 800,
+          height: 260,
+          tab: tab,
+          bridge: RecordingSshBridgeClient(),
+          theme: _defaultTerminalTheme.copyWith(fontSize: 20),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Fill the buffer exactly to the cap after the widget has settled, so
+      // the setup resize cannot trim a full buffer out from under itself.
+      for (var i = 0; i < 99; i++) {
+        terminal.write('line ${i.toString().padLeft(2, '0')} target text\r\n');
+      }
+      terminal.write('line 99 target text');
+      await tester.pump();
+      expect(terminal.buffer.lines.length, 100);
+
+      final view = terminalView(tester);
+      final renderTerminal =
+          tester.renderObject(
+                find.descendant(
+                  of: find.byType(xterm.TerminalView),
+                  matching: find.byWidgetPredicate(
+                    (widget) => widget.runtimeType.toString() == '_TerminalView',
+                  ),
+                ),
+              )
+              as dynamic;
+      final cellSize = renderTerminal.cellSize as Size;
+
+      // Grab the start of the row showing 'line 95' (buffer index 95).
+      final start =
+          renderTerminal.localToGlobal(
+                (renderTerminal.getOffset(const xterm.CellOffset(0, 95))
+                        as Offset) +
+                    Offset(cellSize.width / 2, cellSize.height / 2),
+              )
+              as Offset;
+      final end =
+          renderTerminal.localToGlobal(
+                Offset(cellSize.width * 10, cellSize.height * 6.5),
+              )
+              as Offset;
+
+      final gesture = await tester.startGesture(
+        start,
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.moveBy(const Offset(4, 0));
+      await tester.pump();
+
+      // Sanity: the selection begins on the grabbed row.
+      expect(view.controller!.selection!.normalized.begin.y, 95);
+
+      // Mid-drag output at the scrollback cap: three appended lines drop the
+      // three oldest, shifting every surviving line down by three indexes —
+      // 'line 95' now lives at buffer index 92.
+      terminal.write('\r\nflood 1\r\nflood 2\r\nflood 3');
+      await tester.pump();
+
+      await gesture.moveTo(end);
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      // The grabbed text must stay in the selection. A raw cell snapshot of
+      // the drag start still points at index 95, which now holds 'line 98'.
+      final selection = view.controller!.selection!;
+      expect(terminal.buffer.getText(selection), contains('line 95'));
+      expect(selection.normalized.begin.y, 92);
+    },
+  );
+
   testWidgets('paints selection at the terminal render offset', (tester) async {
     final terminal = xterm.Terminal(maxLines: 3000);
     terminal.resize(20, 5);
