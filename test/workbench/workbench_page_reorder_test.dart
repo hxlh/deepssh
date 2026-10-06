@@ -1,5 +1,6 @@
 import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/features/hosts/host_tree.dart';
+import 'package:deepssh/features/hosts/session_reorder.dart';
 import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/theme/theme_bridge.dart';
@@ -33,7 +34,7 @@ class _FakeSshBridge extends InMemorySshBridgeClient {
 
 class _FakeThemeBridge extends InMemoryThemeBridgeClient {}
 
-Future<void> _pumpWithTwoLocalTerminals(WidgetTester tester) async {
+Future<void> _pumpWithLocalTerminals(WidgetTester tester, int count) async {
   tester.view.physicalSize = const Size(1400, 1000);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
@@ -49,7 +50,7 @@ Future<void> _pumpWithTwoLocalTerminals(WidgetTester tester) async {
   );
   await tester.pumpAndSettle();
 
-  for (var i = 0; i < 2; i++) {
+  for (var i = 0; i < count; i++) {
     await tester.tap(find.text('新增连接'));
     await tester.pumpAndSettle();
     await tester.tap(
@@ -58,6 +59,9 @@ Future<void> _pumpWithTwoLocalTerminals(WidgetTester tester) async {
     await tester.pumpAndSettle();
   }
 }
+
+Future<void> _pumpWithTwoLocalTerminals(WidgetTester tester) =>
+    _pumpWithLocalTerminals(tester, 2);
 
 void main() {
   testWidgets('profiles display after loading', (tester) async {
@@ -189,5 +193,50 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('local-local-terminal-1')));
     await tester.pumpAndSettle();
     expect(selected(), 'local-terminal-1');
+  });
+
+  testWidgets('the drop slot follows the pointer, not the drag start', (
+    tester,
+  ) async {
+    await _pumpWithLocalTerminals(tester, 3);
+
+    final firstRow = find.byKey(const ValueKey('local-local-terminal-1'));
+    final double top = tester.getTopLeft(firstRow).dy;
+    const double slot = 36;
+
+    // Press the top row and glide it one slot down: the moment the pointer
+    // passes the next row's middle the dashed slot has to be there, not left
+    // behind at the drag's origin.
+    final gesture = await tester.startGesture(
+      Offset(120, top + 18),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump();
+    await gesture.moveTo(Offset(120, top + slot + 20));
+    await tester.pump();
+    expect(
+      tester.getTopLeft(find.byKey(sessionDropShadeKey)).dy,
+      closeTo(top + slot, 1),
+    );
+
+    // Above the next row's middle the slot comes back home.
+    await gesture.moveTo(Offset(120, top + 2));
+    await tester.pump();
+    expect(
+      tester.getTopLeft(find.byKey(sessionDropShadeKey)).dy,
+      closeTo(top, 1),
+    );
+
+    // And it reaches the bottom slot without extra travel.
+    await gesture.moveTo(Offset(120, top + slot * 2 + 20));
+    await tester.pump();
+    expect(
+      tester.getTopLeft(find.byKey(sessionDropShadeKey)).dy,
+      closeTo(top + slot * 2, 1),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(firstRow).dy, closeTo(top + slot * 2, 1));
   });
 }

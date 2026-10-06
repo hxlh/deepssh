@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import 'host_tree_node.dart';
 import 'host_tree_state.dart';
+import 'session_reorder.dart';
 
 class HostTree extends StatelessWidget {
   const HostTree({
@@ -84,6 +85,12 @@ class HostTree extends StatelessWidget {
   static const double _rowLeft = 24;
   static const double _rowRight = 8;
   static const double _rowGap = 2;
+  static const SessionRowMetrics _rowMetrics = SessionRowMetrics(
+    rowHeight: _rowHeight,
+    rowGap: _rowGap,
+    rowLeft: _rowLeft,
+    rowRight: _rowRight,
+  );
 
   static Widget _dragProxy(
     Widget child,
@@ -240,10 +247,12 @@ class HostTree extends StatelessWidget {
     SshSessionItem session, {
     Key? key,
     required int reorderIndex,
+    SessionReorderController? dragController,
   }) {
     return _ExplorerSessionRow(
       key: key,
       reorderIndex: reorderIndex,
+      dragController: dragController,
       compact: compact,
       selected: selectedTerminalId == session.id,
       accentColor: _groupColor(session.connectionGroupId),
@@ -269,10 +278,12 @@ class HostTree extends StatelessWidget {
     LocalTerminalItem terminal, {
     Key? key,
     required int reorderIndex,
+    SessionReorderController? dragController,
   }) {
     return _ExplorerSessionRow(
       key: key,
       reorderIndex: reorderIndex,
+      dragController: dragController,
       compact: compact,
       selected: selectedTerminalId == terminal.id,
       accentColor: AppColors.accent,
@@ -347,22 +358,20 @@ class HostTree extends StatelessWidget {
           child: _profileHeader(profile),
         ),
         if (sessions.isNotEmpty)
-          ReorderableListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            buildDefaultDragHandles: false,
-            proxyDecorator: _dragProxy,
+          SessionReorderList(
             itemCount: sessions.length,
+            metrics: _rowMetrics,
             onReorder: (oldIndex, newIndex) {
               onReorderSessions?.call(profile.id, oldIndex, newIndex);
             },
-            itemBuilder: (context, sessionIndex) {
+            itemBuilder: (context, sessionIndex, dragController) {
               final session = sessions[sessionIndex];
               return _sessionItem(
                 context,
                 session,
                 key: ValueKey('session-${session.id}'),
                 reorderIndex: sessionIndex,
+                dragController: dragController,
               );
             },
           ),
@@ -420,20 +429,18 @@ class HostTree extends StatelessWidget {
           child: compact ? Tooltip(message: 'Local', child: header) : header,
         ),
         if (localExpanded)
-          ReorderableListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            buildDefaultDragHandles: false,
-            proxyDecorator: _dragProxy,
+          SessionReorderList(
             itemCount: localTerminals.length,
+            metrics: _rowMetrics,
             onReorder: onReorderLocalTerminals ?? (_, __) {},
-            itemBuilder: (context, index) {
+            itemBuilder: (context, index, dragController) {
               final terminal = localTerminals[index];
               return _localTerminalItem(
                 context,
                 terminal,
                 key: ValueKey('local-${terminal.id}'),
                 reorderIndex: index,
+                dragController: dragController,
               );
             },
           ),
@@ -577,6 +584,7 @@ class _ExplorerSessionRow extends StatefulWidget {
   const _ExplorerSessionRow({
     super.key,
     required this.reorderIndex,
+    this.dragController,
     required this.compact,
     required this.selected,
     required this.accentColor,
@@ -590,6 +598,7 @@ class _ExplorerSessionRow extends StatefulWidget {
   });
 
   final int reorderIndex;
+  final SessionReorderController? dragController;
   final bool compact;
   final bool selected;
   final Color accentColor;
@@ -662,122 +671,138 @@ class _ExplorerSessionRowState extends State<_ExplorerSessionRow> {
       );
     }
 
+    Widget content = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // The prototype lifts the row from a press anywhere on it — the
+        // grip is the affordance, not the only drag surface. The close
+        // button sits above this surface in the stack, and stack hits
+        // stop at the topmost child, so a press that starts on the button
+        // never starts a reorder.
+        Positioned(
+          left: HostTree._rowLeft,
+          right: HostTree._rowRight,
+          top: HostTree._rowGap,
+          bottom: HostTree._rowGap,
+          child: RowDragSurface(
+            index: widget.reorderIndex,
+            controller: widget.dragController,
+            child: InkWell(
+              onTap: widget.onTap,
+              onSecondaryTapDown: widget.onSecondaryTapDown,
+              child: Container(
+                height: HostTree._rowHeight,
+                // The 26px right padding reserves the 22px close slot
+                // (plus the row's 4px end padding) so the name still
+                // ellipsises exactly where it did when the button sat
+                // in the row's own flex.
+                padding: const EdgeInsets.fromLTRB(10, 0, 26, 0),
+                decoration: BoxDecoration(
+                  border: Border(
+                    left: BorderSide(
+                      color: selected ? groupColor : Colors.transparent,
+                      width: 3,
+                    ),
+                  ),
+                  color: background,
+                ),
+                child: Row(
+                  children: [
+                    Icon(widget.icon, size: 15, color: iconColor),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.label,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: nameColor,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        // Close button: above the drag surface, so presses land here
+        // only, and the row's own flex no longer needs to make room.
+        Positioned(
+          right: HostTree._rowRight + 4,
+          top: HostTree._rowGap + 5,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 120),
+            opacity: _hovered || _closeFocused ? 1 : 0,
+            child: Tooltip(
+              message: widget.closeTooltip,
+              child: GestureDetector(
+                onTap: widget.onClose,
+                onSecondaryTapDown: widget.onSecondaryTapDown,
+                child: Focus(
+                  onFocusChange: (focused) =>
+                      setState(() => _closeFocused = focused),
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: Icon(
+                      Icons.close,
+                      size: 13,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        // The grip is painted in the row's left gutter, so it has to be a
+        // child of this full-width stack. The previous layout parked it
+        // at `Positioned(left: -24)` inside the inset row stack: that
+        // renders through `Clip.none` but stacks never hit-test outside
+        // their own bounds, so pointer events never reached it and the
+        // rows could not be dragged at all.
+        Positioned(
+          left: HostTree._rowLeft - 11,
+          top: HostTree._rowGap + 5,
+          child: RowDragSurface(
+            index: widget.reorderIndex,
+            controller: widget.dragController,
+            cursor: SystemMouseCursors.grab,
+            child: SizedBox(
+              width: 14,
+              height: 22,
+              child: Icon(
+                Icons.drag_indicator,
+                size: 12,
+                color: AppColors.textMuted,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+    final SessionReorderController? dragController = widget.dragController;
+    if (dragController != null) {
+      content = ValueListenableBuilder<int?>(
+        valueListenable: dragController.dragging,
+        builder: (context, draggingIndex, child) => Opacity(
+          // The lifted row flies in the overlay; its slot stays empty.
+          opacity: draggingIndex == widget.reorderIndex ? 0 : 1,
+          child: child,
+        ),
+        child: content,
+      );
+    }
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: SizedBox(
         height: HostTree._rowHeight + HostTree._rowGap * 2,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            // The prototype lifts the row from a press anywhere on it — the
-            // grip is the affordance and the keyboard target, not the only
-            // drag surface. The close button sits above this listener in the
-            // stack, and stack hits stop at the topmost child, so a press
-            // that starts on the button never starts a reorder.
-            Positioned(
-              left: HostTree._rowLeft,
-              right: HostTree._rowRight,
-              top: HostTree._rowGap,
-              bottom: HostTree._rowGap,
-              child: ReorderableDragStartListener(
-                index: widget.reorderIndex,
-                child: InkWell(
-                  onTap: widget.onTap,
-                  onSecondaryTapDown: widget.onSecondaryTapDown,
-                  child: Container(
-                    height: HostTree._rowHeight,
-                    // The 26px right padding reserves the 22px close slot
-                    // (plus the row's 4px end padding) so the name still
-                    // ellipsises exactly where it did when the button sat
-                    // in the row's own flex.
-                    padding: const EdgeInsets.fromLTRB(10, 0, 26, 0),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        left: BorderSide(
-                          color: selected ? groupColor : Colors.transparent,
-                          width: 3,
-                        ),
-                      ),
-                      color: background,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(widget.icon, size: 15, color: iconColor),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            widget.label,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: nameColor,
-                              fontWeight: selected
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            // Close button: above the drag surface, so presses land here
-            // only, and the row's own flex no longer needs to make room.
-            Positioned(
-              right: HostTree._rowRight + 4,
-              top: HostTree._rowGap + 5,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 120),
-                opacity: _hovered || _closeFocused ? 1 : 0,
-                child: Tooltip(
-                  message: widget.closeTooltip,
-                  child: GestureDetector(
-                    onTap: widget.onClose,
-                    onSecondaryTapDown: widget.onSecondaryTapDown,
-                    child: Focus(
-                      onFocusChange: (focused) =>
-                          setState(() => _closeFocused = focused),
-                      child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: Icon(
-                          Icons.close,
-                          size: 13,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            // The grip is painted in the row's left gutter, so it has to be a
-            // child of this full-width stack. The previous layout parked it
-            // at `Positioned(left: -24)` inside the inset row stack: that
-            // renders through `Clip.none` but stacks never hit-test outside
-            // their own bounds, so pointer events never reached it and the
-            // rows could not be dragged at all.
-            Positioned(
-              left: HostTree._rowLeft - 11,
-              top: HostTree._rowGap + 5,
-              child: ReorderableDragStartListener(
-                index: widget.reorderIndex,
-                child: SizedBox(
-                  width: 14,
-                  height: 22,
-                  child: Icon(
-                    Icons.drag_indicator,
-                    size: 12,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+        child: content,
       ),
     );
   }
