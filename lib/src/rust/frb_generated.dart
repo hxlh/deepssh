@@ -1235,6 +1235,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  double dco_decode_f_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as double;
+  }
+
+  @protected
   int dco_decode_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -1444,7 +1450,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return TerminalTheme(
       presetName: dco_decode_String(arr[0]),
       fontFamily: dco_decode_String(arr[1]),
-      fontSize: dco_decode_u_32(arr[2]),
+      fontSize: dco_decode_f_64(arr[2]),
       normalFontWeight: dco_decode_u_32(arr[3]),
       boldFontWeight: dco_decode_u_32(arr[4]),
       cursorStyle: dco_decode_String(arr[5]),
@@ -1546,7 +1552,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return UiTheme(
       presetName: dco_decode_String(arr[0]),
       fontFamily: dco_decode_String(arr[1]),
-      fontSize: dco_decode_u_32(arr[2]),
+      fontSize: dco_decode_f_64(arr[2]),
       normalFontWeight: dco_decode_u_32(arr[3]),
       boldFontWeight: dco_decode_u_32(arr[4]),
       background: dco_decode_String(arr[5]),
@@ -1634,6 +1640,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int sse_decode_box_autoadd_u_16(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_u_16(deserializer));
+  }
+
+  @protected
+  double sse_decode_f_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getFloat64();
   }
 
   @protected
@@ -1915,7 +1927,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_presetName = sse_decode_String(deserializer);
     var var_fontFamily = sse_decode_String(deserializer);
-    var var_fontSize = sse_decode_u_32(deserializer);
+    var var_fontSize = sse_decode_f_64(deserializer);
     var var_normalFontWeight = sse_decode_u_32(deserializer);
     var var_boldFontWeight = sse_decode_u_32(deserializer);
     var var_cursorStyle = sse_decode_String(deserializer);
@@ -2033,7 +2045,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_presetName = sse_decode_String(deserializer);
     var var_fontFamily = sse_decode_String(deserializer);
-    var var_fontSize = sse_decode_u_32(deserializer);
+    var var_fontSize = sse_decode_f_64(deserializer);
     var var_normalFontWeight = sse_decode_u_32(deserializer);
     var var_boldFontWeight = sse_decode_u_32(deserializer);
     var var_background = sse_decode_String(deserializer);
@@ -2149,6 +2161,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_u_16(self, serializer);
+  }
+
+  @protected
+  void sse_encode_f_64(double self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putFloat64(self);
   }
 
   @protected
@@ -2395,7 +2413,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.presetName, serializer);
     sse_encode_String(self.fontFamily, serializer);
-    sse_encode_u_32(self.fontSize, serializer);
+    sse_encode_f_64(self.fontSize, serializer);
     sse_encode_u_32(self.normalFontWeight, serializer);
     sse_encode_u_32(self.boldFontWeight, serializer);
     sse_encode_String(self.cursorStyle, serializer);
@@ -2486,7 +2504,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.presetName, serializer);
     sse_encode_String(self.fontFamily, serializer);
-    sse_encode_u_32(self.fontSize, serializer);
+    sse_encode_f_64(self.fontSize, serializer);
     sse_encode_u_32(self.normalFontWeight, serializer);
     sse_encode_u_32(self.boldFontWeight, serializer);
     sse_encode_String(self.background, serializer);

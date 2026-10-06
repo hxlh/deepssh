@@ -56,7 +56,7 @@ class UiThemeSettings {
 
   final String presetName;
   final String fontFamily;
-  final int fontSize;
+  final double fontSize;
   final int normalFontWeight;
   final int boldFontWeight;
   final Color background;
@@ -69,7 +69,7 @@ class UiThemeSettings {
   UiThemeSettings copyWith({
     String? presetName,
     String? fontFamily,
-    int? fontSize,
+    double? fontSize,
     int? normalFontWeight,
     int? boldFontWeight,
     Color? background,
@@ -143,7 +143,7 @@ class TerminalThemeSettings {
 
   final String presetName;
   final String fontFamily;
-  final int fontSize;
+  final double fontSize;
   final int normalFontWeight;
   final int boldFontWeight;
   final CursorStyle cursorStyle;
@@ -158,7 +158,7 @@ class TerminalThemeSettings {
   TerminalThemeSettings copyWith({
     String? presetName,
     String? fontFamily,
-    int? fontSize,
+    double? fontSize,
     int? normalFontWeight,
     int? boldFontWeight,
     CursorStyle? cursorStyle,

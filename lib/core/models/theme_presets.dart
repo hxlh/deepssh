@@ -197,7 +197,7 @@ UiThemeSettings? uiFromJson(Map<String, Object?> json) {
   final presetName = json['presetName'];
   final fontFamily = json['fontFamily'];
   final fontSize = json['fontSize'];
-  if (presetName is! String || fontFamily is! String || fontSize is! int) {
+  if (presetName is! String || fontFamily is! String || fontSize is! num) {
     return null;
   }
   Color? color(String key) => css.hexToColor(json[key] as String? ?? '');
@@ -218,7 +218,7 @@ UiThemeSettings? uiFromJson(Map<String, Object?> json) {
   return UiThemeSettings(
     presetName: presetName,
     fontFamily: fontFamily,
-    fontSize: fontSize,
+    fontSize: fontSize.toDouble(),
     normalFontWeight: json['normalFontWeight'] as int? ?? 500,
     boldFontWeight: json['boldFontWeight'] as int? ?? 700,
     background: background,
@@ -257,7 +257,7 @@ TerminalThemeSettings? terminalFromJson(Map<String, Object?> json) {
   final presetName = json['presetName'];
   final fontFamily = json['fontFamily'];
   final fontSize = json['fontSize'];
-  if (presetName is! String || fontFamily is! String || fontSize is! int) {
+  if (presetName is! String || fontFamily is! String || fontSize is! num) {
     return null;
   }
   Color? color(String key) => css.hexToColor(json[key] as String? ?? '');
@@ -292,7 +292,7 @@ TerminalThemeSettings? terminalFromJson(Map<String, Object?> json) {
   return TerminalThemeSettings(
     presetName: presetName,
     fontFamily: fontFamily,
-    fontSize: fontSize,
+    fontSize: fontSize.toDouble(),
     normalFontWeight: json['normalFontWeight'] as int? ?? 400,
     boldFontWeight: json['boldFontWeight'] as int? ?? 700,
     cursorStyle: CursorStyle.values.firstWhere(

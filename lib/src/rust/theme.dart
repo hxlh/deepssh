@@ -43,7 +43,7 @@ class RegexHighlight {
 class TerminalTheme {
   final String presetName;
   final String fontFamily;
-  final int fontSize;
+  final double fontSize;
   final int normalFontWeight;
   final int boldFontWeight;
   final String cursorStyle;
@@ -128,7 +128,7 @@ class ThemeSettings {
 class UiTheme {
   final String presetName;
   final String fontFamily;
-  final int fontSize;
+  final double fontSize;
   final int normalFontWeight;
   final int boldFontWeight;
   final String background;

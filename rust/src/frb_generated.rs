@@ -1064,6 +1064,13 @@ impl SseDecode for bool {
     }
 }
 
+impl SseDecode for f64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_f64::<NativeEndian>().unwrap()
+    }
+}
+
 impl SseDecode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1358,7 +1365,7 @@ impl SseDecode for crate::theme::TerminalTheme {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_presetName = <String>::sse_decode(deserializer);
         let mut var_fontFamily = <String>::sse_decode(deserializer);
-        let mut var_fontSize = <u32>::sse_decode(deserializer);
+        let mut var_fontSize = <f64>::sse_decode(deserializer);
         let mut var_normalFontWeight = <u32>::sse_decode(deserializer);
         let mut var_boldFontWeight = <u32>::sse_decode(deserializer);
         let mut var_cursorStyle = <String>::sse_decode(deserializer);
@@ -1495,7 +1502,7 @@ impl SseDecode for crate::theme::UiTheme {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_presetName = <String>::sse_decode(deserializer);
         let mut var_fontFamily = <String>::sse_decode(deserializer);
-        let mut var_fontSize = <u32>::sse_decode(deserializer);
+        let mut var_fontSize = <f64>::sse_decode(deserializer);
         let mut var_normalFontWeight = <u32>::sse_decode(deserializer);
         let mut var_boldFontWeight = <u32>::sse_decode(deserializer);
         let mut var_background = <String>::sse_decode(deserializer);
@@ -2025,6 +2032,13 @@ impl SseEncode for bool {
     }
 }
 
+impl SseEncode for f64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_f64::<NativeEndian>(self).unwrap();
+    }
+}
+
 impl SseEncode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2255,7 +2269,7 @@ impl SseEncode for crate::theme::TerminalTheme {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.preset_name, serializer);
         <String>::sse_encode(self.font_family, serializer);
-        <u32>::sse_encode(self.font_size, serializer);
+        <f64>::sse_encode(self.font_size, serializer);
         <u32>::sse_encode(self.normal_font_weight, serializer);
         <u32>::sse_encode(self.bold_font_weight, serializer);
         <String>::sse_encode(self.cursor_style, serializer);
@@ -2366,7 +2380,7 @@ impl SseEncode for crate::theme::UiTheme {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.preset_name, serializer);
         <String>::sse_encode(self.font_family, serializer);
-        <u32>::sse_encode(self.font_size, serializer);
+        <f64>::sse_encode(self.font_size, serializer);
         <u32>::sse_encode(self.normal_font_weight, serializer);
         <u32>::sse_encode(self.bold_font_weight, serializer);
         <String>::sse_encode(self.background, serializer);

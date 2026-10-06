@@ -822,7 +822,7 @@ class _TerminalViewState extends State<TerminalView> {
                         ? null
                         : _regexForegroundForRow,
                     textStyle: xterm.TerminalStyle(
-                      fontSize: settings.fontSize.toDouble(),
+                      fontSize: settings.fontSize,
                       fontFamily: termFamily ?? 'monospace',
                       fontFamilyFallback: termFallback,
                       normalFontWeight: _fontWeightFromConfig(
@@ -898,7 +898,7 @@ class _TerminalViewState extends State<TerminalView> {
               right: 0,
               child: TerminalFindBar(
                 session: _findSession!,
-                fontSize: widget.terminalThemeSettings.fontSize.toDouble(),
+                fontSize: widget.terminalThemeSettings.fontSize,
                 onClose: _closeFind,
                 onQueryChanged: (query) {
                   widget.onFindQueryChanged?.call(query);
