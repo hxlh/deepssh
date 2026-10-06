@@ -16,6 +16,11 @@ abstract final class AppColors {
   static int normalFontWeight = 500;
   static int boldFontWeight = 700;
 
+  /// Fires when [applyUi] changes the base font size. The app root listens and
+  /// re-derives its UI text scaler from it; the deck widgets hard-code their
+  /// sizes, so a scaler is the one switch that reaches all of them.
+  static final ValueNotifier<double> textScale = ValueNotifier<double>(1);
+
   static Color background = DeckTokens.bg;
   static Color panel = DeckTokens.surface;
   static Color sidebar = DeckTokens.bg;
@@ -52,6 +57,7 @@ abstract final class AppColors {
     fontSize = settings.fontSize;
     normalFontWeight = settings.normalFontWeight;
     boldFontWeight = settings.boldFontWeight;
+    textScale.value = settings.fontSize / 13;
     background = settings.background;
     panel = settings.panel;
     sidebar = settings.sidebar;

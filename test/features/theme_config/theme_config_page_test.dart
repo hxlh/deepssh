@@ -408,6 +408,35 @@ void main() {
     );
     expect(field.controller?.text, '(unclosed');
   });
+
+  testWidgets('live preview follows the terminal font stack and size', (
+    tester,
+  ) async {
+    await _pumpPage(tester);
+
+    TextSpan previewSpan() {
+      final rich = tester.widget<RichText>(
+        find.byKey(const ValueKey('term-preview')),
+      );
+      return rich.text as TextSpan;
+    }
+
+    expect(previewSpan().style?.fontSize, 14);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('term-font-input')),
+      'Fira Code, monospace',
+    );
+    await tester.pump();
+    expect(
+      (previewSpan().children!.first as TextSpan).style?.fontFamily,
+      'Fira Code',
+    );
+
+    await tester.enterText(find.byKey(const ValueKey('term-size-input')), '20');
+    await tester.pump();
+    expect(previewSpan().style?.fontSize, 20);
+  });
 }
 
 Future<void> _pumpPage(

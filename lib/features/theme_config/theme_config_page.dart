@@ -1180,10 +1180,14 @@ class _MiniTerminalPreview extends StatelessWidget {
       DeckTokens.fontMono,
       'monospace',
     );
+    // The preview exists to show the effect of the terminal font controls,
+    // so it has to follow both the family stack and the font size. A fixed
+    // size here made the size field look like it did nothing.
+    final fontSize = settings.fontSize.toDouble();
     TextStyle style(Color color) => TextStyle(
       fontFamily: mono,
       fontFamilyFallback: fallback,
-      fontSize: 11.5,
+      fontSize: fontSize,
       height: 1.55,
       color: color,
     );
@@ -1196,6 +1200,7 @@ class _MiniTerminalPreview extends StatelessWidget {
         border: Border.all(color: AppColors.textPrimary),
       ),
       child: RichText(
+        key: const ValueKey('term-preview'),
         text: TextSpan(
           style: style(settings.foreground),
           children: [
@@ -1233,8 +1238,8 @@ class _MiniTerminalPreview extends StatelessWidget {
             WidgetSpan(
               alignment: PlaceholderAlignment.middle,
               child: Container(
-                width: 7,
-                height: 13,
+                width: fontSize * 0.61,
+                height: fontSize * 1.13,
                 color: settings.cursorColor,
               ),
             ),
@@ -1521,6 +1526,16 @@ class _RuleInputState extends State<_RuleInput> {
         controller: _controller,
         onChanged: widget.onChanged,
         textAlignVertical: TextAlignVertical.center,
+        // A forced 1em strut pins the line box to the font size instead of
+        // the font's (asymmetric) ascent/descent, so the glyphs land in the
+        // optical centre of the 32px frame on every engine and font stack.
+        strutStyle: StrutStyle(
+          fontFamily: 'JetBrains Mono',
+          fontFamilyFallback: DeckTokens.fontMono,
+          fontSize: widget.mono ? 11.5 : 12.5,
+          height: 1,
+          forceStrutHeight: true,
+        ),
         style: widget.mono
             ? TextStyle(
                 fontFamily: 'JetBrains Mono',
@@ -1539,7 +1554,16 @@ class _RuleInputState extends State<_RuleInput> {
                   color: AppColors.textMuted,
                 )
               : TextStyle(fontSize: 12.5, color: AppColors.textMuted),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          // Symmetric vertical padding is what keeps the text optically
+          // centred in the fixed 32px frame across engines and fonts: the
+          // intrinsic-height + isCollapsed route leaves the font's descent
+          // hanging below the glyphs (the same skew the colour picker field
+          // hit). The intrinsic height stays under 32px for both styles.
+          isCollapsed: false,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 6,
+          ),
         ),
       ),
     );

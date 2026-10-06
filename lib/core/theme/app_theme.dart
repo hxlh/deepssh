@@ -182,13 +182,9 @@ abstract final class AppTheme {
 
   static TextStyle? _applyTextStyle(TextStyle? style, {bool bold = false}) {
     if (style == null) return null;
-    final baseFontSize = style.fontSize;
     return style.copyWith(
       fontFamily: AppColors.fontFamilyPrimary,
       fontFamilyFallback: AppColors.fontFamilyFallback,
-      fontSize: baseFontSize == null
-          ? AppColors.fontSize.toDouble()
-          : baseFontSize * AppColors.fontSize / 14,
       fontWeight: _fontWeightFor(style, bold: bold),
       color: AppColors.textPrimary,
     );
