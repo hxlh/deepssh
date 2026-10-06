@@ -317,6 +317,13 @@ class _SessionReorderListState extends State<SessionReorderList> {
   void _finish() {
     _removeOverlay();
     _controller.dragging.value = null;
+    // Reset the drag bookkeeping, not just the visuals: with _dragIndex left
+    // set, the next _begin bails out on its "already dragging" guard, so the
+    // second drag shows no lifted row or drop shade and _end reorders the
+    // previously dragged row against the stale grid.
+    _dragIndex = null;
+    _dropIndex = null;
+    _grid = const <Rect>[];
   }
 
   void _removeOverlay() {
