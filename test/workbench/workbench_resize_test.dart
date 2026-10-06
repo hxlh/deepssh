@@ -163,4 +163,56 @@ void main() {
     // Releasing applies the new width in one resize.
     expect(terminal().viewWidth, greaterThan(before));
   });
+
+  testWidgets('explorer splitter follows every move when frames lag behind', (
+    tester,
+  ) async {
+    await pumpWorkbench(tester);
+
+    final sidebar = find.byType(Sidebar);
+    expect(tester.getSize(sidebar).width, 280);
+
+    // Three pointer moves before any frame runs, as happens with a
+    // high-rate mouse on a slow frame. The width must follow the pointer's
+    // total travel; adding each delta to the last-built widget value
+    // instead dropped every move but the first, so the splitter trailed
+    // the cursor while the pointer kept moving.
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(ResizeHandle)),
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveBy(const Offset(30, 0));
+    await gesture.moveBy(const Offset(30, 0));
+    await gesture.moveBy(const Offset(30, 0));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(tester.getSize(sidebar).width, closeTo(370, 1));
+  });
+
+  testWidgets('dock grip follows every move when frames lag behind', (
+    tester,
+  ) async {
+    await pumpWorkbench(tester);
+
+    final grip = find.byWidgetPredicate(
+      (widget) => widget.runtimeType.toString() == '_VerticalGrip',
+    );
+    expect(grip, findsOneWidget);
+    final before = tester.getCenter(grip);
+
+    final gesture = await tester.startGesture(
+      before,
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveBy(const Offset(30, 0));
+    await gesture.moveBy(const Offset(30, 0));
+    await gesture.moveBy(const Offset(30, 0));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(tester.getCenter(grip).dx, closeTo(before.dx + 90, 1));
+  });
 }

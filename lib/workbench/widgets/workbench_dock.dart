@@ -364,6 +364,13 @@ class _VerticalGripState extends State<_VerticalGrip> {
   bool _focused = false;
   bool _dragging = false;
 
+  /// Same absolute drag maths as the Explorer splitter: anchoring to the
+  /// start position keeps the grip 1:1 with the pointer when several move
+  /// events arrive between frames, where "currentWidth + delta" against the
+  /// last-built widget value would swallow all but one delta per frame.
+  double? _dragStartPointerX;
+  double? _dragStartWidth;
+
   @override
   void dispose() {
     _focusNode.dispose();
@@ -402,14 +409,34 @@ class _VerticalGripState extends State<_VerticalGrip> {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapDown: (_) => _focusNode.requestFocus(),
-          onHorizontalDragStart: (_) {
+          onHorizontalDragDown: (details) {
+            _dragStartPointerX = details.globalPosition.dx;
+            _dragStartWidth = widget.currentWidth;
+          },
+          onHorizontalDragStart: (details) {
             _focusNode.requestFocus();
             setState(() => _dragging = true);
+            _dragStartPointerX ??= details.globalPosition.dx;
+            _dragStartWidth ??= widget.currentWidth;
           },
-          onHorizontalDragEnd: (_) => setState(() => _dragging = false),
-          onHorizontalDragCancel: () => setState(() => _dragging = false),
-          onHorizontalDragUpdate: (details) =>
-              widget.onWidthRequested(widget.currentWidth + details.delta.dx),
+          onHorizontalDragEnd: (_) {
+            _dragStartPointerX = null;
+            _dragStartWidth = null;
+            setState(() => _dragging = false);
+          },
+          onHorizontalDragCancel: () {
+            _dragStartPointerX = null;
+            _dragStartWidth = null;
+            setState(() => _dragging = false);
+          },
+          onHorizontalDragUpdate: (details) {
+            final startX = _dragStartPointerX;
+            final startWidth = _dragStartWidth;
+            if (startX == null || startWidth == null) return;
+            widget.onWidthRequested(
+              startWidth + (details.globalPosition.dx - startX),
+            );
+          },
           child: SizedBox(
             width: _VerticalGrip.width,
             child: Stack(

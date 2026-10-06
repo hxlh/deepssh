@@ -60,6 +60,15 @@ class _ResizeHandleState extends State<ResizeHandle> {
   bool _focused = false;
   bool _dragging = false;
 
+  /// Pointer position and splitter width when the drag started. The update
+  /// maths is absolute against these, never incremental against
+  /// [ResizeHandle.value]: several pointer events can arrive between two
+  /// frames, and [ResizeHandle.value] is the value from the last build, so
+  /// "value + delta" dropped every event but the first per frame and the
+  /// splitter trailed the cursor on high-rate mice.
+  double? _dragStartPointerX;
+  double? _dragStartWidth;
+
   @override
   void dispose() {
     _focusNode.dispose();
@@ -102,21 +111,42 @@ class _ResizeHandleState extends State<ResizeHandle> {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapDown: (_) => _focusNode.requestFocus(),
-          onHorizontalDragStart: (_) {
+          // The reference is taken on the raw pointer down: DragStartDetails
+          // reports where the drag *recognizer accepted*, which is already
+          // past the slop, and that slop distance would never be credited.
+          onHorizontalDragDown: (details) {
+            _dragStartPointerX = details.globalPosition.dx;
+            _dragStartWidth = widget.value;
+          },
+          onHorizontalDragStart: (details) {
             _focusNode.requestFocus();
             setState(() => _dragging = true);
+            _dragStartPointerX ??= details.globalPosition.dx;
+            _dragStartWidth ??= widget.value;
             widget.onDraggingChanged?.call(true);
           },
           onHorizontalDragEnd: (_) {
+            _dragStartPointerX = null;
+            _dragStartWidth = null;
             setState(() => _dragging = false);
             widget.onDraggingChanged?.call(false);
           },
           onHorizontalDragCancel: () {
+            _dragStartPointerX = null;
+            _dragStartWidth = null;
             setState(() => _dragging = false);
             widget.onDraggingChanged?.call(false);
           },
-          onHorizontalDragUpdate: (details) =>
-              _request(widget.value + details.delta.dx),
+          // Absolute mapping: the width follows the pointer's total travel
+          // from the drag start, exactly like the dock splitter maps
+          // `dockBottomY() - globalPosition.dy`. Independent of how many
+          // events the platform delivers between frames.
+          onHorizontalDragUpdate: (details) {
+            final startX = _dragStartPointerX;
+            final startWidth = _dragStartWidth;
+            if (startX == null || startWidth == null) return;
+            _request(startWidth + (details.globalPosition.dx - startX));
+          },
           child: SizedBox(
             width: 7,
             child: Stack(
