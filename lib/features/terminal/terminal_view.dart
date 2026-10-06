@@ -14,6 +14,7 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/deck_fields.dart';
 import '../local_terminal/local_terminal_bridge.dart';
 import '../ssh/ssh_bridge.dart';
+import '../../workbench/widgets/resize_handle.dart';
 import 'terminal_find.dart';
 import 'terminal_state.dart';
 
@@ -783,79 +784,81 @@ class _TerminalViewState extends State<TerminalView> {
         key: _terminalStackKey,
         children: [
           Positioned.fill(
-            child: Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerDown: (event) {
-                if (event.buttons == kSecondaryButton) {
-                  _showContextMenu(context, event.position);
-                } else {
-                  _focusTerminalInput();
-                }
-              },
-              child: Scrollbar(
-                controller: _findScrollController,
-                child: xterm.TerminalView(
-                  terminal,
-                  key: _xtermTerminalViewKey,
-                  controller: terminalController,
-                  scrollController: _findScrollController,
-                  focusNode: inputFocusNode,
-                  autofocus: _isMacOS,
-                  hardwareKeyboardOnly: !_isMacOS,
-                  onKeyEvent: _handleTerminalKeyEvent,
-                  // macOS Cmd+C flows through xterm's TerminalActions -> onCopy.
-                  // `text` is already buffer.getText(), which clamps each line to
-                  // its last content cell: trailing empty cells are dropped and
-                  // written spaces are preserved. Same semantics as the Ctrl+C /
-                  // context-menu path above, on all platforms.
-                  onCopy: (text) {
-                    if (text.isNotEmpty) {
-                      Clipboard.setData(ClipboardData(text: text));
-                    }
-                  },
-                  cursorType: _xtermCursorType(settings.cursorStyle),
-                  alwaysShowCursor: false,
-                  cursorBlinkVisible: _cursorVisible,
-                  foregroundColorResolver: _compiledRegexHighlights.isEmpty
-                      ? null
-                      : _regexForegroundForRow,
-                  textStyle: xterm.TerminalStyle(
-                    fontSize: settings.fontSize.toDouble(),
-                    fontFamily: termFamily ?? 'monospace',
-                    fontFamilyFallback: termFallback,
-                    normalFontWeight: _fontWeightFromConfig(
-                      settings.normalFontWeight,
+            child: _HoldWidthDuringExplorerResize(
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (event) {
+                  if (event.buttons == kSecondaryButton) {
+                    _showContextMenu(context, event.position);
+                  } else {
+                    _focusTerminalInput();
+                  }
+                },
+                child: Scrollbar(
+                  controller: _findScrollController,
+                  child: xterm.TerminalView(
+                    terminal,
+                    key: _xtermTerminalViewKey,
+                    controller: terminalController,
+                    scrollController: _findScrollController,
+                    focusNode: inputFocusNode,
+                    autofocus: _isMacOS,
+                    hardwareKeyboardOnly: !_isMacOS,
+                    onKeyEvent: _handleTerminalKeyEvent,
+                    // macOS Cmd+C flows through xterm's TerminalActions -> onCopy.
+                    // `text` is already buffer.getText(), which clamps each line to
+                    // its last content cell: trailing empty cells are dropped and
+                    // written spaces are preserved. Same semantics as the Ctrl+C /
+                    // context-menu path above, on all platforms.
+                    onCopy: (text) {
+                      if (text.isNotEmpty) {
+                        Clipboard.setData(ClipboardData(text: text));
+                      }
+                    },
+                    cursorType: _xtermCursorType(settings.cursorStyle),
+                    alwaysShowCursor: false,
+                    cursorBlinkVisible: _cursorVisible,
+                    foregroundColorResolver: _compiledRegexHighlights.isEmpty
+                        ? null
+                        : _regexForegroundForRow,
+                    textStyle: xterm.TerminalStyle(
+                      fontSize: settings.fontSize.toDouble(),
+                      fontFamily: termFamily ?? 'monospace',
+                      fontFamilyFallback: termFallback,
+                      normalFontWeight: _fontWeightFromConfig(
+                        settings.normalFontWeight,
+                      ),
+                      boldFontWeight: _fontWeightFromConfig(
+                        settings.boldFontWeight,
+                      ),
                     ),
-                    boldFontWeight: _fontWeightFromConfig(
-                      settings.boldFontWeight,
+                    theme: xterm.TerminalTheme(
+                      cursor: settings.cursorColor,
+                      selection: _terminalSelectionColor(settings),
+                      foreground: settings.foreground,
+                      background: settings.terminalBackground,
+                      black: const Color(0xFF000000),
+                      red: const Color(0xFFCD3131),
+                      green: const Color(0xFF0DBC79),
+                      yellow: const Color(0xFFE5E510),
+                      blue: const Color(0xFF2472C8),
+                      magenta: const Color(0xFFBC3FBC),
+                      cyan: const Color(0xFF11A8CD),
+                      white: const Color(0xFFE5E5E5),
+                      brightBlack: const Color(0xFF666666),
+                      brightRed: const Color(0xFFF14C4C),
+                      brightGreen: const Color(0xFF23D18B),
+                      brightYellow: const Color(0xFFF5F543),
+                      brightBlue: const Color(0xFF3B8EEA),
+                      brightMagenta: const Color(0xFFD670D6),
+                      brightCyan: const Color(0xFF29B8DB),
+                      brightWhite: const Color(0xFFE5E5E5),
+                      searchHitBackground: AppColors.accent.withOpacity(0.3),
+                      searchHitBackgroundCurrent: AppColors.accent.withOpacity(
+                        0.7,
+                      ),
+                      searchHitForeground: settings.foreground,
                     ),
-                  ),
-                  theme: xterm.TerminalTheme(
-                    cursor: settings.cursorColor,
-                    selection: _terminalSelectionColor(settings),
-                    foreground: settings.foreground,
-                    background: settings.terminalBackground,
-                    black: const Color(0xFF000000),
-                    red: const Color(0xFFCD3131),
-                    green: const Color(0xFF0DBC79),
-                    yellow: const Color(0xFFE5E510),
-                    blue: const Color(0xFF2472C8),
-                    magenta: const Color(0xFFBC3FBC),
-                    cyan: const Color(0xFF11A8CD),
-                    white: const Color(0xFFE5E5E5),
-                    brightBlack: const Color(0xFF666666),
-                    brightRed: const Color(0xFFF14C4C),
-                    brightGreen: const Color(0xFF23D18B),
-                    brightYellow: const Color(0xFFF5F543),
-                    brightBlue: const Color(0xFF3B8EEA),
-                    brightMagenta: const Color(0xFFD670D6),
-                    brightCyan: const Color(0xFF29B8DB),
-                    brightWhite: const Color(0xFFE5E5E5),
-                    searchHitBackground: AppColors.accent.withOpacity(0.3),
-                    searchHitBackgroundCurrent: AppColors.accent.withOpacity(
-                      0.7,
-                    ),
-                    searchHitForeground: settings.foreground,
                   ),
                 ),
               ),
@@ -994,6 +997,66 @@ class _TerminalContextMenuItemState extends State<_TerminalContextMenuItem> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Holds the terminal's width while the Explorer splitter is being dragged.
+///
+/// Changing the terminal's width forces a full-buffer reflow in the xterm
+/// engine; changing its height does not. On a deep scrollback the per-frame
+/// reflow costs milliseconds and the splitter stutters, while the dock
+/// splitter — which only moves along the cheap axis — stays smooth. While the
+/// pointer is down the box below keeps the last laid-out width, paints it in
+/// place and clips the strip, then the terminal resizes exactly once when the
+/// drag ends (where the reflow also happens just once).
+class _HoldWidthDuringExplorerResize extends StatelessWidget {
+  const _HoldWidthDuringExplorerResize({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final hold = ExplorerResizeHold.maybeOf(context);
+    if (hold == null) return child;
+    return _HeldWidthBox(holding: hold.value, child: child);
+  }
+}
+
+class _HeldWidthBox extends StatefulWidget {
+  const _HeldWidthBox({required this.holding, required this.child});
+
+  final bool holding;
+  final Widget child;
+
+  @override
+  State<_HeldWidthBox> createState() => _HeldWidthBoxState();
+}
+
+class _HeldWidthBoxState extends State<_HeldWidthBox> {
+  /// The width the terminal was last laid out at; captured on every free
+  /// layout so the first held frame has the pre-drag value.
+  double? _width;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!widget.holding) {
+          _width = constraints.maxWidth;
+          return widget.child;
+        }
+        final width = _width ?? constraints.maxWidth;
+        _width = width;
+        return ClipRect(
+          child: OverflowBox(
+            alignment: Alignment.topLeft,
+            minWidth: width,
+            maxWidth: width,
+            child: widget.child,
+          ),
+        );
+      },
     );
   }
 }

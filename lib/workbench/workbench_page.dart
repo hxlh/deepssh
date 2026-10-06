@@ -434,6 +434,11 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   static const double _minSidebarWidth = 56;
   double _sidebarWidth = AppSpacing.sidebarWidth;
 
+  /// True while the Explorer splitter is under the pointer. The terminal
+  /// listens (through [ExplorerResizeHold]) and holds its width for the
+  /// duration so a drag does not reflow the whole scrollback every frame.
+  final ValueNotifier<bool> _explorerResizeHold = ValueNotifier<bool>(false);
+
   ErrorLogger get _errorLogger =>
       widget.errorLogger ?? FileErrorLogger.frontend();
 
@@ -488,6 +493,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
     for (final subscription in localOutputSubscriptions.values) {
       subscription.cancel();
     }
+    _explorerResizeHold.dispose();
     super.dispose();
   }
 
@@ -1717,146 +1723,155 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              AppTopBar(
-                current: _currentSection,
-                onNavigate: _handleNavigateSection,
-                onAddConnection: _handleAddConnection,
-                sessionCount: terminalState.tabs.length,
-                tunnelCount: tunnelConfigs.length,
-                memoryRssMb: _memoryRssMb,
-                clock: _clock,
-              ),
-              Expanded(
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          if (_showExplorer) ...[
-                            Sidebar(
-                              width: _sidebarWidth,
-                              // The prototype collapses the Explorer into an icon rail once
-                              // the column gets too narrow to carry labels.
-                              compact:
-                                  _sidebarWidth <= Sidebar.compactBreakpoint,
-                              onAddConnectionSelected: _handleAddConnection,
-                              child: HostTree(
-                                state: hostTreeState,
-                                selectedTerminalId: terminalState.activeTabId,
-                                onToggleHost: _handleHostToggle,
-                                onTerminalTap: _handleTerminalTap,
-                                localTerminals: localTerminals,
-                                localExpanded: localExpanded,
-                                onToggleLocal: _handleLocalToggle,
-                                onLocalTerminalTap: _handleLocalTerminalTap,
-                                sshProfiles: sshProfiles,
-                                sshSessionsByProfileId: sshSessionsByProfileId,
-                                onSshProfileTap: (_) {},
-                                onSshSessionTap: _handleSshSessionTap,
-                                onEditSshSessionNote: _handleEditSshSessionNote,
-                                onCloseSshSession: _handleCloseSshSession,
-                                onDuplicateSshSession:
-                                    _handleDuplicateSshSession,
-                                onCloseLocalTerminal: _handleCloseLocalTerminal,
-                                onOpenThemeConfig: _handleOpenThemeConfig,
-                                themeConfigActive:
-                                    contentMode ==
-                                    WorkbenchContentMode.themeConfig,
-                                onToggleMemoryDock: _handleToggleMemoryDock,
-                                memoryDockVisible: _memoryDockVisible,
-                                onReorderSessions: _handleReorderSessions,
-                                onReorderLocalTerminals:
-                                    _handleReorderLocalTerminals,
-                                sectionOrder: explorerSectionOrder,
-                                onSectionOrderChanged:
-                                    _handleExplorerSectionOrderChanged,
+      body: ExplorerResizeHold(
+        hold: _explorerResizeHold,
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                AppTopBar(
+                  current: _currentSection,
+                  onNavigate: _handleNavigateSection,
+                  onAddConnection: _handleAddConnection,
+                  sessionCount: terminalState.tabs.length,
+                  tunnelCount: tunnelConfigs.length,
+                  memoryRssMb: _memoryRssMb,
+                  clock: _clock,
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            if (_showExplorer) ...[
+                              Sidebar(
+                                width: _sidebarWidth,
+                                // The prototype collapses the Explorer into an icon rail once
+                                // the column gets too narrow to carry labels.
                                 compact:
                                     _sidebarWidth <= Sidebar.compactBreakpoint,
+                                onAddConnectionSelected: _handleAddConnection,
+                                child: HostTree(
+                                  state: hostTreeState,
+                                  selectedTerminalId: terminalState.activeTabId,
+                                  onToggleHost: _handleHostToggle,
+                                  onTerminalTap: _handleTerminalTap,
+                                  localTerminals: localTerminals,
+                                  localExpanded: localExpanded,
+                                  onToggleLocal: _handleLocalToggle,
+                                  onLocalTerminalTap: _handleLocalTerminalTap,
+                                  sshProfiles: sshProfiles,
+                                  sshSessionsByProfileId:
+                                      sshSessionsByProfileId,
+                                  onSshProfileTap: (_) {},
+                                  onSshSessionTap: _handleSshSessionTap,
+                                  onEditSshSessionNote:
+                                      _handleEditSshSessionNote,
+                                  onCloseSshSession: _handleCloseSshSession,
+                                  onDuplicateSshSession:
+                                      _handleDuplicateSshSession,
+                                  onCloseLocalTerminal:
+                                      _handleCloseLocalTerminal,
+                                  onOpenThemeConfig: _handleOpenThemeConfig,
+                                  themeConfigActive:
+                                      contentMode ==
+                                      WorkbenchContentMode.themeConfig,
+                                  onToggleMemoryDock: _handleToggleMemoryDock,
+                                  memoryDockVisible: _memoryDockVisible,
+                                  onReorderSessions: _handleReorderSessions,
+                                  onReorderLocalTerminals:
+                                      _handleReorderLocalTerminals,
+                                  sectionOrder: explorerSectionOrder,
+                                  onSectionOrderChanged:
+                                      _handleExplorerSectionOrderChanged,
+                                  compact:
+                                      _sidebarWidth <=
+                                      Sidebar.compactBreakpoint,
+                                ),
+                              ),
+                              ResizeHandle(
+                                value: _sidebarWidth,
+                                min: _minSidebarWidth,
+                                max: 560,
+                                onChanged: (width) =>
+                                    setState(() => _sidebarWidth = width),
+                                onDraggingChanged: (dragging) =>
+                                    _explorerResizeHold.value = dragging,
+                              ),
+                            ],
+                            Expanded(
+                              child: WorkbenchContentSwitcher(
+                                mode: contentMode,
+                                terminalState: terminalState,
+                                sshProfiles: sshProfiles,
+                                sshErrorMessage: sshErrorMessage,
+                                editingSshProfile: editingSshProfile,
+                                tunnelConfigs: tunnelConfigs,
+                                tunnelErrorMessage: tunnelErrorMessage,
+                                editingTunnelConfig: editingTunnelConfig,
+                                uiThemeSettings: uiThemeSettings,
+                                terminalThemeSettings: terminalThemeSettings,
+                                onSelectTab: _handleTabSelect,
+                                onCloseTab: _handleTabClose,
+                                onReorderTab: _handleTabReorder,
+                                onRegexRuleError: _handleRegexRuleError,
+                                onAddSshProfile: _handleAddSshProfile,
+                                onlineSshProfileIds: [
+                                  for (final entry
+                                      in sshSessionsByProfileId.entries)
+                                    if (entry.value.isNotEmpty) entry.key,
+                                ],
+                                lastConnectedSshProfileAt: _lastConnectedAt,
+                                onConnectSshProfile: _handleConnectSshProfile,
+                                onEditSshProfile: _handleEditSshProfile,
+                                onDeleteSshProfile: _handleDeleteSshProfile,
+                                onCancelSshForm: _handleCancelSshForm,
+                                onSaveSshProfile: _handleSaveSshProfile,
+                                onAddTunnelConfig: _handleAddTunnelConfig,
+                                onStartTunnelConfig: _handleStartTunnelConfig,
+                                onStopTunnelConfig: _handleStopTunnelConfig,
+                                onEditTunnelConfig: _handleEditTunnelConfig,
+                                onDeleteTunnelConfig: _handleDeleteTunnelConfig,
+                                onCancelTunnelForm: _handleCancelTunnelForm,
+                                onSaveTunnelConfig: _handleSaveTunnelConfig,
+                                onUiThemeChanged: _handleUiThemeChanged,
+                                onTerminalThemeChanged:
+                                    _handleTerminalThemeChanged,
+                                onBackFromConfig: _handleBackFromConfig,
+                                sshBridge: widget.sshBridge,
+                                localTerminalBridge: widget.localTerminalBridge,
+                                onSshInput:
+                                    null, // command tracking removed; was causing setState on every Enter
+                                onSshTerminalInput: _writeSshTerminalInput,
+                                onPreviewLabelChanged:
+                                    _handleActiveTabPreviewLabelChanged,
                               ),
                             ),
-                            ResizeHandle(
-                              value: _sidebarWidth,
-                              min: _minSidebarWidth,
-                              max: 560,
-                              onChanged: (width) =>
-                                  setState(() => _sidebarWidth = width),
-                            ),
                           ],
-                          Expanded(
-                            child: WorkbenchContentSwitcher(
-                              mode: contentMode,
-                              terminalState: terminalState,
-                              sshProfiles: sshProfiles,
-                              sshErrorMessage: sshErrorMessage,
-                              editingSshProfile: editingSshProfile,
-                              tunnelConfigs: tunnelConfigs,
-                              tunnelErrorMessage: tunnelErrorMessage,
-                              editingTunnelConfig: editingTunnelConfig,
-                              uiThemeSettings: uiThemeSettings,
-                              terminalThemeSettings: terminalThemeSettings,
-                              onSelectTab: _handleTabSelect,
-                              onCloseTab: _handleTabClose,
-                              onReorderTab: _handleTabReorder,
-                              onRegexRuleError: _handleRegexRuleError,
-                              onAddSshProfile: _handleAddSshProfile,
-                              onlineSshProfileIds: [
-                                for (final entry
-                                    in sshSessionsByProfileId.entries)
-                                  if (entry.value.isNotEmpty) entry.key,
-                              ],
-                              lastConnectedSshProfileAt: _lastConnectedAt,
-                              onConnectSshProfile: _handleConnectSshProfile,
-                              onEditSshProfile: _handleEditSshProfile,
-                              onDeleteSshProfile: _handleDeleteSshProfile,
-                              onCancelSshForm: _handleCancelSshForm,
-                              onSaveSshProfile: _handleSaveSshProfile,
-                              onAddTunnelConfig: _handleAddTunnelConfig,
-                              onStartTunnelConfig: _handleStartTunnelConfig,
-                              onStopTunnelConfig: _handleStopTunnelConfig,
-                              onEditTunnelConfig: _handleEditTunnelConfig,
-                              onDeleteTunnelConfig: _handleDeleteTunnelConfig,
-                              onCancelTunnelForm: _handleCancelTunnelForm,
-                              onSaveTunnelConfig: _handleSaveTunnelConfig,
-                              onUiThemeChanged: _handleUiThemeChanged,
-                              onTerminalThemeChanged:
-                                  _handleTerminalThemeChanged,
-                              onBackFromConfig: _handleBackFromConfig,
-                              sshBridge: widget.sshBridge,
-                              localTerminalBridge: widget.localTerminalBridge,
-                              onSshInput:
-                                  null, // command tracking removed; was causing setState on every Enter
-                              onSshTerminalInput: _writeSshTerminalInput,
-                              onPreviewLabelChanged:
-                                  _handleActiveTabPreviewLabelChanged,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                    if (_showDock)
-                      WorkbenchDock(
-                        events: _events,
-                        height: _dockHeight,
-                        collapsed: _dockCollapsed,
-                        showMemory: _memoryDockVisible,
-                        onCollapsedChanged: (collapsed) =>
-                            setState(() => _dockCollapsed = collapsed),
-                        onHeightChanged: (height) => setState(() {
-                          _dockCollapsed = false;
-                          _dockHeight = height.clamp(96.0, 420.0);
-                        }),
-                      ),
-                  ],
+                      if (_showDock)
+                        WorkbenchDock(
+                          events: _events,
+                          height: _dockHeight,
+                          collapsed: _dockCollapsed,
+                          showMemory: _memoryDockVisible,
+                          onCollapsedChanged: (collapsed) =>
+                              setState(() => _dockCollapsed = collapsed),
+                          onHeightChanged: (height) => setState(() {
+                            _dockCollapsed = false;
+                            _dockHeight = height.clamp(96.0, 420.0);
+                          }),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          if (_openDrawer != null) _openDrawer!,
-        ],
+              ],
+            ),
+            if (_openDrawer != null) _openDrawer!,
+          ],
+        ),
       ),
     );
   }

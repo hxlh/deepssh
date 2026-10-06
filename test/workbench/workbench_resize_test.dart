@@ -1,13 +1,17 @@
 import 'package:deepssh/features/hosts/host_tree.dart';
+import 'package:deepssh/features/local_terminal/local_terminal_bridge.dart';
 import 'package:deepssh/features/ssh/ssh_bridge.dart';
 import 'package:deepssh/features/theme/theme_bridge.dart';
+import 'package:deepssh/workbench/widgets/add_connection_button.dart';
 import 'package:deepssh/workbench/widgets/resize_handle.dart';
 import 'package:deepssh/workbench/widgets/sidebar.dart';
 import 'package:deepssh/workbench/widgets/workbench_dock.dart';
 import 'package:deepssh/workbench/workbench_page.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xterm/xterm.dart' as xterm;
 
 void main() {
   Future<void> pumpWorkbench(WidgetTester tester) async {
@@ -18,6 +22,7 @@ void main() {
       MaterialApp(
         home: WorkbenchPage(
           sshBridge: InMemorySshBridgeClient(),
+          localTerminalBridge: InMemoryLocalTerminalBridgeClient(),
           themeBridge: InMemoryThemeBridgeClient(),
         ),
       ),
@@ -103,5 +108,59 @@ void main() {
     expect(tester.getSize(sidebar).width, 560);
     expect(tester.widget<HostTree>(find.byType(HostTree)).compact, isFalse);
     expect(sidebarMemory, findsOneWidget);
+  });
+
+  testWidgets('explorer splitter holds the terminal width until release', (
+    tester,
+  ) async {
+    // The xterm engine reflows its whole buffer on every width change but not
+    // on height changes; without the hold, dragging the Explorer splitter
+    // reflows the scrollback once per frame and stutters, while the dock
+    // splitter (height only) stays smooth. The terminal must therefore keep
+    // its pre-drag layout while the pointer is down and resize once on
+    // release.
+    await pumpWorkbench(tester);
+
+    // The terminal only mounts once a session tab exists.
+    await tester.tap(find.text('新增连接'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(addConnectionMenuKey(AddConnectionAction.localTerminal)),
+    );
+    await tester.pumpAndSettle();
+
+    xterm.Terminal terminal() => tester
+        .widget<xterm.TerminalView>(find.byType(xterm.TerminalView))
+        .terminal;
+
+    final before = terminal().viewWidth;
+    expect(before, greaterThan(0));
+
+    final sidebar = find.byType(Sidebar);
+    final sidebarBefore = tester.getSize(sidebar).width;
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(ResizeHandle)),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await gesture.moveBy(const Offset(-3, 0));
+      await tester.pump();
+    }
+
+    // The sidebar tracks the pointer the whole time...
+    expect(tester.getSize(sidebar).width, lessThan(sidebarBefore));
+
+    // ...while the terminal keeps its pre-drag width so no reflow runs
+    // mid-drag.
+    expect(terminal().viewWidth, before);
+
+    await gesture.up();
+    await tester.pump();
+    await tester.pump();
+
+    // Releasing applies the new width in one resize.
+    expect(terminal().viewWidth, greaterThan(before));
   });
 }

@@ -3,6 +3,29 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 
+/// Broadcasts "the Explorer splitter is being dragged" while the user holds it.
+///
+/// Resizing the Explorer changes the width of everything to its right, and the
+/// terminal answers every width change with a full-buffer reflow — with a deep
+/// scrollback that costs milliseconds per frame and makes the drag stutter
+/// (the dock splitter only changes heights, which skip the reflow entirely).
+/// Widgets that are expensive to resize subscribe to this notifier and hold
+/// their last laid-out width until the drag ends, then resize once.
+class ExplorerResizeHold extends InheritedNotifier<ValueNotifier<bool>> {
+  const ExplorerResizeHold({
+    super.key,
+    required ValueNotifier<bool> hold,
+    required super.child,
+  }) : super(notifier: hold);
+
+  /// The active hold notifier, or null when no splitter is in the tree.
+  static ValueNotifier<bool>? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<ExplorerResizeHold>()
+        ?.notifier;
+  }
+}
+
 /// Vertical splitter between the Explorer and the workbench stage.
 ///
 /// Mirrors the prototype's `#sbSplit`: 56–560px, arrow keys move 16px and
@@ -15,12 +38,17 @@ class ResizeHandle extends StatefulWidget {
     required this.min,
     required this.max,
     required this.onChanged,
+    this.onDraggingChanged,
   });
 
   final double value;
   final double min;
   final double max;
   final ValueChanged<double> onChanged;
+
+  /// Fires with true while a pointer drag is in progress, false once it ends
+  /// (or is cancelled). Keyboard steps do not toggle it.
+  final ValueChanged<bool>? onDraggingChanged;
 
   @override
   State<ResizeHandle> createState() => _ResizeHandleState();
@@ -77,9 +105,16 @@ class _ResizeHandleState extends State<ResizeHandle> {
           onHorizontalDragStart: (_) {
             _focusNode.requestFocus();
             setState(() => _dragging = true);
+            widget.onDraggingChanged?.call(true);
           },
-          onHorizontalDragEnd: (_) => setState(() => _dragging = false),
-          onHorizontalDragCancel: () => setState(() => _dragging = false),
+          onHorizontalDragEnd: (_) {
+            setState(() => _dragging = false);
+            widget.onDraggingChanged?.call(false);
+          },
+          onHorizontalDragCancel: () {
+            setState(() => _dragging = false);
+            widget.onDraggingChanged?.call(false);
+          },
           onHorizontalDragUpdate: (details) =>
               _request(widget.value + details.delta.dx),
           child: SizedBox(
