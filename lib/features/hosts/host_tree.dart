@@ -670,75 +670,86 @@ class _ExplorerSessionRowState extends State<_ExplorerSessionRow> {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
+            // The prototype lifts the row from a press anywhere on it — the
+            // grip is the affordance and the keyboard target, not the only
+            // drag surface. The close button sits above this listener in the
+            // stack, and stack hits stop at the topmost child, so a press
+            // that starts on the button never starts a reorder.
             Positioned(
               left: HostTree._rowLeft,
               right: HostTree._rowRight,
               top: HostTree._rowGap,
               bottom: HostTree._rowGap,
-              child: InkWell(
-                onTap: widget.onTap,
-                onSecondaryTapDown: widget.onSecondaryTapDown,
-                child: Container(
-                  height: HostTree._rowHeight,
-                  padding: const EdgeInsets.fromLTRB(10, 0, 4, 0),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      left: BorderSide(
-                        color: selected ? groupColor : Colors.transparent,
-                        width: 3,
+              child: ReorderableDragStartListener(
+                index: widget.reorderIndex,
+                child: InkWell(
+                  onTap: widget.onTap,
+                  onSecondaryTapDown: widget.onSecondaryTapDown,
+                  child: Container(
+                    height: HostTree._rowHeight,
+                    // The 26px right padding reserves the 22px close slot
+                    // (plus the row's 4px end padding) so the name still
+                    // ellipsises exactly where it did when the button sat
+                    // in the row's own flex.
+                    padding: const EdgeInsets.fromLTRB(10, 0, 26, 0),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        left: BorderSide(
+                          color: selected ? groupColor : Colors.transparent,
+                          width: 3,
+                        ),
+                      ),
+                      color: background,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(widget.icon, size: 15, color: iconColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            widget.label,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: nameColor,
+                              fontWeight: selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Close button: above the drag surface, so presses land here
+            // only, and the row's own flex no longer needs to make room.
+            Positioned(
+              right: HostTree._rowRight + 4,
+              top: HostTree._rowGap + 5,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 120),
+                opacity: _hovered || _closeFocused ? 1 : 0,
+                child: Tooltip(
+                  message: widget.closeTooltip,
+                  child: GestureDetector(
+                    onTap: widget.onClose,
+                    onSecondaryTapDown: widget.onSecondaryTapDown,
+                    child: Focus(
+                      onFocusChange: (focused) =>
+                          setState(() => _closeFocused = focused),
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: Icon(
+                          Icons.close,
+                          size: 13,
+                          color: AppColors.textMuted,
+                        ),
                       ),
                     ),
-                    color: background,
-                  ),
-                  child: Stack(
-                    // expand so the Row fills the 32px row and its own
-                    // crossAxisAlignment.center centres the label; loose
-                    // would top-align the shorter Row and push the text up.
-                    fit: StackFit.expand,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(widget.icon, size: 15, color: iconColor),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              widget.label,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: nameColor,
-                                fontWeight: selected
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                          AnimatedOpacity(
-                            duration: const Duration(milliseconds: 120),
-                            opacity: _hovered || _closeFocused ? 1 : 0,
-                            child: Tooltip(
-                              message: widget.closeTooltip,
-                              child: GestureDetector(
-                                onTap: widget.onClose,
-                                child: Focus(
-                                  onFocusChange: (focused) =>
-                                      setState(() => _closeFocused = focused),
-                                  child: SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: Icon(
-                                      Icons.close,
-                                      size: 13,
-                                      color: AppColors.textMuted,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                   ),
                 ),
               ),
