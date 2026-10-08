@@ -29,6 +29,10 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          # Pin the SDK so release artifacts always carry the renderer this
+          # version enables by default (Impeller on Windows since 3.47).
+          # Bump deliberately; 'channel: stable' alone tracks a moving target.
+          flutter-version: '3.47.6'
           channel: stable
           cache: true
 
