@@ -283,6 +283,35 @@ void main() {
     expect(find.text('example.com · terminal1'), findsNothing);
   });
 
+  testWidgets('right-clicking an SSH profile creates a terminal directly', (
+    tester,
+  ) async {
+    final bridge = FakeSshBridgeClient();
+    bridge.profiles.add(
+      const SshProfileItem(
+        id: 'profile-1',
+        name: 'Prod',
+        host: 'example.com',
+        port: 22,
+        username: 'root',
+        password: 'secret',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: WorkbenchPage(sshBridge: bridge)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Prod'), buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('新增'));
+    await tester.pumpAndSettle();
+
+    expect(bridge.connectCount, 1);
+    expect(find.text('terminal1'), findsWidgets);
+  });
+
   testWidgets('connect with empty saved password prompts for password', (
     tester,
   ) async {

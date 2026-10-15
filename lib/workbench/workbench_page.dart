@@ -1793,10 +1793,16 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                                       onToggleLocal: _handleLocalToggle,
                                       onLocalTerminalTap:
                                           _handleLocalTerminalTap,
+                                      onCreateLocalTerminal: () =>
+                                          unawaited(_createLocalTerminal()),
                                       sshProfiles: sshProfiles,
                                       sshSessionsByProfileId:
                                           sshSessionsByProfileId,
                                       onSshProfileTap: (_) {},
+                                      onConnectSshProfile: (profile) =>
+                                          unawaited(
+                                            _handleConnectSshProfile(profile),
+                                          ),
                                       onSshSessionTap: _handleSshSessionTap,
                                       onEditSshSessionNote:
                                           _handleEditSshSessionNote,

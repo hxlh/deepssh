@@ -22,9 +22,11 @@ class HostTree extends StatelessWidget {
     required this.localExpanded,
     required this.onToggleLocal,
     required this.onLocalTerminalTap,
+    required this.onCreateLocalTerminal,
     required this.sshProfiles,
     required this.sshSessionsByProfileId,
     required this.onSshProfileTap,
+    required this.onConnectSshProfile,
     required this.onSshSessionTap,
     required this.onEditSshSessionNote,
     required this.onCloseSshSession,
@@ -49,9 +51,11 @@ class HostTree extends StatelessWidget {
   final bool localExpanded;
   final VoidCallback onToggleLocal;
   final ValueChanged<LocalTerminalItem> onLocalTerminalTap;
+  final VoidCallback onCreateLocalTerminal;
   final List<SshProfileItem> sshProfiles;
   final Map<String, List<SshSessionItem>> sshSessionsByProfileId;
   final ValueChanged<SshProfileItem> onSshProfileTap;
+  final ValueChanged<SshProfileItem> onConnectSshProfile;
   final ValueChanged<SshSessionItem> onSshSessionTap;
   final Future<void> Function(SshSessionItem) onEditSshSessionNote;
   final Future<void> Function(SshSessionItem) onCloseSshSession;
@@ -186,6 +190,21 @@ class HostTree extends StatelessWidget {
     }
   }
 
+  Future<void> _showCreateMenu({
+    required BuildContext context,
+    required Offset position,
+    required VoidCallback onCreate,
+  }) async {
+    final selected = await showDeckContextMenu(
+      context: context,
+      globalPosition: position,
+      items: const [DeckMenuItem(value: 'create', label: '新增')],
+    );
+    if (selected == 'create') {
+      onCreate();
+    }
+  }
+
   Widget _sessionItem(
     BuildContext context,
     SshSessionItem session, {
@@ -248,9 +267,16 @@ class HostTree extends StatelessWidget {
     );
   }
 
-  Widget _profileHeader(SshProfileItem profile) {
+  Widget _profileHeader(BuildContext context, SshProfileItem profile) {
     final header = InkWell(
       onTap: () => onSshProfileTap(profile),
+      onSecondaryTapDown: (details) {
+        _showCreateMenu(
+          context: context,
+          position: details.globalPosition,
+          onCreate: () => onConnectSshProfile(profile),
+        );
+      },
       child: Container(
         height: compact ? 34 : 32,
         margin: const EdgeInsets.symmetric(vertical: _rowGap),
@@ -290,7 +316,11 @@ class HostTree extends StatelessWidget {
     return compact ? Tooltip(message: profile.name, child: header) : header;
   }
 
-  Widget _profileSection(SshProfileItem profile, int sectionIndex) {
+  Widget _profileSection(
+    BuildContext context,
+    SshProfileItem profile,
+    int sectionIndex,
+  ) {
     final sessions =
         sshSessionsByProfileId[profile.id] ?? const <SshSessionItem>[];
     return Column(
@@ -299,7 +329,7 @@ class HostTree extends StatelessWidget {
       children: [
         ReorderableDragStartListener(
           index: sectionIndex,
-          child: _profileHeader(profile),
+          child: _profileHeader(context, profile),
         ),
         if (sessions.isNotEmpty)
           SessionReorderList(
@@ -323,9 +353,16 @@ class HostTree extends StatelessWidget {
     );
   }
 
-  Widget _localSection(int sectionIndex) {
+  Widget _localSection(BuildContext context, int sectionIndex) {
     final header = InkWell(
       onTap: onToggleLocal,
+      onSecondaryTapDown: (details) {
+        _showCreateMenu(
+          context: context,
+          position: details.globalPosition,
+          onCreate: onCreateLocalTerminal,
+        );
+      },
       child: Container(
         height: compact ? 34 : 32,
         margin: const EdgeInsets.symmetric(vertical: _rowGap),
@@ -427,10 +464,11 @@ class HostTree extends StatelessWidget {
                     itemBuilder: (context, sectionIndex) {
                       final sectionId = sections[sectionIndex];
                       if (sectionId == _localSectionId) {
-                        return _localSection(sectionIndex);
+                        return _localSection(context, sectionIndex);
                       }
                       final profileId = _profileIdFromSectionId(sectionId)!;
                       return _profileSection(
+                        context,
                         profilesById[profileId]!,
                         sectionIndex,
                       );

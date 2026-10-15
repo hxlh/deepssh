@@ -53,6 +53,13 @@ void main() {
 
     expect(find.text('terminal2'), findsWidgets);
     expect(find.text('local · terminal2'), findsNothing);
+
+    await tester.tap(find.text('Local'), buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('新增'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('terminal3'), findsWidgets);
   });
 
   testWidgets(

@@ -3,6 +3,7 @@ import 'package:deepssh/core/models/ssh_profile_item.dart';
 import 'package:deepssh/core/models/ssh_session_item.dart';
 import 'package:deepssh/features/hosts/host_tree.dart';
 import 'package:deepssh/features/hosts/host_tree_state.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -40,9 +41,11 @@ Widget _hostTree({
         localExpanded: true,
         onToggleLocal: () {},
         onLocalTerminalTap: (_) {},
+        onCreateLocalTerminal: () {},
         sshProfiles: sshProfiles,
         sshSessionsByProfileId: sshSessionsByProfileId,
         onSshProfileTap: (_) {},
+        onConnectSshProfile: (_) {},
         onSshSessionTap: (_) {},
         onEditSshSessionNote: (_) async {},
         onCloseSshSession: (_) async {},
@@ -133,5 +136,59 @@ void main() {
 
     expect(find.text('Server A'), findsOneWidget);
     expect(find.text('Local'), findsOneWidget);
+  });
+
+  testWidgets('section headers expose a direct create action on right click', (
+    tester,
+  ) async {
+    var localCreates = 0;
+    var sshCreates = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HostTree(
+            state: HostTreeState(),
+            selectedTerminalId: null,
+            onToggleHost: (_) {},
+            onTerminalTap: (_) {},
+            localTerminals: const [
+              LocalTerminalItem(id: 'local-terminal-1', title: 'terminal1'),
+            ],
+            localExpanded: true,
+            onToggleLocal: () {},
+            onLocalTerminalTap: (_) {},
+            onCreateLocalTerminal: () => localCreates++,
+            sshProfiles: [_profile('p1', 'Server A')],
+            sshSessionsByProfileId: const {},
+            onSshProfileTap: (_) {},
+            onConnectSshProfile: (_) => sshCreates++,
+            onSshSessionTap: (_) {},
+            onEditSshSessionNote: (_) async {},
+            onCloseSshSession: (_) async {},
+            onCloseLocalTerminal: (_) async {},
+            onOpenThemeConfig: () {},
+            onDuplicateSshSession: (_) async {},
+            themeConfigActive: false,
+            onToggleMemoryDock: () {},
+            memoryDockVisible: true,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Server A'), buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    expect(find.text('新增'), findsOneWidget);
+    await tester.tap(find.text('新增'));
+    await tester.pumpAndSettle();
+    expect(sshCreates, 1);
+
+    await tester.tap(find.text('Local'), buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    expect(find.text('新增'), findsOneWidget);
+    await tester.tap(find.text('新增'));
+    await tester.pumpAndSettle();
+    expect(localCreates, 1);
   });
 }
