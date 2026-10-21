@@ -93,7 +93,8 @@ List<ThemePreset> builtInTerminalPresets() => [
 /// Custom presets plus the built-ins the user removed from the list.
 ///
 /// Mirrors the prototype's `deepssh.uiPresets` / `deepssh.uiHiddenPresets`
-/// localStorage keys, but persists to `config/theme_presets.json` instead.
+/// arrays, but persists alongside the active theme in
+/// `config/theme_settings.yaml`.
 class ThemePresetLibrary {
   ThemePresetLibrary({
     List<ThemePreset>? uiCustom,

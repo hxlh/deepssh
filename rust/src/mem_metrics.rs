@@ -139,7 +139,11 @@ mod tests {
     #[test]
     fn snapshot_reports_nonzero_rss_and_includes_stats_text() {
         let snap = rust_mem_snapshot();
-        assert!(snap.current_rss > 0, "rss should be > 0, got {}", snap.current_rss);
+        assert!(
+            snap.current_rss > 0,
+            "rss should be > 0, got {}",
+            snap.current_rss
+        );
         assert!(snap.peak_rss >= snap.current_rss);
         assert!(!snap.mimalloc_stats_text.is_empty());
     }

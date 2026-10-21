@@ -63,15 +63,18 @@ void main() {
     await tester.tap(find.byKey(appNavKey(AppSection.theme)));
     await tester.pumpAndSettle();
 
-    Future<void> chooseSize(String label) async {
-      await tester.tap(find.byKey(const ValueKey('ui-size-select')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(label).last);
-      await tester.pumpAndSettle();
+    Future<void> enterSize(String value) async {
+      final field = find.descendant(
+        of: find.byKey(const ValueKey('ui-size-select')),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(field, value);
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
     }
 
-    await chooseSize('15 px');
-    await chooseSize('14 px');
+    await enterSize('15');
+    await enterSize('14');
     await tester.tap(find.byKey(const ValueKey('theme-save')));
     await tester.pump();
     expect(themeBridge.pendingSaves, hasLength(1));

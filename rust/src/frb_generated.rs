@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1354039263;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 558906639;
 
 // Section: executor
 
@@ -560,6 +560,40 @@ fn wire__crate__theme__load_theme_impl(
         },
     )
 }
+fn wire__crate__theme__load_theme_presets_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "load_theme_presets",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::theme::load_theme_presets()?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__local_terminal__resize_local_terminal_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -733,6 +767,41 @@ fn wire__crate__theme__save_theme_impl(
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
                     (move || {
                         let output_ok = crate::theme::save_theme(api_settings)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__theme__save_theme_presets_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "save_theme_presets",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_presets = <crate::theme::ThemePresetLibrary>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::theme::save_theme_presets(api_presets)?;
                         Ok(output_ok)
                     })(),
                 )
@@ -1078,6 +1147,18 @@ impl SseDecode for i32 {
     }
 }
 
+impl SseDecode for Vec<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<String>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1109,6 +1190,18 @@ impl SseDecode for Vec<crate::profile::SshProfile> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::profile::SshProfile>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::theme::ThemePreset> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::theme::ThemePreset>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -1171,6 +1264,17 @@ impl SseDecode for Option<crate::ssh_session::SshSession> {
     }
 }
 
+impl SseDecode for Option<crate::theme::TerminalTheme> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::theme::TerminalTheme>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::tunnel::TunnelConfig> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1187,6 +1291,17 @@ impl SseDecode for Option<u16> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<u16>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::theme::UiTheme> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::theme::UiTheme>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -1394,6 +1509,40 @@ impl SseDecode for crate::theme::TerminalTheme {
     }
 }
 
+impl SseDecode for crate::theme::ThemePreset {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_swatch = <String>::sse_decode(deserializer);
+        let mut var_ui = <Option<crate::theme::UiTheme>>::sse_decode(deserializer);
+        let mut var_terminal = <Option<crate::theme::TerminalTheme>>::sse_decode(deserializer);
+        return crate::theme::ThemePreset {
+            id: var_id,
+            name: var_name,
+            swatch: var_swatch,
+            ui: var_ui,
+            terminal: var_terminal,
+        };
+    }
+}
+
+impl SseDecode for crate::theme::ThemePresetLibrary {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_uiPresets = <Vec<crate::theme::ThemePreset>>::sse_decode(deserializer);
+        let mut var_terminalPresets = <Vec<crate::theme::ThemePreset>>::sse_decode(deserializer);
+        let mut var_hiddenUiPresetIds = <Vec<String>>::sse_decode(deserializer);
+        let mut var_hiddenTerminalPresetIds = <Vec<String>>::sse_decode(deserializer);
+        return crate::theme::ThemePresetLibrary {
+            ui_presets: var_uiPresets,
+            terminal_presets: var_terminalPresets,
+            hidden_ui_preset_ids: var_hiddenUiPresetIds,
+            hidden_terminal_preset_ids: var_hiddenTerminalPresetIds,
+        };
+    }
+}
+
 impl SseDecode for crate::theme::ThemeSettings {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1564,35 +1713,37 @@ fn pde_ffi_dispatcher_primary_impl(
         11 => wire__crate__profile__list_profiles_impl(port, ptr, rust_vec_len, data_len),
         12 => wire__crate__tunnel__list_tunnels_impl(port, ptr, rust_vec_len, data_len),
         13 => wire__crate__theme__load_theme_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__local_terminal__resize_local_terminal_impl(
+        14 => wire__crate__theme__load_theme_presets_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__local_terminal__resize_local_terminal_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        15 => wire__crate__ssh_session__resize_session_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__mem_metrics__rust_mem_snapshot_impl(port, ptr, rust_vec_len, data_len),
-        17 => {
+        16 => wire__crate__ssh_session__resize_session_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__mem_metrics__rust_mem_snapshot_impl(port, ptr, rust_vec_len, data_len),
+        18 => {
             wire__crate__mem_metrics__rust_mimalloc_collect_impl(port, ptr, rust_vec_len, data_len)
         }
-        18 => wire__crate__theme__save_theme_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__local_terminal__spawn_local_terminal_impl(
+        19 => wire__crate__theme__save_theme_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__theme__save_theme_presets_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__local_terminal__spawn_local_terminal_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        20 => wire__crate__tunnel__start_tunnel_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__tunnel__stop_tunnel_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__profile__update_profile_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__tunnel__update_tunnel_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__local_terminal__write_to_local_terminal_impl(
+        22 => wire__crate__tunnel__start_tunnel_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__tunnel__stop_tunnel_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__profile__update_profile_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__tunnel__update_tunnel_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__local_terminal__write_to_local_terminal_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        25 => wire__crate__ssh_session__write_to_session_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__ssh_session__write_to_session_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1872,6 +2023,48 @@ impl flutter_rust_bridge::IntoIntoDart<crate::theme::TerminalTheme>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::theme::ThemePreset {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.swatch.into_into_dart().into_dart(),
+            self.ui.into_into_dart().into_dart(),
+            self.terminal.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::theme::ThemePreset {}
+impl flutter_rust_bridge::IntoIntoDart<crate::theme::ThemePreset> for crate::theme::ThemePreset {
+    fn into_into_dart(self) -> crate::theme::ThemePreset {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::theme::ThemePresetLibrary {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.ui_presets.into_into_dart().into_dart(),
+            self.terminal_presets.into_into_dart().into_dart(),
+            self.hidden_ui_preset_ids.into_into_dart().into_dart(),
+            self.hidden_terminal_preset_ids.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::theme::ThemePresetLibrary
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::theme::ThemePresetLibrary>
+    for crate::theme::ThemePresetLibrary
+{
+    fn into_into_dart(self) -> crate::theme::ThemePresetLibrary {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::theme::ThemeSettings {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2046,6 +2239,16 @@ impl SseEncode for i32 {
     }
 }
 
+impl SseEncode for Vec<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <String>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2072,6 +2275,16 @@ impl SseEncode for Vec<crate::profile::SshProfile> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::profile::SshProfile>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::theme::ThemePreset> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::theme::ThemePreset>::sse_encode(item, serializer);
         }
     }
 }
@@ -2124,6 +2337,16 @@ impl SseEncode for Option<crate::ssh_session::SshSession> {
     }
 }
 
+impl SseEncode for Option<crate::theme::TerminalTheme> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::theme::TerminalTheme>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::tunnel::TunnelConfig> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2140,6 +2363,16 @@ impl SseEncode for Option<u16> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <u16>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::theme::UiTheme> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::theme::UiTheme>::sse_encode(value, serializer);
         }
     }
 }
@@ -2280,6 +2513,27 @@ impl SseEncode for crate::theme::TerminalTheme {
         <String>::sse_encode(self.cursor_color, serializer);
         <u32>::sse_encode(self.scrollback_lines, serializer);
         <Vec<crate::theme::RegexHighlight>>::sse_encode(self.regex_highlights, serializer);
+    }
+}
+
+impl SseEncode for crate::theme::ThemePreset {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <String>::sse_encode(self.swatch, serializer);
+        <Option<crate::theme::UiTheme>>::sse_encode(self.ui, serializer);
+        <Option<crate::theme::TerminalTheme>>::sse_encode(self.terminal, serializer);
+    }
+}
+
+impl SseEncode for crate::theme::ThemePresetLibrary {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<crate::theme::ThemePreset>>::sse_encode(self.ui_presets, serializer);
+        <Vec<crate::theme::ThemePreset>>::sse_encode(self.terminal_presets, serializer);
+        <Vec<String>>::sse_encode(self.hidden_ui_preset_ids, serializer);
+        <Vec<String>>::sse_encode(self.hidden_terminal_preset_ids, serializer);
     }
 }
 

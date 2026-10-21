@@ -8,7 +8,7 @@ DeepSSH 是一个基于 Flutter Desktop 和 Rust 的跨平台 SSH 客户端。�
 - Explorer 侧边栏：管理本地终端、SSH Profile 和已打开的 SSH 会话。
 - SSH 会话：连接、关闭、复制会话，并在 Explorer 中显示会话备注或最近执行的命令。
 - 终端渲染：基于 vendored `xterm`，支持终端输入、输出、光标样式、滚动缓冲等能力。
-- 主题配置：支持 UI 主题和终端主题配置，并持久化到本地 YAML 配置。
+- 主题配置：UI 主题、终端主题和自定义方案统一持久化到 `config/theme_settings.yaml`。
 - 颜色配置：支持调色板、十六进制颜色和 HTML/CSS 颜色名输入。
 - 正则高亮：支持为终端输出配置正则匹配规则、前景色和备注。
 - 跨平台构建脚本：提供 Bash、Windows Batch、PowerShell 三套入口。

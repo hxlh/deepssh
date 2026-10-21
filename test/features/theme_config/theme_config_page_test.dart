@@ -195,10 +195,10 @@ void main() {
     expect(find.text('自定义方案 1'), findsNothing);
   });
 
-  testWidgets('terminal presets keep the configured font stack', (
+  testWidgets('saving edits updates only the selected custom preset', (
     tester,
   ) async {
-    TerminalThemeSettings? savedTerminal;
+    TerminalThemeSettings? activeTerminal;
     const fontStack = 'JetBrains Mono, JetBrainsMono Nerd Font';
     final presetSettings = TerminalThemeSettings.oneDark().copyWith(
       presetName: 'One Dark Nerd Font',
@@ -219,30 +219,54 @@ void main() {
 
     await _pumpPage(
       tester,
-      terminalSettings: TerminalThemeSettings.commandDeck().copyWith(
-        fontFamily: fontStack,
-      ),
+      terminalSettings: presetSettings,
       presetStore: store,
-      onTerminalSaved: (settings) => savedTerminal = settings,
+      onTerminalSaved: (settings) => activeTerminal = settings,
     );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('term-font-input')),
+      fontStack,
+    );
+    final cursorSelect = find.byKey(const ValueKey('cursor-style-select'));
+    await tester.ensureVisible(cursorSelect);
+    await tester.tap(cursorSelect);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下划线').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('光标闪烁'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
+    await tester.pumpAndSettle();
+
+    final savedTerminal = (await store.load()).terminalCustom.single.terminal!;
+    expect(activeTerminal?.fontFamily, fontStack);
+    expect(activeTerminal?.cursorStyle, CursorStyle.underline);
+    expect(savedTerminal.fontFamily, fontStack);
+    expect(savedTerminal.cursorStyle, CursorStyle.underline);
+    expect(savedTerminal.cursorBlink, isFalse);
+    expect(
+      TerminalThemeSettings.commandDeck().fontFamily,
+      'JetBrains Mono',
+      reason: 'editing the custom preset must not mutate the built-in preset',
+    );
+    expect(TerminalThemeSettings.commandDeck().cursorStyle, CursorStyle.bar);
 
     final trigger = find.byKey(const ValueKey('preset-trigger-terminal'));
     await tester.ensureVisible(trigger);
     await tester.pumpAndSettle();
     await tester.tap(trigger);
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Command Deck').last);
+    await tester.pumpAndSettle();
+    expect(find.text('竖线'), findsOneWidget);
+
+    await tester.tap(trigger);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('One Dark Nerd Font'));
     await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('theme-save')));
-    await tester.pump();
-
-    expect(savedTerminal?.fontFamily, fontStack);
-    expect(
-      savedTerminal?.terminalBackground,
-      presetSettings.terminalBackground,
-      reason: 'the remaining fields should still come from the preset',
-    );
+    expect(find.text('下划线'), findsOneWidget);
   });
 
   testWidgets('empty regex list shows the guidance', (tester) async {

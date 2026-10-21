@@ -14,6 +14,7 @@ static THEME_STORE: Lazy<Mutex<ThemeStore>> = Lazy::new(|| Mutex::new(ThemeStore
 #[derive(Default)]
 struct ThemeStore {
     settings: Option<ThemeSettings>,
+    presets: Option<ThemePresetLibrary>,
     initialized: bool,
 }
 
@@ -62,6 +63,32 @@ pub struct RegexHighlight {
     pub note: String,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct ThemePreset {
+    pub id: String,
+    pub name: String,
+    pub swatch: String,
+    pub ui: Option<UiTheme>,
+    pub terminal: Option<TerminalTheme>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ThemePresetLibrary {
+    pub ui_presets: Vec<ThemePreset>,
+    pub terminal_presets: Vec<ThemePreset>,
+    pub hidden_ui_preset_ids: Vec<String>,
+    pub hidden_terminal_preset_ids: Vec<String>,
+}
+
+fn empty_presets() -> ThemePresetLibrary {
+    ThemePresetLibrary {
+        ui_presets: Vec::new(),
+        terminal_presets: Vec::new(),
+        hidden_ui_preset_ids: Vec::new(),
+        hidden_terminal_preset_ids: Vec::new(),
+    }
+}
+
 #[flutter_rust_bridge::frb(ignore)]
 #[derive(Debug, Deserialize, Serialize)]
 struct ThemeFile {
@@ -71,6 +98,14 @@ struct ThemeFile {
     version: Option<u32>,
     ui: UiThemeConfig,
     terminal: TerminalThemeConfig,
+    #[serde(default)]
+    ui_presets: Vec<ThemePresetConfig>,
+    #[serde(default)]
+    terminal_presets: Vec<ThemePresetConfig>,
+    #[serde(default)]
+    hidden_ui_preset_ids: Vec<String>,
+    #[serde(default)]
+    hidden_terminal_preset_ids: Vec<String>,
 }
 
 fn default_ui_normal_font_weight() -> u32 {
@@ -137,21 +172,65 @@ struct RegexHighlightConfig {
     note: String,
 }
 
-impl From<&ThemeSettings> for ThemeFile {
-    fn from(settings: &ThemeSettings) -> Self {
+#[flutter_rust_bridge::frb(ignore)]
+#[derive(Debug, Deserialize, Serialize)]
+struct ThemePresetConfig {
+    id: String,
+    name: String,
+    swatch: String,
+    #[serde(default)]
+    ui: Option<UiThemeConfig>,
+    #[serde(default)]
+    terminal: Option<TerminalThemeConfig>,
+}
+
+#[flutter_rust_bridge::frb(ignore)]
+struct ThemeDocument {
+    settings: ThemeSettings,
+    presets: ThemePresetLibrary,
+}
+
+impl From<&ThemeDocument> for ThemeFile {
+    fn from(document: &ThemeDocument) -> Self {
         Self {
             version: Some(CURRENT_THEME_VERSION),
-            ui: UiThemeConfig::from(&settings.ui),
-            terminal: TerminalThemeConfig::from(&settings.terminal),
+            ui: UiThemeConfig::from(&document.settings.ui),
+            terminal: TerminalThemeConfig::from(&document.settings.terminal),
+            ui_presets: document
+                .presets
+                .ui_presets
+                .iter()
+                .map(ThemePresetConfig::from)
+                .collect(),
+            terminal_presets: document
+                .presets
+                .terminal_presets
+                .iter()
+                .map(ThemePresetConfig::from)
+                .collect(),
+            hidden_ui_preset_ids: document.presets.hidden_ui_preset_ids.clone(),
+            hidden_terminal_preset_ids: document.presets.hidden_terminal_preset_ids.clone(),
         }
     }
 }
 
-impl From<ThemeFile> for ThemeSettings {
+impl From<ThemeFile> for ThemeDocument {
     fn from(file: ThemeFile) -> Self {
         Self {
-            ui: UiTheme::from(file.ui),
-            terminal: TerminalTheme::from(file.terminal),
+            settings: ThemeSettings {
+                ui: UiTheme::from(file.ui),
+                terminal: TerminalTheme::from(file.terminal),
+            },
+            presets: ThemePresetLibrary {
+                ui_presets: file.ui_presets.into_iter().map(ThemePreset::from).collect(),
+                terminal_presets: file
+                    .terminal_presets
+                    .into_iter()
+                    .map(ThemePreset::from)
+                    .collect(),
+                hidden_ui_preset_ids: file.hidden_ui_preset_ids,
+                hidden_terminal_preset_ids: file.hidden_terminal_preset_ids,
+            },
         }
     }
 }
@@ -260,7 +339,32 @@ impl From<RegexHighlightConfig> for RegexHighlight {
     }
 }
 
-const CURRENT_THEME_VERSION: u32 = 2;
+impl From<&ThemePreset> for ThemePresetConfig {
+    fn from(preset: &ThemePreset) -> Self {
+        Self {
+            id: preset.id.clone(),
+            name: preset.name.clone(),
+            swatch: preset.swatch.clone(),
+            ui: preset.ui.as_ref().map(UiThemeConfig::from),
+            terminal: preset.terminal.as_ref().map(TerminalThemeConfig::from),
+        }
+    }
+}
+
+impl From<ThemePresetConfig> for ThemePreset {
+    fn from(config: ThemePresetConfig) -> Self {
+        Self {
+            id: config.id,
+            name: config.name,
+            swatch: config.swatch,
+            ui: config.ui.map(UiTheme::from),
+            terminal: config.terminal.map(TerminalTheme::from),
+        }
+    }
+}
+
+const CURRENT_THEME_VERSION: u32 = 3;
+const LEGACY_THEME_VERSION: u32 = 2;
 
 /// Prototype defaults: `design/deepssh-prototype.html` `:root` plus the regex
 /// set the user ships (also mirrored in Dart `TerminalThemeSettings.commandDeck`).
@@ -432,11 +536,16 @@ fn legacy_default_theme() -> ThemeSettings {
     }
 }
 
-fn load_theme_from_disk() -> Result<ThemeSettings> {
+fn load_document_from_disk() -> Result<ThemeDocument> {
     let path = config_file_path(CONFIG_FILE_NAME)?;
     let content = match fs::read_to_string(&path) {
         Ok(content) => content,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(default_theme()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(ThemeDocument {
+                settings: default_theme(),
+                presets: empty_presets(),
+            });
+        }
         Err(error) => {
             return Err(error).with_context(|| format!("Failed to read {}", path.display()))
         }
@@ -444,35 +553,35 @@ fn load_theme_from_disk() -> Result<ThemeSettings> {
     let file: ThemeFile = serde_yaml::from_str(&content)
         .with_context(|| format!("Failed to parse {}", path.display()))?;
     let version = file.version.unwrap_or(0);
-    let settings = ThemeSettings::from(file);
-    if version < CURRENT_THEME_VERSION {
+    let mut document = ThemeDocument::from(file);
+    if version < LEGACY_THEME_VERSION {
         // An untouched pre-refresh file still carries the old seven-rule set
         // and the old terminal cursor colours; upgrade it to the prototype
         // defaults instead of showing rules the user replaced.
-        if settings == legacy_default_theme() {
-            return Ok(default_theme());
+        if document.settings == legacy_default_theme() {
+            document.settings = default_theme();
         }
         // The prototype picker only ships Command Deck. Files still sitting on
         // the removed built-ins fall back to it instead of reappearing as an
         // unsupported preset.
-        let removed_preset = matches!(settings.ui.preset_name.as_str(), "VS Code Dark")
+        let removed_preset = matches!(document.settings.ui.preset_name.as_str(), "VS Code Dark")
             || matches!(
-                settings.terminal.preset_name.as_str(),
+                document.settings.terminal.preset_name.as_str(),
                 "One Dark" | "Solarized"
             );
         if removed_preset {
-            return Ok(default_theme());
+            document.settings = default_theme();
         }
     }
-    Ok(settings)
+    Ok(document)
 }
 
-fn write_theme_to_disk(settings: &ThemeSettings) -> Result<()> {
+fn write_document_to_disk(document: &ThemeDocument) -> Result<()> {
     let path = config_file_path(CONFIG_FILE_NAME)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|| format!("Failed to create {parent:?}"))?;
     }
-    let file = ThemeFile::from(settings);
+    let file = ThemeFile::from(document);
     let content = serde_yaml::to_string(&file).context("Failed to serialize theme settings")?;
     fs::write(&path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
@@ -482,9 +591,24 @@ fn ensure_theme_loaded(store: &mut ThemeStore) -> Result<()> {
     if store.initialized {
         return Ok(());
     }
-    store.settings = Some(load_theme_from_disk()?);
+    let document = load_document_from_disk()?;
+    store.settings = Some(document.settings);
+    store.presets = Some(document.presets);
     store.initialized = true;
     Ok(())
+}
+
+fn current_document(store: &ThemeStore) -> ThemeDocument {
+    ThemeDocument {
+        settings: store
+            .settings
+            .clone()
+            .expect("Theme settings should be initialized"),
+        presets: store
+            .presets
+            .clone()
+            .expect("Theme presets should be initialized"),
+    }
 }
 
 pub fn load_theme() -> Result<ThemeSettings> {
@@ -505,13 +629,46 @@ pub fn load_theme() -> Result<ThemeSettings> {
 pub fn save_theme(settings: ThemeSettings) -> Result<()> {
     let result = (|| {
         let mut store = THEME_STORE.lock().unwrap();
-        write_theme_to_disk(&settings)?;
+        ensure_theme_loaded(&mut store)?;
+        let mut document = current_document(&store);
+        document.settings = settings.clone();
+        write_document_to_disk(&document)?;
         store.settings = Some(settings);
-        store.initialized = true;
         Ok(())
     })();
     if let Err(error) = &result {
         crate::app_log::log_error("theme.save", error);
+    }
+    result
+}
+
+pub fn load_theme_presets() -> Result<ThemePresetLibrary> {
+    let result = (|| {
+        let mut store = THEME_STORE.lock().unwrap();
+        ensure_theme_loaded(&mut store)?;
+        Ok(store
+            .presets
+            .clone()
+            .expect("Theme presets should be initialized"))
+    })();
+    if let Err(error) = &result {
+        crate::app_log::log_error("theme.presets.load", error);
+    }
+    result
+}
+
+pub fn save_theme_presets(presets: ThemePresetLibrary) -> Result<()> {
+    let result = (|| {
+        let mut store = THEME_STORE.lock().unwrap();
+        ensure_theme_loaded(&mut store)?;
+        let mut document = current_document(&store);
+        document.presets = presets.clone();
+        write_document_to_disk(&document)?;
+        store.presets = Some(presets);
+        Ok(())
+    })();
+    if let Err(error) = &result {
+        crate::app_log::log_error("theme.presets.save", error);
     }
     result
 }
@@ -521,6 +678,7 @@ fn clear_theme_for_test() -> std::sync::MutexGuard<'static, ()> {
     let guard = crate::test_support::WORKSPACE_LOCK.lock().unwrap();
     let mut store = THEME_STORE.lock().unwrap();
     store.settings = None;
+    store.presets = None;
     store.initialized = false;
     guard
 }
@@ -569,7 +727,20 @@ mod tests {
     fn reset_store() {
         let mut store = THEME_STORE.lock().unwrap();
         store.settings = None;
+        store.presets = None;
         store.initialized = false;
+    }
+
+    fn legacy_theme_file(settings: &ThemeSettings) -> ThemeFile {
+        ThemeFile {
+            version: None,
+            ui: UiThemeConfig::from(&settings.ui),
+            terminal: TerminalThemeConfig::from(&settings.terminal),
+            ui_presets: Vec::new(),
+            terminal_presets: Vec::new(),
+            hidden_ui_preset_ids: Vec::new(),
+            hidden_terminal_preset_ids: Vec::new(),
+        }
     }
 
     fn sample_theme() -> ThemeSettings {
@@ -606,6 +777,28 @@ mod tests {
                     note: "错误日志".to_string(),
                 }],
             },
+        }
+    }
+
+    fn sample_presets() -> ThemePresetLibrary {
+        let theme = sample_theme();
+        ThemePresetLibrary {
+            ui_presets: vec![ThemePreset {
+                id: "ui-custom-1".to_string(),
+                name: "UI Custom".to_string(),
+                swatch: "#000000".to_string(),
+                ui: Some(theme.ui),
+                terminal: None,
+            }],
+            terminal_presets: vec![ThemePreset {
+                id: "term-custom-1".to_string(),
+                name: "Terminal Custom".to_string(),
+                swatch: "#000010".to_string(),
+                ui: None,
+                terminal: Some(theme.terminal),
+            }],
+            hidden_ui_preset_ids: vec!["deck".to_string()],
+            hidden_terminal_preset_ids: vec!["deck".to_string()],
         }
     }
 
@@ -647,17 +840,37 @@ mod tests {
     }
 
     #[test]
+    fn active_theme_and_presets_share_one_yaml_document() {
+        let _guard = clear_theme_for_test();
+        let workspace = TestWorkspace::new();
+        reset_store();
+
+        save_theme(sample_theme()).unwrap();
+        save_theme_presets(sample_presets()).unwrap();
+
+        let yaml = fs::read_to_string(workspace.config_path()).unwrap();
+        assert!(yaml.contains("version: 3"));
+        assert!(yaml.contains("ui_presets:"));
+        assert!(yaml.contains("id: ui-custom-1"));
+        assert!(yaml.contains("terminal_presets:"));
+        assert!(yaml.contains("id: term-custom-1"));
+        assert!(yaml.contains("hidden_ui_preset_ids:"));
+        assert!(yaml.contains("hidden_terminal_preset_ids:"));
+        assert!(!workspace.path().join("config/theme_presets.json").exists());
+
+        reset_store();
+        assert_eq!(load_theme().unwrap(), sample_theme());
+        assert_eq!(load_theme_presets().unwrap(), sample_presets());
+    }
+
+    #[test]
     fn legacy_default_file_is_upgraded_to_prototype_defaults() {
         let _guard = clear_theme_for_test();
         let workspace = TestWorkspace::new();
         reset_store();
         fs::create_dir_all(workspace.path().join("config")).unwrap();
         let legacy = legacy_default_theme();
-        let file = ThemeFile {
-            version: None,
-            ui: UiThemeConfig::from(&legacy.ui),
-            terminal: TerminalThemeConfig::from(&legacy.terminal),
-        };
+        let file = legacy_theme_file(&legacy);
         fs::write(
             workspace.config_path(),
             serde_yaml::to_string(&file).unwrap(),
@@ -679,11 +892,7 @@ mod tests {
         let mut old = sample_theme();
         old.ui.preset_name = "VS Code Dark".to_string();
         old.terminal.preset_name = "One Dark".to_string();
-        let file = ThemeFile {
-            version: None,
-            ui: UiThemeConfig::from(&old.ui),
-            terminal: TerminalThemeConfig::from(&old.terminal),
-        };
+        let file = legacy_theme_file(&old);
         fs::write(
             workspace.config_path(),
             serde_yaml::to_string(&file).unwrap(),

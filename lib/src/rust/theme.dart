@@ -6,15 +6,21 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `default_terminal_bold_font_weight`, `default_terminal_normal_font_weight`, `default_theme`, `default_ui_bold_font_weight`, `default_ui_normal_font_weight`, `ensure_theme_loaded`, `load_theme_from_disk`, `write_theme_to_disk`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `RegexHighlightConfig`, `TerminalThemeConfig`, `ThemeFile`, `ThemeStore`, `UiThemeConfig`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `current_document`, `default_terminal_bold_font_weight`, `default_terminal_normal_font_weight`, `default_theme`, `default_ui_bold_font_weight`, `default_ui_normal_font_weight`, `empty_presets`, `ensure_theme_loaded`, `legacy_default_theme`, `load_document_from_disk`, `write_document_to_disk`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `RegexHighlightConfig`, `TerminalThemeConfig`, `ThemeDocument`, `ThemeFile`, `ThemePresetConfig`, `ThemeStore`, `UiThemeConfig`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
 // These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`
 
 Future<ThemeSettings> loadTheme() => RustLib.instance.api.crateThemeLoadTheme();
 
 Future<void> saveTheme({required ThemeSettings settings}) =>
     RustLib.instance.api.crateThemeSaveTheme(settings: settings);
+
+Future<ThemePresetLibrary> loadThemePresets() =>
+    RustLib.instance.api.crateThemeLoadThemePresets();
+
+Future<void> saveThemePresets({required ThemePresetLibrary presets}) =>
+    RustLib.instance.api.crateThemeSaveThemePresets(presets: presets);
 
 class RegexHighlight {
   final String pattern;
@@ -105,6 +111,72 @@ class TerminalTheme {
           cursorColor == other.cursorColor &&
           scrollbackLines == other.scrollbackLines &&
           regexHighlights == other.regexHighlights;
+}
+
+class ThemePreset {
+  final String id;
+  final String name;
+  final String swatch;
+  final UiTheme? ui;
+  final TerminalTheme? terminal;
+
+  const ThemePreset({
+    required this.id,
+    required this.name,
+    required this.swatch,
+    this.ui,
+    this.terminal,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      swatch.hashCode ^
+      ui.hashCode ^
+      terminal.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ThemePreset &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          swatch == other.swatch &&
+          ui == other.ui &&
+          terminal == other.terminal;
+}
+
+class ThemePresetLibrary {
+  final List<ThemePreset> uiPresets;
+  final List<ThemePreset> terminalPresets;
+  final List<String> hiddenUiPresetIds;
+  final List<String> hiddenTerminalPresetIds;
+
+  const ThemePresetLibrary({
+    required this.uiPresets,
+    required this.terminalPresets,
+    required this.hiddenUiPresetIds,
+    required this.hiddenTerminalPresetIds,
+  });
+
+  @override
+  int get hashCode =>
+      uiPresets.hashCode ^
+      terminalPresets.hashCode ^
+      hiddenUiPresetIds.hashCode ^
+      hiddenTerminalPresetIds.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ThemePresetLibrary &&
+          runtimeType == other.runtimeType &&
+          uiPresets == other.uiPresets &&
+          terminalPresets == other.terminalPresets &&
+          hiddenUiPresetIds == other.hiddenUiPresetIds &&
+          hiddenTerminalPresetIds == other.hiddenTerminalPresetIds;
 }
 
 class ThemeSettings {

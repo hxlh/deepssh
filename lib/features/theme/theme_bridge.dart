@@ -27,8 +27,8 @@ class RustThemeBridgeClient implements ThemeBridgeClient {
     await _ensureInitialized();
     final settings = await rust_theme.loadTheme();
     return (
-      ui: _uiFromRust(settings.ui),
-      terminal: _terminalFromRust(settings.terminal),
+      ui: uiFromRust(settings.ui),
+      terminal: terminalFromRust(settings.terminal),
     );
   }
 
@@ -40,8 +40,8 @@ class RustThemeBridgeClient implements ThemeBridgeClient {
     await _ensureInitialized();
     await rust_theme.saveTheme(
       settings: rust_theme.ThemeSettings(
-        ui: _uiToRust(ui),
-        terminal: _terminalToRust(terminal),
+        ui: uiToRust(ui),
+        terminal: terminalToRust(terminal),
       ),
     );
   }
@@ -67,7 +67,7 @@ class InMemoryThemeBridgeClient implements ThemeBridgeClient {
   }
 }
 
-UiThemeSettings _uiFromRust(rust_theme.UiTheme value) {
+UiThemeSettings uiFromRust(rust_theme.UiTheme value) {
   return UiThemeSettings(
     presetName: value.presetName,
     fontFamily: value.fontFamily,
@@ -83,7 +83,7 @@ UiThemeSettings _uiFromRust(rust_theme.UiTheme value) {
   );
 }
 
-rust_theme.UiTheme _uiToRust(UiThemeSettings value) {
+rust_theme.UiTheme uiToRust(UiThemeSettings value) {
   return rust_theme.UiTheme(
     presetName: value.presetName,
     fontFamily: value.fontFamily,
@@ -99,7 +99,7 @@ rust_theme.UiTheme _uiToRust(UiThemeSettings value) {
   );
 }
 
-TerminalThemeSettings _terminalFromRust(rust_theme.TerminalTheme value) {
+TerminalThemeSettings terminalFromRust(rust_theme.TerminalTheme value) {
   return TerminalThemeSettings(
     presetName: value.presetName,
     fontFamily: value.fontFamily,
@@ -127,7 +127,7 @@ TerminalThemeSettings _terminalFromRust(rust_theme.TerminalTheme value) {
   );
 }
 
-rust_theme.TerminalTheme _terminalToRust(TerminalThemeSettings value) {
+rust_theme.TerminalTheme terminalToRust(TerminalThemeSettings value) {
   return rust_theme.TerminalTheme(
     presetName: value.presetName,
     fontFamily: value.fontFamily,

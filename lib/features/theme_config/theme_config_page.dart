@@ -20,8 +20,7 @@ import '../../core/widgets/deck_widgets.dart';
 /// Edits are buffered in this page and land in the app when 保存主题 is
 /// pressed; 恢复默认 swaps the draft back to the Command Deck baseline. The
 /// preset list itself (custom entries and hidden built-ins) persists through
-/// [ThemePresetStore] as soon as it changes, matching the prototype where
-/// localStorage updates immediately.
+/// [ThemePresetStore] in the same YAML document as the active theme.
 class ThemeConfigPage extends StatefulWidget {
   const ThemeConfigPage({
     super.key,
@@ -89,7 +88,15 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
   }
 
   Future<void> _loadPresetLibrary() async {
-    final loaded = await _presetStore.load();
+    late final ThemePresetLibrary loaded;
+    try {
+      loaded = await _presetStore.load();
+    } catch (_) {
+      // Theme editing must remain available when the storage backend cannot
+      // initialize; built-in presets still come from code.
+      if (mounted) setState(() {});
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _library.uiCustom
@@ -189,20 +196,85 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
   }
 
   void _updateUi(UiThemeSettings settings) {
-    setState(() => uiSettings = settings);
+    setState(() {
+      uiSettings = settings;
+      _clearBuiltInUiSelection();
+    });
   }
 
   void _updateTerm(TerminalThemeSettings settings) {
     setState(() {
       termSettings = settings;
       _syncRegexRuleKeys(settings.regexHighlights.length);
+      _clearBuiltInTerminalSelection();
     });
   }
 
+  void _clearBuiltInUiSelection() {
+    final id = _uiPresetId;
+    if (id == null || _library.uiCustom.any((preset) => preset.id == id)) {
+      return;
+    }
+    _uiPresetId = null;
+  }
+
+  void _clearBuiltInTerminalSelection() {
+    final id = _terminalPresetId;
+    if (id == null ||
+        _library.terminalCustom.any((preset) => preset.id == id)) {
+      return;
+    }
+    _terminalPresetId = null;
+  }
+
   void _save() {
+    final presetLibraryChanged = _updateSelectedCustomPresets();
     widget.onUiSettingsChanged(uiSettings);
     widget.onTerminalSettingsChanged(termSettings);
+    if (presetLibraryChanged) {
+      unawaited(_persistPresetLibrary());
+    }
     _showMessage('已保存主题');
+  }
+
+  bool _updateSelectedCustomPresets() {
+    var changed = false;
+
+    final uiId = _uiPresetId;
+    final uiIndex = uiId == null
+        ? -1
+        : _library.uiCustom.indexWhere((preset) => preset.id == uiId);
+    if (uiIndex >= 0) {
+      final preset = _library.uiCustom[uiIndex];
+      _library.uiCustom[uiIndex] = ThemePreset(
+        id: preset.id,
+        name: preset.name,
+        swatch: uiSettings.background,
+        ui: uiSettings,
+        custom: true,
+      );
+      changed = true;
+    }
+
+    final terminalId = _terminalPresetId;
+    final terminalIndex = terminalId == null
+        ? -1
+        : _library.terminalCustom.indexWhere(
+            (preset) => preset.id == terminalId,
+          );
+    if (terminalIndex >= 0) {
+      final preset = _library.terminalCustom[terminalIndex];
+      _library.terminalCustom[terminalIndex] = ThemePreset(
+        id: preset.id,
+        name: preset.name,
+        swatch: termSettings.terminalBackground,
+        terminal: termSettings,
+        custom: true,
+      );
+      changed = true;
+    }
+
+    return changed;
   }
 
   void _reset() {
@@ -230,17 +302,13 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
     final preset = _library.terminalPreset(id);
     final settings = preset?.terminal;
     if (settings == null) return;
-    // The font stack is tied to the local machine's installed fonts. Applying
-    // a colour preset must not replace a working Nerd Font stack with a name
-    // that may not exist on this system.
-    final nextSettings = settings.copyWith(fontFamily: termSettings.fontFamily);
     setState(() {
       _terminalPresetId = id;
-      termSettings = nextSettings;
-      _syncRegexRuleKeys(nextSettings.regexHighlights.length);
+      termSettings = settings;
+      _syncRegexRuleKeys(settings.regexHighlights.length);
     });
     _showMessage(
-      '终端主题已切换为 ${preset!.name}，高亮规则共 ${nextSettings.regexHighlights.length} 条',
+      '终端主题已切换为 ${preset!.name}，高亮规则共 ${settings.regexHighlights.length} 条',
     );
   }
 
