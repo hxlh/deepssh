@@ -1,4 +1,5 @@
 import 'package:deepssh/core/models/theme_settings.dart';
+import 'package:deepssh/core/models/theme_presets.dart';
 import 'package:deepssh/core/storage/theme_preset_store.dart';
 import 'package:deepssh/core/theme/app_colors.dart';
 import 'package:deepssh/core/theme/app_theme.dart';
@@ -192,6 +193,56 @@ void main() {
 
     expect((await store.load()).terminalCustom, isEmpty);
     expect(find.text('自定义方案 1'), findsNothing);
+  });
+
+  testWidgets('terminal presets keep the configured font stack', (
+    tester,
+  ) async {
+    TerminalThemeSettings? savedTerminal;
+    const fontStack = 'JetBrains Mono, JetBrainsMono Nerd Font';
+    final presetSettings = TerminalThemeSettings.oneDark().copyWith(
+      presetName: 'One Dark Nerd Font',
+    );
+    final store = InMemoryThemePresetStore(
+      ThemePresetLibrary(
+        terminalCustom: [
+          ThemePreset(
+            id: 'term-nerd',
+            name: 'One Dark Nerd Font',
+            swatch: presetSettings.terminalBackground,
+            terminal: presetSettings,
+            custom: true,
+          ),
+        ],
+      ),
+    );
+
+    await _pumpPage(
+      tester,
+      terminalSettings: TerminalThemeSettings.commandDeck().copyWith(
+        fontFamily: fontStack,
+      ),
+      presetStore: store,
+      onTerminalSaved: (settings) => savedTerminal = settings,
+    );
+
+    final trigger = find.byKey(const ValueKey('preset-trigger-terminal'));
+    await tester.ensureVisible(trigger);
+    await tester.pumpAndSettle();
+    await tester.tap(trigger);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('One Dark Nerd Font'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('theme-save')));
+    await tester.pump();
+
+    expect(savedTerminal?.fontFamily, fontStack);
+    expect(
+      savedTerminal?.terminalBackground,
+      presetSettings.terminalBackground,
+      reason: 'the remaining fields should still come from the preset',
+    );
   });
 
   testWidgets('empty regex list shows the guidance', (tester) async {

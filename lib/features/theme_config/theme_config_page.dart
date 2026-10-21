@@ -230,13 +230,17 @@ class _ThemeConfigPageState extends State<ThemeConfigPage> {
     final preset = _library.terminalPreset(id);
     final settings = preset?.terminal;
     if (settings == null) return;
+    // The font stack is tied to the local machine's installed fonts. Applying
+    // a colour preset must not replace a working Nerd Font stack with a name
+    // that may not exist on this system.
+    final nextSettings = settings.copyWith(fontFamily: termSettings.fontFamily);
     setState(() {
       _terminalPresetId = id;
-      termSettings = settings;
-      _syncRegexRuleKeys(settings.regexHighlights.length);
+      termSettings = nextSettings;
+      _syncRegexRuleKeys(nextSettings.regexHighlights.length);
     });
     _showMessage(
-      '终端主题已切换为 ${preset!.name}，高亮规则共 ${settings.regexHighlights.length} 条',
+      '终端主题已切换为 ${preset!.name}，高亮规则共 ${nextSettings.regexHighlights.length} 条',
     );
   }
 
