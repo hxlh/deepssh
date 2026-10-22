@@ -507,6 +507,118 @@ void main() {
     await gesture.up();
   });
 
+  testWidgets('trackpad pan gestures scroll terminal history', (tester) async {
+    final terminal = xterm.Terminal(maxLines: 3000);
+    terminal.resize(80, 8);
+    for (var i = 0; i < 60; i++) {
+      terminal.write('line ${i.toString().padLeft(2, '0')}\r\n');
+    }
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      _terminalApp(
+        width: 800,
+        height: 260,
+        tab: tab,
+        bridge: RecordingSshBridgeClient(),
+        theme: _defaultTerminalTheme.copyWith(fontSize: 20),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scrollController = terminalView(tester).scrollController!;
+    final initialOffset = scrollController.offset;
+    final center = tester.getCenter(find.byType(xterm.TerminalView));
+    final gesture = await tester.createGesture(
+      kind: PointerDeviceKind.trackpad,
+    );
+    await gesture.panZoomStart(center);
+    await tester.pump();
+    await gesture.panZoomUpdate(center, pan: const Offset(0, 160));
+    await tester.pumpAndSettle();
+    await gesture.panZoomEnd();
+    await tester.pumpAndSettle();
+
+    expect(scrollController.offset, lessThan(initialOffset));
+  });
+
+  testWidgets('trackpad pan gestures forward scrolling to full-screen apps', (
+    tester,
+  ) async {
+    final output = <String>[];
+    final terminal = xterm.Terminal(onOutput: output.add);
+    terminal.useAltBuffer();
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      _terminalApp(
+        width: 800,
+        height: 260,
+        tab: tab,
+        bridge: RecordingSshBridgeClient(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final center = tester.getCenter(find.byType(xterm.TerminalView));
+    final gesture = await tester.createGesture(
+      kind: PointerDeviceKind.trackpad,
+    );
+    await gesture.panZoomStart(center);
+    await tester.pump();
+    await gesture.panZoomUpdate(center, pan: const Offset(0, -160));
+    await tester.pumpAndSettle();
+    await gesture.panZoomEnd();
+    await tester.pumpAndSettle();
+
+    expect(output.join(), contains('\x1B[B'));
+  });
+
+  testWidgets('trackpad pointer scroll signals reach full-screen apps', (
+    tester,
+  ) async {
+    final output = <String>[];
+    final terminal = xterm.Terminal(onOutput: output.add);
+    terminal.useAltBuffer();
+    final tab = OpenTerminalTab.ssh(
+      id: 'ssh-tab-1',
+      hostName: 'host1',
+      title: 'terminal1',
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      _terminalApp(
+        width: 800,
+        height: 260,
+        tab: tab,
+        bridge: RecordingSshBridgeClient(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        kind: PointerDeviceKind.trackpad,
+        position: tester.getCenter(find.byType(xterm.TerminalView)),
+        scrollDelta: const Offset(0, -80),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(output.join(), contains('\x1B[A'));
+  });
+
   testWidgets(
     'drag selection tracks the grabbed line when output shifts the buffer '
     'mid-drag',
@@ -552,7 +664,8 @@ void main() {
                 find.descendant(
                   of: find.byType(xterm.TerminalView),
                   matching: find.byWidgetPredicate(
-                    (widget) => widget.runtimeType.toString() == '_TerminalView',
+                    (widget) =>
+                        widget.runtimeType.toString() == '_TerminalView',
                   ),
                 ),
               )

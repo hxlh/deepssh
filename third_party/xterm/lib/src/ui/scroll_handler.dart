@@ -63,6 +63,12 @@ class _TerminalScrollGestureHandlerState
   /// compute the cell offset of the terminal mouse event.
   var lastPointerPosition = Offset.zero;
 
+  /// Fractional pixel deltas from a precision trackpad accumulate here until
+  /// they cover one terminal line. Forwarding every tiny pan update as one key
+  /// or wheel event would make trackpad scrolling accelerate far past the
+  /// user's gesture.
+  var pendingScrollDelta = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -97,6 +103,7 @@ class _TerminalScrollGestureHandlerState
     _refreshState();
     final routeToApp = isAltBuffer && !hasScrollback;
     if (wasRoutingToApp != routeToApp) {
+      pendingScrollDelta = 0;
       setState(() {});
     }
   }
@@ -124,24 +131,58 @@ class _TerminalScrollGestureHandlerState
     }
   }
 
+  void _scrollByPixels(double delta) {
+    if (delta == 0) return;
+    if (pendingScrollDelta != 0 && pendingScrollDelta.sign != delta.sign) {
+      pendingScrollDelta = 0;
+    }
+    pendingScrollDelta += delta;
+
+    final measuredLineHeight = widget.getLineHeight();
+    final lineHeight = measuredLineHeight < 1 ? 1.0 : measuredLineHeight;
+    while (pendingScrollDelta.abs() >= lineHeight) {
+      final up = pendingScrollDelta < 0;
+      _sendScrollEvent(up);
+      pendingScrollDelta += up ? lineHeight : -lineHeight;
+    }
+  }
+
   void _onPointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollInertiaCancelEvent) {
+      pendingScrollDelta = 0;
+      return;
+    }
     if (event is! PointerScrollEvent) return;
-    if (event.kind != PointerDeviceKind.mouse) return;
+    if (event.kind != PointerDeviceKind.mouse &&
+        event.kind != PointerDeviceKind.trackpad &&
+        event.kind != PointerDeviceKind.unknown) {
+      return;
+    }
 
     lastPointerPosition = event.position;
 
     // PointerScrollEvent.scrollDelta.dy follows the platform convention:
     //   dy > 0 => user spun the wheel DOWN (wants content below)
     //   dy < 0 => user spun the wheel UP   (wants content above)
-    final lineHeight = widget.getLineHeight();
     final dy = event.scrollDelta.dy;
     if (dy == 0) return;
-    final up = dy < 0;
-    var count = (dy.abs() / lineHeight).round();
-    if (count < 1) count = 1;
-    for (var i = 0; i < count; i++) {
-      _sendScrollEvent(up);
-    }
+    _scrollByPixels(dy);
+  }
+
+  void _onPointerPanZoomStart(PointerPanZoomStartEvent event) {
+    lastPointerPosition = event.position;
+    pendingScrollDelta = 0;
+  }
+
+  void _onPointerPanZoomUpdate(PointerPanZoomUpdateEvent event) {
+    lastPointerPosition = event.position;
+    // Pointer pan deltas follow physical finger movement: fingers down mean
+    // scroll toward older content, equivalent to a negative wheel delta.
+    _scrollByPixels(-event.panDelta.dy);
+  }
+
+  void _onPointerPanZoomEnd(PointerPanZoomEndEvent event) {
+    pendingScrollDelta = 0;
   }
 
   @override
@@ -159,6 +200,9 @@ class _TerminalScrollGestureHandlerState
       onPointerDown: (event) {
         lastPointerPosition = event.position;
       },
+      onPointerPanZoomStart: _onPointerPanZoomStart,
+      onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
+      onPointerPanZoomEnd: _onPointerPanZoomEnd,
       child: widget.child,
     );
   }
